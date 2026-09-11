@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# build output
+.next/
+out/
+next-env.d.ts
+
+# env & secrets
+.env
+.env.local
+.env*.local
+
+# runtime data
+data/
+db/
+*.db
+*.db-journal
+
+# logs
+dev.log
+server.log
+*.log
+
+# misc
+*.tsbuildinfo
+.DS_Store
+.turbo/
