@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import { useApp } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
@@ -12,44 +11,31 @@ import { AppFooter } from "@/components/shared/footer";
 import { BackToTop } from "@/components/shared/back-to-top";
 import { WelcomeQuote } from "@/components/shared/welcome-quote";
 import { ViewSkeleton } from "@/components/shared/algeria-skeleton";
-
-/* ═══ v1.13.0 — تسريع الإقلاع: تقسيم الحزمة (Code Splitting) ═══
-   كل الصفحات كانت تُحمَّل دفعة واحدة في الحزمة الأولى فتبطّئ أول ولوج —
-   الآن: الصفحات الحرجة (الهبوط + بوابة الأدوار + مدخل العميل ووجهته
-   المباشرة) تبقى فورية، والبقية تُحمَّل عند الطلب فقط (chunk لكل صفحة)
-   — نفس المنطق تماماً، وحجم الجافاسكريبت الأولي أصغر بكثير، وسكيلتون
-   التحميل (420ms) يغطي جلب أي chunk أثناء التنقّل. */
-
-const ClientSlotsView = dynamic(() => import("@/components/views/client-slots").then((m) => m.ClientSlotsView), { loading: () => null });
-const ClientFindView = dynamic(() => import("@/components/views/client-find").then((m) => m.ClientFindView), { loading: () => null });
-const ClientSessionsView = dynamic(() => import("@/components/views/client-sessions").then((m) => m.ClientSessionsView), { loading: () => null });
-const SessionRoomView = dynamic(() => import("@/components/session/session-room").then((m) => m.SessionRoomView), { loading: () => null });
-const CounselorRegisterView = dynamic(() => import("@/components/views/counselor-register").then((m) => m.CounselorRegisterView), { loading: () => null });
-const CounselorLoginView = dynamic(() => import("@/components/views/counselor-login").then((m) => m.CounselorLoginView), { loading: () => null });
-const CounselorAuthView = dynamic(() => import("@/components/views/counselor-auth").then((m) => m.CounselorAuthView), { loading: () => null });
-const CounselorsDirectoryView = dynamic(() => import("@/components/views/counselors-directory").then((m) => m.CounselorsDirectoryView), { loading: () => null });
-const CommunityView = dynamic(() => import("@/components/views/community").then((m) => m.CommunityView), { loading: () => null });
-const CounselorDashboardView = dynamic(() => import("@/components/views/counselor-dashboard").then((m) => m.CounselorDashboardView), { loading: () => null });
-const CounselorStats = dynamic(() => import("@/components/views/counselor-stats").then((m) => m.CounselorStats), { loading: () => null });
-const AdminLoginView = dynamic(() => import("@/components/views/admin").then((m) => m.AdminLoginView), { loading: () => null });
-const AdminPanelView = dynamic(() => import("@/components/views/admin").then((m) => m.AdminPanelView), { loading: () => null });
-const SettingsView = dynamic(() => import("@/components/views/settings").then((m) => m.SettingsView), { loading: () => null });
-const FeedbackView = dynamic(() => import("@/components/views/feedback").then((m) => m.FeedbackView), { loading: () => null });
-const AboutView = dynamic(() => import("@/components/views/info-pages").then((m) => m.AboutView), { loading: () => null });
-const FaqView = dynamic(() => import("@/components/views/info-pages").then((m) => m.FaqView), { loading: () => null });
-const PrivacyView = dynamic(() => import("@/components/views/info-pages").then((m) => m.PrivacyView), { loading: () => null });
-const TermsView = dynamic(() => import("@/components/views/info-pages").then((m) => m.TermsView), { loading: () => null });
-const ContactView = dynamic(() => import("@/components/views/info-pages").then((m) => m.ContactView), { loading: () => null });
-const GratitudeView = dynamic(() => import("@/components/views/gratitude").then((m) => m.GratitudeView), { loading: () => null });
-const FoundersView = dynamic(() => import("@/components/views/founders").then((m) => m.FoundersView), { loading: () => null });
-const DuaView = dynamic(() => import("@/components/views/dua").then((m) => m.DuaView), { loading: () => null });
-const HowItWorksView = dynamic(() => import("@/components/views/how-it-works").then((m) => m.HowItWorksView), { loading: () => null });
-const AdminChatView = dynamic(() => import("@/components/views/admin-chat").then((m) => m.AdminChatView), { loading: () => null });
-const ExercisesView = dynamic(() => import("@/components/views/exercises").then((m) => m.ExercisesView), { loading: () => null });
 import { LandingView } from "@/components/views/landing";
 import { RolesView } from "@/components/views/roles";
 import { ClientStartView } from "@/components/views/client-start";
 import { ClientTopicsView } from "@/components/views/client-topics";
+import { ClientSlotsView } from "@/components/views/client-slots";
+import { ClientFindView } from "@/components/views/client-find";
+import { ClientSessionsView } from "@/components/views/client-sessions";
+import { SessionRoomView } from "@/components/session/session-room";
+import { CounselorRegisterView } from "@/components/views/counselor-register";
+import { CounselorLoginView } from "@/components/views/counselor-login";
+import { CounselorAuthView } from "@/components/views/counselor-auth";
+import { CounselorsDirectoryView } from "@/components/views/counselors-directory";
+import { CommunityView } from "@/components/views/community";
+import { CounselorDashboardView } from "@/components/views/counselor-dashboard";
+import { CounselorStats } from "@/components/views/counselor-stats";
+import { AdminLoginView, AdminPanelView } from "@/components/views/admin";
+import { SettingsView } from "@/components/views/settings";
+import { FeedbackView } from "@/components/views/feedback";
+import { AboutView, FaqView, PrivacyView, TermsView, ContactView } from "@/components/views/info-pages";
+import { GratitudeView } from "@/components/views/gratitude";
+import { FoundersView } from "@/components/views/founders";
+import { DuaView } from "@/components/views/dua";
+import { HowItWorksView } from "@/components/views/how-it-works";
+import { AdminChatView } from "@/components/views/admin-chat";
+import { ExercisesView } from "@/components/views/exercises";
 import { DmDialog } from "@/components/shared/dm-dialog";
 import { ThemeStudio } from "@/components/shared/theme-studio";
 import { RatingsDialog } from "@/components/shared/ratings-dialog";

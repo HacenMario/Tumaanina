@@ -12,7 +12,6 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const zlib = require("zlib");
 const mongoose = require("mongoose");
 const webpush = require("web-push");
 
@@ -236,111 +235,6 @@ async function sendDueReminders() {
   }
 }
 
-/* ─── v1.13.0: ضغط gzip لاستجابات النصوص — تسريع التحميل بلا أي تغيير منطقي ───
-   الخادم المخصّص لا يضغط استجابات Next تلقائياً (خلافاً لـ next start)، والصفحات
-   وحزم الجافاسكريبت والـ JSON كبيرة؛ الضغط يقلّص الحجم ~70% ويُسرّع أول ولوج
-   وتنقّل الصفحات على الشبكات البطيئة. القواعد:
-   • GET/HEAD فقط وبمتصفح يفهم gzip (Accept-Encoding) — ومسار socket.io مستثنى
-   • الأنواع النصية القابلة للضغط حصراً (الصور والفيديو المضغوطة أصلاً تُمرَّر كما هي)
-   • الاستجابات الأصغر من 1KB تبقى كما هي (الضغط لا يفيد)
-   • أي خلل في الضغط لا يُعطِّل الاستجابة — نعالج الاستجابة ببلاطها الطبيعي */
-const COMPRESSIBLE_RE =
-  /^(text\/|application\/(json|javascript|ecmascript|xml|manifest\+json|wasm)|image\/svg\+xml|font\/)/;
-const GZIP_MIN_BYTES = 1024;
-
-function handleWithCompression(handle, req, res) {
-  const ae = String(req.headers["accept-encoding"] || "");
-  if (
-    (req.method !== "GET" && req.method !== "HEAD") ||
-    !/\bgzip\b/i.test(ae) ||
-    String(req.url || "").startsWith("/socket.io")
-  ) {
-    handle(req, res);
-    return;
-  }
-
-  try {
-    res.setHeader("Vary", "Accept-Encoding");
-  } catch (_) {
-    /* تجاهل */
-  }
-
-  const origWriteHead = res.writeHead.bind(res);
-  const origWrite = res.write.bind(res);
-  const origEnd = res.end.bind(res);
-  let gz = null;
-  let decided = false;
-
-  /* قرار الضغط يُتّخذ مرة واحدة عند أول writeHead/write — حين تكون ترويسة
-     Content-Type معروفة. يُستبعد: نوع غير قابل للضغط، ترميز سابق، حجم < 1KB */
-  const decide = (extraHeaders) => {
-    if (decided) return;
-    decided = true;
-    try {
-      const ex = extraHeaders && typeof extraHeaders === "object" ? extraHeaders : null;
-      const type = String(
-        res.getHeader("Content-Type") ||
-          (ex ? ex["Content-Type"] || ex["content-type"] || "" : "")
-      ).trim();
-      if (!COMPRESSIBLE_RE.test(type)) return false;
-      if (res.getHeader("Content-Encoding")) return false;
-      const len = Number(
-        res.getHeader("Content-Length") ??
-          (ex ? ex["Content-Length"] ?? ex["content-length"] ?? 0 : 0)
-      );
-      if (len && len < GZIP_MIN_BYTES) return false;
-      res.removeHeader("Content-Length");
-      res.setHeader("Content-Encoding", "gzip");
-      gz = zlib.createGzip({ level: zlib.constants.Z_BEST_SPEED });
-      gz.pipe(res);
-      res.write = function compressedWrite(...a) {
-        return gz.write(...a);
-      };
-      res.end = function compressedEnd(...a) {
-        return gz.end(...a);
-      };
-      return true;
-    } catch (_) {
-      return false;
-    }
-  };
-
-  /* إزالة Content-Length من الترويسات الممرَّرة داخل writeHead نفسها (نادراً) */
-  const stripLenFrom = (hdrs) => {
-    if (!hdrs || typeof hdrs !== "object") return;
-    if (Array.isArray(hdrs)) {
-      for (let i = hdrs.length - 1; i >= 0; i--) {
-        if (String(hdrs[i][0]).toLowerCase() === "content-length") hdrs.splice(i, 1);
-      }
-      return;
-    }
-    for (const k of Object.keys(hdrs)) {
-      if (k.toLowerCase() === "content-length") delete hdrs[k];
-    }
-  };
-
-  res.writeHead = function compressionWriteHead(status, ...rest) {
-    const hdrs = rest.length && rest[0] && typeof rest[0] === "object" ? rest[0] : null;
-    const compressed = decide(hdrs && !Array.isArray(hdrs) ? hdrs : null);
-    if (compressed) stripLenFrom(hdrs);
-    return origWriteHead(status, ...rest);
-  };
-
-  res.write = function compressionWrite(...a) {
-    if (decide()) return gz.write(...a);
-    if (gz) return gz.write(...a);
-    return origWrite(...a);
-  };
-
-  res.end = function compressionEnd(...a) {
-    if (decide()) return gz.end(...a);
-    if (gz) return gz.end(...a);
-    return origEnd(...a);
-  };
-
-  handle(req, res);
-}
-
 async function main() {
   /* ─── الاتصال بـ MongoDB أولاً ─── */
   const safeUri = MONGODB_URI.replace(/\/\/([^@/]*)@/, "//***:***@");
@@ -363,7 +257,7 @@ async function main() {
   const handle = app.getRequestHandler();
   await app.prepare();
 
-  const server = http.createServer((req, res) => handleWithCompression(handle, req, res));
+  const server = http.createServer((req, res) => handle(req, res));
 
   /* Socket.io على نفس الخادم والمنفذ — مسار /socket.io */
   const io = new Server(server, {
@@ -492,7 +386,7 @@ async function main() {
   server.listen(PORT, () => {
     console.log("────────────────────────────────────────────────");
     console.log(`🟢 طمأنينة — الخادم الموحّد يعمل (${DEV ? "تطوير" : "إنتاج"})`);
-    console.log(`   الإصدار:     v1.13.0`);
+    console.log(`   الإصدار:     v1.13.1`);
     console.log(`   العنوان:     http://localhost:${PORT}`);
     console.log(`   فحص الصحة:   http://localhost:${PORT}/api/health`);
     console.log(`   قاعدة البيانات: ${safeUri}`);
