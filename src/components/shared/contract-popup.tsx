@@ -34,7 +34,10 @@ interface PendingContract {
 
 /* احتياط إن فاتنا حدث إغلاق نافذة الاطمئنان (مدتها القصوى ~10.6 ثانية) */
 const WELCOME_FALLBACK_MS = 12_000;
-const POLL_MS = 12_000;
+/* v1.9.1: استقصاء أسرع (6 ثوانٍ) + فحص فوري عند إغلاق نافذة الاطمئنان
+   وعند العودة إلى الصفحة أو تركيز النافذة — يظهر العقد شبه فورياً
+   على أي صفحة فاتحها العميل دون إعادة فتح المنصة أو التطبيق */
+const POLL_MS = 6_000;
 
 export function ContractPopup() {
   const { t } = useI18n();
@@ -47,16 +50,19 @@ export function ContractPopup() {
   const [err, setErr] = useState("");
   const armedRef = useRef(false);
   const contractRef = useRef<PendingContract | null>(null);
+  const loadRef = useRef<(() => void) | null>(null);
 
   const maybeOpen = useCallback(() => {
     if (armedRef.current && contractRef.current) setContract(contractRef.current);
   }, []);
 
-  /* ① انتظار إغلاق نافذة الاطمئنان (حدث + احتياط زمني) */
+  /* ① انتظار إغلاق نافذة الاطمئنان (حدث + احتياط زمني) —
+     v1.9.1: عند الإغلاق يُجرى فحص فوري للعقد وليس انتظار الدورة القادمة */
   useEffect(() => {
     const onClose = () => {
       armedRef.current = true;
       setArmed(true);
+      loadRef.current?.();
       maybeOpen();
     };
     window.addEventListener("tumaanina-welcome-closed", onClose);
@@ -67,7 +73,9 @@ export function ContractPopup() {
     };
   }, [maybeOpen]);
 
-  /* ② استقصاء عقد بانتظار التوقيع — للعملاء المسجّلين فقط */
+  /* ② استقصاء عقد بانتظار التوقيع — للعملاء المسجّلين فقط
+     v1.9.1: فحص فوري عند العودة إلى التبويب أو تركيز النافذة —
+     العقد يصل العميل أينما كان في المنصة دون إعادة فتحها */
   useEffect(() => {
     if (!user || user.role !== "VICTIM" || !user.id) return;
     let alive = true;
@@ -84,11 +92,22 @@ export function ContractPopup() {
         /* الشبكة متقطعة — الدورة القادمة تعيد المحاولة */
       }
     };
+    loadRef.current = load;
     load();
     const i = setInterval(load, POLL_MS);
+    const onWake = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    window.addEventListener("pageshow", onWake);
     return () => {
       alive = false;
+      loadRef.current = null;
       clearInterval(i);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+      window.removeEventListener("pageshow", onWake);
     };
   }, [user, maybeOpen]);
 
@@ -203,7 +222,8 @@ export function ContractPopup() {
             {/* الامضاء الرقمي */}
             <div className="space-y-2.5">
               <Label>{t.contract.clientSignLabel}</Label>
-              <SignaturePad onChange={setSignature} height={150} />
+              {/* v1.9.1: مساحة امضاء أطول بكثير — راحة كاملة في الرسم بالإصبع */}
+              <SignaturePad onChange={setSignature} height={230} />
               <div className="space-y-1.5">
                 <Label>{t.contract.fullNameLabel}</Label>
                 <Input

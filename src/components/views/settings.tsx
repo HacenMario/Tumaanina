@@ -1423,7 +1423,7 @@ export function SettingsView() {
               </Label>
               <SignaturePad
                 onChange={setContractSignature}
-                height={150}
+                height={210} /* v1.9.1: مساحة امضاء أطول — راحة أكبر في الرسم */
               />
               {contractSignature && (
                 <div className="space-y-1">

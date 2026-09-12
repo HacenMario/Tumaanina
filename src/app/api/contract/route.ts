@@ -168,7 +168,10 @@ async function POST_impl(req: NextRequest) {
     | null;
   if (!user) return NextResponse.json({ error: "INVALID" }, { status: 401 });
 
-  /* ═① حفظ القالب من إعدادات الأخصائي — الإمضاء الرقمي إلزامي ═ */
+  /* ═① حفظ القالب من إعدادات الأخصائي — الإمضاء الرقمي إلزامي ═
+     v1.9.1: بعد الحفظ تُزوَّد كل الجلسات المقبولة سابقاً بعقود بانتظار
+     امضاء عملائها — إغلاق ثغرة الترتيب: أخصائي قبل جلسة ثم أنشأ القالب
+        بعدها كانت الجلسات القديمة تبقى بلا عقد أبداً ولا ترى النافذة. */
   if (action === "save-template") {
     if (user.role !== "COUNSELOR") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
     const text = typeof body.text === "string" ? body.text.trim() : "";
@@ -190,7 +193,54 @@ async function POST_impl(req: NextRequest) {
         },
       }
     );
-    return NextResponse.json({ ok: true, signedAt: new Date().toISOString() });
+    /* ─── v1.9.1: سدّ ثغرة الترتيب — الجلسات المقبولة قبل وجود قالب
+       تحصل الآن على عقودها فور حفظ القالب (العميل الممضي سابقاً لا يُمَس) ─── */
+    let backfilled = 0;
+    try {
+      const accepted = (await SupportSession.find({
+        counselorId: userId,
+        status: { $in: ["ACCEPTED", "ACTIVE"] },
+      })
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .select("_id victimId")
+        .lean()) as unknown as Array<{ _id: unknown; victimId: unknown }>;
+      for (const s of accepted) {
+        const existing = (await TherapyContract.findOne({
+          counselorId: userId,
+          clientUserId: s.victimId,
+        })
+          .select("_id status")
+          .lean()) as { _id: unknown; status?: string } | null;
+        if (existing?.status === "SIGNED") continue; /* العقد الممضى لا يُمَس */
+        if (!existing) {
+          await TherapyContract.create({
+            counselorId: userId,
+            clientUserId: s.victimId,
+            sessionId: s._id,
+            contractText: text,
+            counselorName: prof.fullName || null,
+            counselorSignature: body.signature,
+            counselorSignedAt: new Date(),
+            status: "AWAITING_CLIENT",
+          });
+          backfilled++;
+        } else {
+          await TherapyContract.findByIdAndUpdate(existing._id, {
+            $set: {
+              sessionId: s._id,
+              contractText: text,
+              counselorSignature: body.signature,
+              counselorSignedAt: new Date(),
+            },
+          });
+          backfilled++;
+        }
+      }
+    } catch (e) {
+      console.error("[CONTRACT] تعذر تزويد الجلسات السابقة بالعقد:", (e as Error).message);
+    }
+    return NextResponse.json({ ok: true, signedAt: new Date().toISOString(), backfilled });
   }
 
   /* ═③ توقيع العميل — إلزامي قبل الدخول لأي خدمة مرتبطة بالعقد ═ */
