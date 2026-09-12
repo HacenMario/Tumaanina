@@ -1,20 +1,22 @@
 "use client";
 
 /**
- * v1.9.0 — النافذة المنبثقة الإلزامية للعقد العلاجي (جهة العميل).
+ * v1.10.0 — النافذة المنبثقة الإلزامية للعقد العلاجي (جهة العميل).
  *
- * المنطق الواقعي حمايةً للطرفين:
- * • عند قبول الأخصائي للجلسة (ولو كان للعميل عقد ممضى سابقاً فلن يظهر شيء)
- *   يُنسخ قالب الأخصائي الموقّع إلى عقد مستقل بانتظار إمضاء العميل.
- * • العميل المسجّل (حساب مسجل الدخول شرط) يرى النافذة مباشرة بعد إغلاق
- *   نافذة «لحظة اطمئنان» — استقصاء كل 12 ثانية + انتظار حدث الإغلاق.
- * • النافذة إلزامية (بلا إغلاق): قراءة العقد ← الامضاء بالرسم ← كتابة
- *   الاسم الكامل ← زر «أقبل» — فتُحفظ النسخة النهائية الممضاة من الطرفين
- *   في حساب الأخصائي، ولا يمكن إعادة التوقيع أو التعديل بعدها.
+ * المنطق الجديد (طلب المستخدم الحرفي):
+ * • تُنشأ نسخة العقد لحظة حجز العميل الجلسة (بإمضاء الأخصائي المسبق
+ *   من إعداداته) — فتظهر النافذة للعميل مباشرة بعد الحجز في نفس الصفحة
+ *   عبر حدث tumaanina-contract-arrived، أو على أي صفحة أخرى مفتوحة
+ *   عبر استقصاء كل 6 ثوانٍ — دون إعادة فتح المنصة أو التطبيق إطلاقاً.
+ * • مسار القبول الاحتياطي (أخصائي أعّد عقده بعد الحجز) يغطيه الاستقصاء
+ *   نفسه فلا يفوت أي عقد أبداً.
+ * • النافذة إلزامية (بلا إغلاق): قراءة المستند الرسمي برقمه التسلسلي ←
+ *   اختيار لغة المستند ← الامضاء بلوحة واسعة ← كتابة الاسم الكامل ←
+ *   زر «أقبل» — فتُحفظ النسخة الموقّعة من الطرفين في حساب الأخصائي.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { FileSignature, PenLine } from "lucide-react";
+import { FileSignature, Hash, PenLine } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { formatDateTime } from "@/lib/utils";
@@ -22,46 +24,59 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SignaturePad } from "@/components/shared/signature-pad";
+import { ContractDocument, ContractLangSelect, type ContractDocData } from "@/components/shared/contract-document";
 import { toast } from "@/hooks/use-toast";
 
 interface PendingContract {
   id: string;
+  number: string | null;
   text: string;
   counselorName: string | null;
+  counselorSignature: string | null;
   counselorSignedAt: string | null;
   scheduledAt: string | null;
+  createdAt: string | null;
 }
 
 /* احتياط إن فاتنا حدث إغلاق نافذة الاطمئنان (مدتها القصوى ~10.6 ثانية) */
 const WELCOME_FALLBACK_MS = 12_000;
-/* v1.9.1: استقصاء أسرع (6 ثوانٍ) + فحص فوري عند إغلاق نافذة الاطمئنان
-   وعند العودة إلى الصفحة أو تركيز النافذة — يظهر العقد شبه فورياً
-   على أي صفحة فاتحها العميل دون إعادة فتح المنصة أو التطبيق */
+/* استقصاء سريع (6 ثوانٍ) + فحص فوري عند الحجز وعند العودة إلى الصفحة —
+   يظهر العقد شبه فورياً على أي صفحة فاتحها العميل دون إعادة الفتح */
 const POLL_MS = 6_000;
+/* حدث وصول العقد بعد الحجز مباشرة — يفتح النافذة فوراً بلا انتظار */
+export const CONTRACT_ARRIVED_EVENT = "tumaanina-contract-arrived";
 
 export function ContractPopup() {
-  const { t } = useI18n();
+  const { t, lang: uiLang } = useI18n();
   const { user } = useApp();
   const [contract, setContract] = useState<PendingContract | null>(null);
-  const [armed, setArmed] = useState(false); /* هل أُغلقت نافذة الاطمئنان؟ */
+  const [armed, setArmed] = useState(false); /* هل أُغلقت نافذة الاطمئنان (أو وصل عقد حي)؟ */
   const [signature, setSignature] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
+  const [docLang, setDocLang] = useState<string>(uiLang);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const armedRef = useRef(false);
   const contractRef = useRef<PendingContract | null>(null);
   const loadRef = useRef<(() => void) | null>(null);
+  const busyRef = useRef(false);
 
   const maybeOpen = useCallback(() => {
     if (armedRef.current && contractRef.current) setContract(contractRef.current);
   }, []);
 
-  /* ① انتظار إغلاق نافذة الاطمئنان (حدث + احتياط زمني) —
-     v1.9.1: عند الإغلاق يُجرى فحص فوري للعقد وليس انتظار الدورة القادمة */
-  useEffect(() => {
-    const onClose = () => {
+  const arm = useCallback(() => {
+    if (!armedRef.current) {
       armedRef.current = true;
       setArmed(true);
+    }
+  }, []);
+
+  /* ① انتظار إغلاق نافذة الاطمئنان (حدث + احتياط زمني) —
+     عند الإغلاق يُجرى فحص فوري للعقد وليس انتظار الدورة القادمة */
+  useEffect(() => {
+    const onClose = () => {
+      arm();
       loadRef.current?.();
       maybeOpen();
     };
@@ -71,15 +86,16 @@ export function ContractPopup() {
       window.removeEventListener("tumaanina-welcome-closed", onClose);
       clearTimeout(fb);
     };
-  }, [maybeOpen]);
+  }, [maybeOpen, arm]);
 
   /* ② استقصاء عقد بانتظار التوقيع — للعملاء المسجّلين فقط
-     v1.9.1: فحص فوري عند العودة إلى التبويب أو تركيز النافذة —
+     فحص فوري عند العودة إلى التبويب أو تركيز النافذة —
      العقد يصل العميل أينما كان في المنصة دون إعادة فتحها */
   useEffect(() => {
     if (!user || user.role !== "VICTIM" || !user.id) return;
     let alive = true;
     const load = async () => {
+      if (busyRef.current) return; /* أثناء الامضاء لا نُحدث الحالة */
       try {
         const res = await fetch(`/api/contract?view=pending&userId=${user.id}`, { cache: "no-store" });
         if (!res.ok) return;
@@ -111,6 +127,24 @@ export function ContractPopup() {
     };
   }, [user, maybeOpen]);
 
+  /* ③ v1.10.0: فتح فوري لحظة الحجز — واجهة الحجز تشعِر النافذة
+     بحدث CONTRACT_ARRIVED فتُجري فحصاً فورياً وتفتح بلا انتظار
+     نافذة الاطمئنان ولا الدورة القادمة (المستخدم حاجز الآن فعلاً) */
+  useEffect(() => {
+    if (!user || user.role !== "VICTIM" || !user.id) return;
+    const onArrived = () => {
+      arm();
+      loadRef.current?.();
+    };
+    window.addEventListener(CONTRACT_ARRIVED_EVENT, onArrived);
+    return () => window.removeEventListener(CONTRACT_ARRIVED_EVENT, onArrived);
+  }, [user, arm]);
+
+  /* لغة المستند الافتراضية تتبع لغة واجهة العميل */
+  useEffect(() => {
+    if (!contract) setDocLang(uiLang);
+  }, [uiLang, contract]);
+
   const sign = async () => {
     if (!contract || !user?.id || busy) return;
     setErr("");
@@ -123,6 +157,7 @@ export function ContractPopup() {
       return;
     }
     setBusy(true);
+    busyRef.current = true;
     try {
       const res = await fetch("/api/contract", {
         method: "POST",
@@ -133,6 +168,7 @@ export function ContractPopup() {
           contractId: contract.id,
           signature,
           fullName: fullName.trim(),
+          lang: docLang, /* v1.10.0: لغة المستند المعتمدة تُحفظ مع العقد */
         }),
       });
       const data = await res.json();
@@ -149,16 +185,31 @@ export function ContractPopup() {
       setErr(t.common.error);
     } finally {
       setBusy(false);
+      busyRef.current = false;
     }
   };
 
-  /* النافذة لا تُفتح إلا: عميل مسجّل + عقد بانتظار التوقيع + نافذة الاطمئنان أُغلقت */
+  /* النافذة لا تُفتح إلا: عميل مسجّل + عقد بانتظار التوقيع + (نافذة الاطمئنان أُغلقت أو وصل عقد حي) */
   if (!contract || !user || user.role !== "VICTIM" || !armed) return null;
+
+  const docData: ContractDocData = {
+    number: contract.number,
+    text: contract.text,
+    counselorName: contract.counselorName,
+    clientName: user.fullName || user.pseudonym || "—",
+    counselorSignature: contract.counselorSignature, /* إمضاء الأخصائي المسبق يظهر في المستند */
+    clientSignature: null,
+    counselorSignedAt: contract.counselorSignedAt,
+    clientSignedAt: null,
+    scheduledAt: contract.scheduledAt,
+    createdAt: contract.createdAt,
+    status: "AWAITING_CLIENT",
+  };
 
   return (
     <Dialog open={!!contract} onOpenChange={() => { /* إلزامية: لا إغلاق بالنقر خارجها أو Escape */ }}>
       <DialogContent
-        className="sm:max-w-lg max-h-[92vh] overflow-hidden p-0 gap-0 [&>button]:hidden"
+        className="sm:max-w-lg max-h-[93vh] overflow-hidden p-0 gap-0 [&>button]:hidden"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
@@ -167,7 +218,7 @@ export function ContractPopup() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25 }}
-          className="max-h-[92vh] overflow-y-auto"
+          className="max-h-[93vh] overflow-y-auto"
         >
           {/* رأس متدرج */}
           <div className="gradient-primary text-white px-5 pt-5 pb-6 sticky top-0 z-10">
@@ -179,51 +230,34 @@ export function ContractPopup() {
                 {t.contract.popupTitle}
               </DialogTitle>
               <p className="text-[11px] text-white/85 font-semibold">{t.contract.popupIntro}</p>
+              {contract.number && (
+                <p className="text-[11px] text-white/95 font-black flex items-center gap-1.5 mt-1">
+                  <Hash className="h-3.5 w-3.5" />
+                  <span className="font-mono tracking-wide" dir="ltr">{contract.number}</span>
+                </p>
+              )}
             </DialogHeader>
           </div>
 
-          <div className="px-5 py-5 space-y-4">
-            {/* الأطراف والسياق */}
-            <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-bold">
-                <span className="text-muted-foreground">{t.contract.partyCounselor}</span>
-                <span dir="auto">{contract.counselorName || "—"}</span>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-bold">
-                <span className="text-muted-foreground">{t.contract.partyClient}</span>
-                <span dir="auto">{user.fullName || user.pseudonym || "—"}</span>
-              </div>
-              {contract.scheduledAt && (
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-bold">
-                  <span className="text-muted-foreground">{t.contract.sessionLabel}</span>
-                  <span dir="auto">{formatDateTime(new Date(contract.scheduledAt))}</span>
+          <div className="px-4 sm:px-5 py-5 space-y-4">
+            {/* المستند الرسمي — معاينة WYSIWYG بلغة مختارة (نفس شكل الطباعة) */}
+            <div className="rounded-xl border border-border overflow-hidden bg-white">
+              <div className="max-h-64 overflow-y-auto">
+                <div className="origin-top" style={{ padding: "6mm 5mm 0" }}>
+                  <ContractDocument data={docData} lang={docLang} />
                 </div>
-              )}
-              {contract.counselorSignedAt && (
-                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] font-semibold text-muted-foreground">
-                  <span>{t.contract.signedByCounselor}</span>
-                  <span dir="auto">{formatDateTime(new Date(contract.counselorSignedAt))}</span>
-                </div>
-              )}
-            </div>
-
-            {/* نص العقد — لقطة ثابتة */}
-            <div className="rounded-xl border border-border bg-card px-4 py-3">
-              <p className="text-[11px] font-black text-muted-foreground mb-2">{t.contract.templateLabel}</p>
-              <div className="max-h-52 overflow-y-auto rounded-lg bg-muted/20 px-3 py-2.5" dir="auto">
-                {contract.text.split("\n").filter((l) => l.trim()).map((line, i) => (
-                  <p key={i} className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                    {line}
-                  </p>
-                ))}
               </div>
             </div>
 
-            {/* الامضاء الرقمي */}
+            {/* لغة المستند — تُختار قبل الإقرار وتُحفظ مع العقد وتُستعمل عند الطباعة */}
+            <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
+              <ContractLangSelect value={docLang} onChange={setDocLang} />
+            </div>
+
+            {/* الامضاء الرقمي — v1.10.0: مساحة امضاء أوسع وأطول (300px) لراحة كاملة */}
             <div className="space-y-2.5">
               <Label>{t.contract.clientSignLabel}</Label>
-              {/* v1.9.1: مساحة امضاء أطول بكثير — راحة كاملة في الرسم بالإصبع */}
-              <SignaturePad onChange={setSignature} height={230} />
+              <SignaturePad onChange={setSignature} height={300} />
               <div className="space-y-1.5">
                 <Label>{t.contract.fullNameLabel}</Label>
                 <Input

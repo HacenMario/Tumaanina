@@ -28,7 +28,6 @@ import {
   Coins,
   FileSignature,
   Clock3,
-  Printer,
   PenLine,
 } from "lucide-react";
 import { useI18n, LANG_META } from "@/lib/i18n";
@@ -56,13 +55,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/shared/signature-pad";
+import { ContractDocument, ContractPrintButton, type ContractDocData } from "@/components/shared/contract-document";
+import { CONTRACT_LANGS, CONTRACT_LANG_LABELS, SUGGESTED_TEMPLATE } from "@/lib/contract-template";
 import { formatDateTime } from "@/lib/utils";
 
 const MAX_AVATAR_BYTES = 900_000;
 
-/* ═ v1.9.0: أنواع العقد العلاجي في الإعدادات (أخصائي) ═ */
+/* ═ v1.9.0: أنواع العقد العلاجي في الإعدادات (أخصائي) ═
+   v1.10.0: + number — الرقم التسلسلي الرسمي لكل عقد */
 interface CContractRow {
   id: string;
+  number: string | null;
   clientName: string | null;
   status: string;
   scheduledAt: string | null;
@@ -72,6 +75,7 @@ interface CContractRow {
 }
 interface CContractFull extends CContractRow {
   text: string;
+  lang?: string | null;
   counselorName: string | null;
   counselorSignature: string | null;
   clientSignature: string | null;
@@ -243,6 +247,8 @@ export function SettingsView() {
   const [contractErr, setContractErr] = useState("");
   const [cContracts, setCContracts] = useState<CContractRow[]>([]);
   const [viewContract, setViewContract] = useState<CContractFull | null>(null);
+  /* v1.10.0: لغة القالب المقترح — يختارها الأخصائي فيُعبّأ المحرر بها فوراً */
+  const [templateLang, setTemplateLang] = useState<string>(lang);
   const [viewBusy, setViewBusy] = useState(false);
 
   const availDirty = () => {
@@ -1385,19 +1391,34 @@ export function SettingsView() {
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Label className="font-bold text-xs">{t.contract.templateLabel}</Label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[11px] font-bold rounded-lg"
-                  onClick={() => {
-                    setContractText(t.contract.suggestedTemplate);
-                    setContractMsg("");
-                    setContractErr("");
-                  }}
-                >
-                  {t.contract.useTemplate}
-                </Button>
+                {/* v1.10.0: قالب مقترح سداسي اللغات — اللغة تُختار قبل التعبئة */}
+                <div className="flex items-center gap-2">
+                  <Select value={templateLang} onValueChange={setTemplateLang}>
+                    <SelectTrigger className="h-8 w-28 text-[11px] rounded-lg font-bold">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONTRACT_LANGS.map((l) => (
+                        <SelectItem key={l} value={l}>
+                          {CONTRACT_LANG_LABELS[l]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] font-bold rounded-lg"
+                    onClick={() => {
+                      setContractText(SUGGESTED_TEMPLATE[(templateLang as keyof typeof SUGGESTED_TEMPLATE) || "ar"] || SUGGESTED_TEMPLATE.ar);
+                      setContractMsg("");
+                      setContractErr("");
+                    }}
+                  >
+                    {t.contract.useTemplate}
+                  </Button>
+                </div>
               </div>
               <p className="text-[11px] text-muted-foreground font-semibold">{t.contract.templateHint}</p>
               <Textarea
@@ -1423,7 +1444,7 @@ export function SettingsView() {
               </Label>
               <SignaturePad
                 onChange={setContractSignature}
-                height={210} /* v1.9.1: مساحة امضاء أطول — راحة أكبر في الرسم */
+                height={280} /* v1.10.0: مساحة امضاء أطول وأوسع — راحة كاملة في الرسم */
               />
               {contractSignature && (
                 <div className="space-y-1">
@@ -1453,7 +1474,12 @@ export function SettingsView() {
                   {cContracts.map((c) => (
                     <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
                       <div className="space-y-0.5 min-w-0">
-                        <div className="font-bold text-sm truncate" dir="auto">{c.clientName || "—"}</div>
+                        <div className="font-bold text-sm truncate flex items-center gap-2" dir="auto">
+                          {c.clientName || "—"}
+                          {c.number && (
+                            <span className="text-[10px] font-mono font-black text-muted-foreground bg-muted rounded px-1.5 py-0.5" dir="ltr">{c.number}</span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-muted-foreground font-semibold flex flex-wrap gap-x-3">
                           {c.scheduledAt && <span dir="auto">{formatDateTime(new Date(c.scheduledAt))}</span>}
                           {c.clientSignedAt && (
@@ -1481,9 +1507,9 @@ export function SettingsView() {
         </Card>
       )}
 
-      {/* ═ v1.9.0: نافذة عرض العقد كاملاً (للطرفين فقط) ═ */}
+      {/* ═ v1.10.0: نافذة عرض العقد كاملاً — مستند رسمي WYSIWYG + طباعة صفحة واحدة ═ */}
       <Dialog open={!!viewContract} onOpenChange={(o) => !o && setViewContract(null)}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] p-0 gap-0 overflow-hidden">
+        <DialogContent className="sm:max-w-lg max-h-[92vh] p-0 gap-0 overflow-hidden">
           <DialogHeader className="gradient-primary text-white px-5 py-4">
             <DialogTitle className="text-white flex items-center gap-2 text-base">
               <FileSignature className="h-4.5 w-4.5" />
@@ -1491,66 +1517,57 @@ export function SettingsView() {
             </DialogTitle>
           </DialogHeader>
           {viewContract && (
-            <div className="p-5 space-y-4 overflow-y-auto max-h-[calc(90vh-4.5rem)]">
-              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1.5 text-xs font-bold">
-                <div className="flex flex-wrap items-center justify-between gap-x-3">
-                  <span className="text-muted-foreground">{t.contract.partyCounselor}</span>
-                  <span dir="auto">{viewContract.counselorName || "—"}</span>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-x-3">
-                  <span className="text-muted-foreground">{t.contract.partyClient}</span>
-                  <span dir="auto">{viewContract.clientName || viewContract.clientSignedName || "—"}</span>
-                </div>
-                {viewContract.scheduledAt && (
-                  <div className="flex flex-wrap items-center justify-between gap-x-3">
-                    <span className="text-muted-foreground">{t.contract.sessionLabel}</span>
-                    <span dir="auto">{formatDateTime(new Date(viewContract.scheduledAt))}</span>
+            <div className="p-4 space-y-3 overflow-y-auto max-h-[calc(92vh-4.5rem)]">
+              {/* المستند الرسمي — نفس شكل الطباعة تماماً */}
+              <div className="rounded-xl border border-border overflow-hidden bg-white">
+                <div className="max-h-[52vh] overflow-y-auto">
+                  <div style={{ padding: "6mm 5mm 0" }}>
+                    <ContractDocument
+                      data={{
+                        number: viewContract.number,
+                        text: viewContract.text,
+                        counselorName: viewContract.counselorName,
+                        clientName: viewContract.clientName || viewContract.clientSignedName,
+                        counselorSignature: viewContract.counselorSignature,
+                        clientSignature: viewContract.clientSignature,
+                        counselorSignedAt: viewContract.counselorSignedAt,
+                        clientSignedAt: viewContract.clientSignedAt,
+                        scheduledAt: viewContract.scheduledAt,
+                        createdAt: viewContract.counselorSignedAt || viewContract.updatedAt,
+                        status: viewContract.status,
+                      } as ContractDocData}
+                      lang={viewContract.lang || lang}
+                    />
                   </div>
-                )}
-              </div>
-              <div className="rounded-xl border border-border bg-card px-4 py-3">
-                <div className="max-h-56 overflow-y-auto rounded-lg bg-muted/20 px-3 py-2.5" dir="auto">
-                  {viewContract.text.split("\n").filter((l) => l.trim()).map((line, i) => (
-                    <p key={i} className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{line}</p>
-                  ))}
                 </div>
               </div>
-              {/* إمضاءا الطرفين مع التاريخين */}
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-black text-muted-foreground">{t.contract.signedByCounselor}</p>
-                  {viewContract.counselorSignature ? (
-                    <img src={viewContract.counselorSignature} alt={t.contract.signedByCounselor} className="h-16 w-auto rounded-lg border border-border bg-white/60 dark:bg-white/10 p-1" />
-                  ) : (
-                    <div className="h-16 rounded-lg border border-dashed border-border" />
-                  )}
-                  {viewContract.counselorSignedAt && (
-                    <p className="text-[10px] font-semibold text-muted-foreground" dir="auto">{formatDateTime(new Date(viewContract.counselorSignedAt))}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-black text-muted-foreground">{t.contract.signedByClient}</p>
-                  {viewContract.clientSignature ? (
-                    <img src={viewContract.clientSignature} alt={t.contract.signedByClient} className="h-16 w-auto rounded-lg border border-border bg-white/60 dark:bg-white/10 p-1" />
-                  ) : (
-                    <div className="h-16 rounded-lg border border-dashed border-border" />
-                  )}
-                  {viewContract.clientSignedAt ? (
-                    <p className="text-[10px] font-semibold text-muted-foreground" dir="auto">{formatDateTime(new Date(viewContract.clientSignedAt))}</p>
-                  ) : (
-                    <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{t.contract.statusAwaiting}</p>
-                  )}
-                </div>
+              {/* اختيار لغة المستند قبل الطباعة + زر طباعة/حفظ PDF صفحة واحدة */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <ContractPrintButton
+                  data={{
+                    number: viewContract.number,
+                    text: viewContract.text,
+                    counselorName: viewContract.counselorName,
+                    clientName: viewContract.clientName || viewContract.clientSignedName,
+                    counselorSignature: viewContract.counselorSignature,
+                    clientSignature: viewContract.clientSignature,
+                    counselorSignedAt: viewContract.counselorSignedAt,
+                    clientSignedAt: viewContract.clientSignedAt,
+                    scheduledAt: viewContract.scheduledAt,
+                    createdAt: viewContract.counselorSignedAt || viewContract.updatedAt,
+                    status: viewContract.status,
+                  } as ContractDocData}
+                  defaultLang={viewContract.lang || lang}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-lg font-bold text-muted-foreground"
+                  onClick={() => setViewContract(null)}
+                >
+                  {t.common.close}
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-lg font-bold w-full sm:w-auto"
-                onClick={() => window.print()}
-              >
-                <Printer className="h-4 w-4" />
-                {t.contract.printBtn}
-              </Button>
             </div>
           )}
         </DialogContent>

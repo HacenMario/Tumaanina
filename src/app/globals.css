@@ -495,3 +495,47 @@
   --sidebar: oklch(0.208 0.02 70); --sidebar-primary: oklch(0.75 0.085 70);
   --sidebar-accent: oklch(0.278 0.03 80); --sidebar-ring: oklch(0.75 0.085 70);
 }
+
+/* ═══ v1.10.0: طباعة العقد العلاجي — عزل المستند وحده في صفحة A4 مضغوطة ═══
+   عند الطباعة/حفظ PDF يُخفى كل محتوى المنصة ويظهر فقط مستند العقد
+   (#tumaanina-contract-print) بهوامش A4 قياسية — فيخرج في صفحة واحدة
+   مرتبة (أو حسب طول نص العقد) بدل صفحات مبعثرة من واجهة الموقع. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 11mm 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body * {
+    visibility: hidden !important;
+    box-shadow: none !important;
+  }
+  #tumaanina-contract-print,
+  #tumaanina-contract-print * {
+    visibility: visible !important;
+  }
+  #tumaanina-contract-print {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: #fff !important;
+    color: #141414 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  #tumaanina-contract-print img {
+    max-height: 44px !important;
+  }
+  /* تجنب تقطيع البنود بين الصفحات بشكل قبيح */
+  #tumaanina-contract-print p,
+  #tumaanina-contract-print div {
+    orphans: 3;
+    widows: 3;
+  }
+}

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import { Message, SupportSession, User, CounselorProfile } from "@/lib/models";
+import { Message, SupportSession, TherapyContract, User, CounselorProfile } from "@/lib/models";
 import { attachParticipants } from "@/lib/server/sessions";
 import { notifyUser, displayNameOf } from "@/lib/server/notify";
 import { apiHandler } from "@/lib/server/api";
+import { nextContractNumber } from "@/lib/server/contract";
 import { dayKeyUTC1, MAX_ACCEPTED_PER_DAY, isSlotAvailable, normalizeAvailability, weekdayOfDate } from "@/lib/availability";
 import { DEFAULT_SESSION_PRICE, priceForCurrency, CURRENCY_CODES, CURRENCIES } from "@/lib/constants";
 import type { CurrencyCode } from "@/lib/constants";
@@ -100,13 +101,18 @@ async function POST_impl(req: NextRequest) {
 
   /* ─── v1.0.0 (طمأنينة): التوثيق للأخصائيين فقط ───
      الحجز لا يُقبل إلا مع أخصائي موثّق من الإدارة (شهادته مراجَعة).
-     حساب العميل نفسه بلا أي توثيق — التسجيل مباشر. */
+     حساب العميل نفسه بلا أي توثيق — التسجيل مباشر.
+     v1.10.0: جلب حقول العقد أيضاً — لإنشاء العقد لحظة الحجز مباشرة */
   const counselorProfile = (await CounselorProfile.findOne({ userId: counselorId })
-    .select("sessionPrice sessionPrices verificationStatus")
+    .select("sessionPrice sessionPrices verificationStatus fullName contractText contractSignature contractSignedAt")
     .lean()) as {
     sessionPrice?: number;
     sessionPrices?: unknown;
     verificationStatus?: string;
+    fullName?: string;
+    contractText?: string | null;
+    contractSignature?: string | null;
+    contractSignedAt?: Date | null;
   } | null;
   if (!counselorProfile || counselorProfile.verificationStatus !== "VERIFIED") {
     return NextResponse.json({ error: "COUNSELOR_UNVERIFIED" }, { status: 403 });
@@ -193,6 +199,48 @@ async function POST_impl(req: NextRequest) {
     currency,
   });
 
+  /* ═ v1.10.0: العقد العلاجي لحظة الحجز مباشرة — المنطق الجديد المطلوب ═
+     إذا كان الأخصائي قد أعّد عقداً ووقّعه في إعداداته مسبقاً، يُنشأ عقد
+     هذا العميل فوراً برقم تسلسلي فريد ولقطة النص والإمضاء، فتظهر النافذة
+     المنبثقة للعميل على أي صفحة مفتوحة دون أي انتظار لقبول الأخصائي.
+     العقود الممضاة سابقاً للعميل نفسه لا تُمَس، والعقد المفتوح القديم
+     تُحدَّث لقطة النص والجلسة المرتبطة فقط. */
+  let contractForClient: { id: string; number: string } | null = null;
+  try {
+    if (counselorProfile.contractText && counselorProfile.contractSignature && counselorProfile.contractSignedAt) {
+      const existing = (await TherapyContract.findOne({ counselorId, clientUserId: victimId }).lean()) as
+        | { _id: unknown; status?: string; number?: string | null }
+        | null;
+      if (!existing) {
+        const number = await nextContractNumber();
+        const created = await TherapyContract.create({
+          number,
+          counselorId,
+          clientUserId: victimId,
+          sessionId: session._id,
+          contractText: counselorProfile.contractText,
+          counselorName: counselorProfile.fullName || null,
+          counselorSignature: counselorProfile.contractSignature,
+          counselorSignedAt: counselorProfile.contractSignedAt,
+          status: "AWAITING_CLIENT",
+        });
+        contractForClient = { id: String(created._id), number };
+      } else if (existing.status === "AWAITING_CLIENT") {
+        await TherapyContract.findByIdAndUpdate(existing._id, {
+          $set: {
+            sessionId: session._id,
+            contractText: counselorProfile.contractText,
+            counselorSignature: counselorProfile.contractSignature,
+            counselorSignedAt: counselorProfile.contractSignedAt,
+          },
+        });
+        contractForClient = { id: String(existing._id), number: existing.number || "" };
+      }
+    }
+  } catch (e) {
+    console.error("[CONTRACT] تعذر تجهيز العقد عند الحجز:", (e as Error).message);
+  }
+
   // إشعار فوري للأخصائي (محلّي حسب لغته) — v1.4.0: باسم العميل
   void displayNameOf(String(victimId)).then((clientName) =>
     notifyUser(String(counselorId), "booked", "/?view=counselor-dashboard", { name: clientName || "—" })
@@ -203,6 +251,8 @@ async function POST_impl(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     session: { ...session.toObject(), id: String(session._id) },
+    /* v1.10.0: العقد الجاهز للعميل — الواجهة تفتح النافذة المنبثقة فوراً */
+    contract: contractForClient,
   });
 }
 

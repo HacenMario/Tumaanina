@@ -195,12 +195,15 @@ const SupportSessionSchema = new Schema(
 );
 
 /* ═ v1.9.0: TherapyContract — العقد العلاجي المستقل لكل (أخصائي × عميل) ═
-   يُنشأ عند قبول الأخصائي لجلسة العميل (إن لم يوجد) وللقطة نص القالب
-   وإمضاء الأخصائي لحظة الإنشاء — فبقاؤه ثابتاً ولو عدّل الأخصائي قالبَه
-   لاحقاً (حماية الطرفين: ما تم ضيّعه لا يتغير خلف ظهورهم). ثم يمضيه
-   العميل من نافذة منبثقة إلزامية فتحفظ النسخة الموقّعة من الطرفين. */
+   v1.10.0: يُنشأ تلقائياً لحظة حجز العميل جلسة مع الأخصائي (وبقية مسار القبول
+   احتياطاً) بلقطة نص القالب وإمضاء الأخصائي المسبق من إعداداته — فتظهر
+   النافذة للعميل مباشرة بعد الحجز على أي صفحة مفتوحة. كل عقد يحمل رقماً
+   تسلسلياً فريداً (TC-YYYY-00001) يُولَّد ذرياً من عدّاد مركزي فلا تكرار،
+   ولغة مستند معتمدة عند الطباعة/الحفظ PDF. */
 const TherapyContractSchema = new Schema(
   {
+    /* v1.10.0: الرقم التسلسلي الرسمي للعقد — فريد (يُولَّد من العدّاد الذرّي) */
+    number: { type: String, unique: true, sparse: true },
     counselorId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     clientUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     /* الجلسة التي ولّدت العقد / آخر جلسة مرتبطة به */
@@ -219,8 +222,21 @@ const TherapyContractSchema = new Schema(
       enum: ["AWAITING_CLIENT", "SIGNED"],
       default: "AWAITING_CLIENT",
     },
+    /* v1.10.0: لغة المستند المعتمدة عند الطباعة/الحفظ PDF (ar/fr/en/tr/ru/zh)
+       — تُختار قبل الطباعة وتُحفظ مع العقد */
+    lang: { type: String, default: "ar" },
   },
   { timestamps: true, collection: "therapy_contracts" }
+);
+
+/* ═ v1.10.0: عدّاد ذرّي لأرقام العقود — findOneAndUpdate مع $inc ذرّية
+   فلا يمكن أن يحصل عقدان على نفس الرقم حتى مع تزامن كامل ═ */
+const ContractCounterSchema = new Schema(
+  {
+    _id: { type: String, default: "therapy" },
+    seq: { type: Number, default: 0 },
+  },
+  { collection: "contract_counters" }
 );
 /* عقد واحد فقط لكل زوج (أخصائي × عميل) */
 TherapyContractSchema.index({ counselorId: 1, clientUserId: 1 }, { unique: true });
@@ -558,6 +574,11 @@ export const Exercise =
 export const TherapyContract =
   (mongoose.models.TherapyContract as mongoose.Model<any>) ||
   mongoose.model("TherapyContract", TherapyContractSchema);
+
+/* v1.10.0: عدّاد أرقام العقود الذرّي */
+export const ContractCounter =
+  (mongoose.models.ContractCounter as mongoose.Model<any>) ||
+  mongoose.model("ContractCounter", ContractCounterSchema);
 
 /* أنواع مساعدة خفيفة */
 export type UserDoc = mongoose.InferSchemaType<typeof UserSchema>;

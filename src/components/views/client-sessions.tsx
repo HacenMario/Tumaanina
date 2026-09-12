@@ -18,7 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { BackButton } from "@/components/shared/back-button";
 import { openDm } from "@/components/shared/dm-dialog";
 import { openRatings } from "@/components/shared/ratings-dialog";
-import { Clock3 } from "lucide-react";
+import { CONTRACT_ARRIVED_EVENT } from "@/components/shared/contract-popup";
+import { Clock3, FileSignature } from "lucide-react";
 
 interface SessionRow {
   id: string;
@@ -127,6 +128,8 @@ export function ClientSessionsView() {
      يسمح بها المختص») — فقرة التوفر الأسبوعي + المحجوز + الفائت */
   const [reschedAvail, setReschedAvail] = useState<Record<string, string[]> | null>(null);
   const [reschedTaken, setReschedTaken] = useState<Record<string, string[]>>({});
+  /* v1.10.0: عقد بانتظار الإمضاء — لافتة علوية تفتح النافذة المنبثقة فوراً */
+  const [pendingContract, setPendingContract] = useState<{ id: string; number: string | null } | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -153,12 +156,29 @@ export function ClientSessionsView() {
     }
   }, [user]);
 
+  /* v1.10.0: فحص خفيف لعقد بانتظار الإمضاء — نفس دورة تحديث الحالة */
+  const loadPendingContract = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/contract?view=pending&userId=${user.id}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const d = await res.json();
+      setPendingContract(d.contract ? { id: d.contract.id, number: d.contract.number || null } : null);
+    } catch {
+      /* تجاهل — الدورة القادمة */
+    }
+  }, [user]);
+
   useEffect(() => {
     load();
     loadChallenge();
-    const interval = setInterval(load, 8000); // live status updates
+    loadPendingContract();
+    const interval = setInterval(() => {
+      load();
+      loadPendingContract();
+    }, 8000); // live status updates + عقد بانتظار الإمضاء
     return () => clearInterval(interval);
-  }, [load, loadChallenge]);
+  }, [load, loadChallenge, loadPendingContract]);
 
   /* ═ v1.3.0: إلغاء بتأكيد ونتيجة صريحة — يتعامل مع الأخطاء بدل الصمت ═ */
   const cancel = async (id: string) => {
@@ -309,6 +329,34 @@ export function ClientSessionsView() {
         </Button>
       </div>
       <p className="text-[11px] font-bold text-muted-foreground rounded-xl bg-muted/50 px-3 py-2 mb-5">{t.client.bookLimitNote}</p>
+
+      {/* ─── v1.10.0: عقد علاجي بانتظار الإمضاء — لافتة تفتح النافذة مباشرة ─── */}
+      {pendingContract && (
+        <Card className="mb-5 border-2 shadow-sm border-primary/50 bg-primary/[0.06]">
+          <CardContent className="p-4 flex flex-wrap items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <FileSignature className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-40">
+              <p className="text-sm font-black leading-snug text-primary">{t.contract.pendingBannerTitle}</p>
+              <p className="text-[11px] font-bold text-muted-foreground mt-0.5">
+                {t.contract.pendingBannerSub}
+                {pendingContract.number && (
+                  <span className="font-mono ms-2 text-primary" dir="ltr">{pendingContract.number}</span>
+                )}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="gradient-primary text-white font-black rounded-xl shrink-0"
+              onClick={() => window.dispatchEvent(new CustomEvent(CONTRACT_ARRIVED_EVENT))}
+            >
+              <FileSignature className="h-4 w-4" />
+              {t.contract.pendingBannerBtn}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ─── v2.9.0: تحدي الالتزام — أول من يحترم 4 مواعيد متتالية (تأخير ≤10 دقائق) ───
           v1.6.0: الفوز يُعطّل التحدي فوراً وتختفي نافذته للجميع — وكذلك عند

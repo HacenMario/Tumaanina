@@ -21,6 +21,7 @@ import { BackButton } from "@/components/shared/back-button";
 import { RoyalCrown } from "@/components/shared/crown-badge";
 import { SLOT_TIMES, WILAYA_LABELS } from "@/lib/constants";
 import { openDm } from "@/components/shared/dm-dialog";
+import { CONTRACT_ARRIVED_EVENT } from "@/components/shared/contract-popup";
 import { openRatings } from "@/components/shared/ratings-dialog";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
 import { waLink } from "@/lib/whatsapp";
@@ -652,6 +653,16 @@ export function BookingDialog({
       const data = await res.json();
       if (data.ok) {
         setOpen(false);
+        /* ═ v1.10.0: العقد جاهز لحظة الحجز (بإمضاء الأخصائي المسبق) ═
+           إشعار عام يفتح النافذة المنبثقة فوراً فوق أي صفحة يتّجه إليها
+           العميل — دون انتظار نافذة الاطمئنان أو دورة الاستقصاء */
+        if (data.contract?.id) {
+          try {
+            window.dispatchEvent(new CustomEvent(CONTRACT_ARRIVED_EVENT, { detail: { number: data.contract.number || null } }));
+          } catch {
+            /* تجاهل */
+          }
+        }
         onBooked();
       } else if (data.error === "PAST_DATE") {
         /* رفض الخادم (سباق زمني نادر): نبهرّ الحالة ونطلب موعداً آخر */

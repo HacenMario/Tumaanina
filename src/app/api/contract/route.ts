@@ -3,8 +3,21 @@ import { connectDB } from "@/lib/db";
 import { CounselorProfile, SupportSession, TherapyContract, User } from "@/lib/models";
 import { apiHandler } from "@/lib/server/api";
 import { notifyUser } from "@/lib/server/notify";
+import { nextContractNumber, safeContractLang } from "@/lib/server/contract";
 
 export const dynamic = "force-dynamic";
+
+/* v1.10.0: إسناد رقم تسلسلي للعقود المفتقرة له (القديمة) — بالعدّاد الذرّي
+   نفسه فلا تكرار؛ شرط التحديث يمنع استبدال رقم موجود بالفعل */
+async function ensureNumber(doc: { _id: unknown; number?: string | null }): Promise<string> {
+  if (doc.number) return doc.number;
+  const n = await nextContractNumber();
+  await TherapyContract.updateOne(
+    { _id: doc._id, number: { $in: [null, undefined, ""] } },
+    { $set: { number: n } }
+  );
+  return n;
+}
 
 /* ═ v1.9.0: العقد العلاجي — مسار مستقل بثلاث مهام ═
    ① الأخصائي يكتب قالب عقد علاجي من إعداداته ويمضيه رقمياً ويحفظه
@@ -67,6 +80,7 @@ async function GET_impl(req: NextRequest) {
       .sort({ createdAt: -1 })
       .lean()) as {
       _id: unknown;
+      number?: string | null;
       contractText: string;
       counselorName?: string | null;
       counselorSignature?: string | null;
@@ -75,6 +89,7 @@ async function GET_impl(req: NextRequest) {
       createdAt?: Date;
     } | null;
     if (!c) return NextResponse.json({ contract: null });
+    const number = await ensureNumber(c);
     /* موعد الجلسة المرتبطة للعرض السياقي داخل النافذة */
     let scheduledAt: string | null = null;
     if (c.sessionId) {
@@ -84,8 +99,10 @@ async function GET_impl(req: NextRequest) {
     return NextResponse.json({
       contract: {
         id: String(c._id),
+        number,
         text: c.contractText,
         counselorName: c.counselorName || null,
+        counselorSignature: c.counselorSignature || null,
         counselorSignedAt: c.counselorSignedAt ? new Date(c.counselorSignedAt).toISOString() : null,
         scheduledAt,
         createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : null,
@@ -98,8 +115,13 @@ async function GET_impl(req: NextRequest) {
     const rows = (await TherapyContract.find({ counselorId: userId })
       .sort({ updatedAt: -1 })
       .limit(200)
-      .select("clientName status sessionId clientSignedAt counselorSignedAt createdAt updatedAt")
+      .select("number clientName status sessionId clientSignedAt counselorSignedAt createdAt updatedAt")
       .lean()) as Array<Record<string, unknown>>;
+    /* v1.10.0: أرقام العقود — وللعقود القديمة تُسند الآن مرة واحدة */
+    const numbers = new Map<string, string>();
+    for (const r of rows) {
+      numbers.set(String(r._id), await ensureNumber(r as { _id: unknown; number?: string | null }));
+    }
     /* مواعيد الجلسات المرتبطة — استعلام واحد */
     const sids = rows.map((r) => String(r.sessionId || "")).filter(Boolean);
     const sessions = sids.length
@@ -109,6 +131,7 @@ async function GET_impl(req: NextRequest) {
     return NextResponse.json({
       contracts: rows.map((r) => ({
         id: String(r._id),
+        number: numbers.get(String(r._id)) || null,
         clientName: r.clientName || null,
         status: r.status,
         scheduledAt: r.sessionId ? whenBySid.get(String(r.sessionId)) ?? null : null,
@@ -136,7 +159,9 @@ async function GET_impl(req: NextRequest) {
     return NextResponse.json({
       contract: {
         id: String(c._id),
+        number: await ensureNumber(c as { _id: unknown; number?: string | null }),
         text: c.contractText,
+        lang: safeContractLang(c.lang),
         counselorName: c.counselorName || null,
         counselorSignature: c.counselorSignature || null,
         counselorSignedAt: c.counselorSignedAt ? new Date(c.counselorSignedAt as Date).toISOString() : null,
@@ -193,13 +218,15 @@ async function POST_impl(req: NextRequest) {
         },
       }
     );
-    /* ─── v1.9.1: سدّ ثغرة الترتيب — الجلسات المقبولة قبل وجود قالب
-       تحصل الآن على عقودها فور حفظ القالب (العميل الممضي سابقاً لا يُمَس) ─── */
+    /* ─── v1.10.0: سدّ ثغرة الترتيب — كل الجلسات الحية (المعلّجة والمقبولة
+       والجارية) قبل وجود القالب أو قبل تحديثه تحصل على العقد فور حفظه
+       برقم تسلسلي فريد، والعقود المفتوحة تُحدَّث لقطة نصها
+       (العميل الممضي سابقاً لا يُمَس أبداً) ─── */
     let backfilled = 0;
     try {
       const accepted = (await SupportSession.find({
         counselorId: userId,
-        status: { $in: ["ACCEPTED", "ACTIVE"] },
+        status: { $in: ["PENDING", "ACCEPTED", "ACTIVE"] },
       })
         .sort({ createdAt: -1 })
         .limit(500)
@@ -215,6 +242,7 @@ async function POST_impl(req: NextRequest) {
         if (existing?.status === "SIGNED") continue; /* العقد الممضى لا يُمَس */
         if (!existing) {
           await TherapyContract.create({
+            number: await nextContractNumber(),
             counselorId: userId,
             clientUserId: s.victimId,
             sessionId: s._id,
@@ -243,7 +271,8 @@ async function POST_impl(req: NextRequest) {
     return NextResponse.json({ ok: true, signedAt: new Date().toISOString(), backfilled });
   }
 
-  /* ═③ توقيع العميل — إلزامي قبل الدخول لأي خدمة مرتبطة بالعقد ═ */
+  /* ═③ توقيع العميل — إلزامي قبل الدخول لأي خدمة مرتبطة بالعقد ═
+     v1.10.0: لغة المستند المعتمدة عند الطباعة تُحفظ مع العقد (lang) */
   if (action === "client-sign") {
     if (user.role !== "VICTIM") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
     const contractId = typeof body.contractId === "string" ? body.contractId : "";
@@ -261,6 +290,7 @@ async function POST_impl(req: NextRequest) {
           clientUserId: unknown;
           counselorId: unknown;
           status: string;
+          lang?: string | null;
           clientName?: string | null;
           clientSignature?: string | null;
           clientSignedName?: string | null;
@@ -276,6 +306,7 @@ async function POST_impl(req: NextRequest) {
     c.clientSignature = body.signature;
     c.clientSignedName = fullName;
     c.clientSignedAt = new Date();
+    c.lang = safeContractLang(body.lang);
     await c.save();
     /* إشعار فوري للأخصائي بوصول العقد الموقّع */
     notifyUser(String(c.counselorId), "contractSigned", "/?view=counselor-dashboard", {
