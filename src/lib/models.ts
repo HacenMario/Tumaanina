@@ -128,6 +128,12 @@ const CounselorProfileSchema = new Schema(
       type: Schema.Types.Mixed,
       default: null, /* null = سجل قديم — يُرحَّل تلقائياً من sessionPrice عند القراءة */
     },
+    /* ═ v1.9.0: العقد العلاجي — قالب يكتبه الأخصائي من إعداداته ويمضيه رقمياً ═
+       يُستنسخ نصه وإمضاؤه في عقد مستقل لكل عميل عند قبول أول جلسة،
+       والعقود الممضاة تُحفظ كاملة في حساب الأخصائي */
+    contractText: { type: String, default: null, maxlength: 15000 },
+    contractSignature: { type: String, default: null }, /* صورة الإمضاء dataURL */
+    contractSignedAt: { type: Date, default: null },
   },
   { timestamps: true, collection: "counselors" }
 );
@@ -187,6 +193,37 @@ const SupportSessionSchema = new Schema(
   },
   { timestamps: true, collection: "sessions" }
 );
+
+/* ═ v1.9.0: TherapyContract — العقد العلاجي المستقل لكل (أخصائي × عميل) ═
+   يُنشأ عند قبول الأخصائي لجلسة العميل (إن لم يوجد) وللقطة نص القالب
+   وإمضاء الأخصائي لحظة الإنشاء — فبقاؤه ثابتاً ولو عدّل الأخصائي قالبَه
+   لاحقاً (حماية الطرفين: ما تم ضيّعه لا يتغير خلف ظهورهم). ثم يمضيه
+   العميل من نافذة منبثقة إلزامية فتحفظ النسخة الموقّعة من الطرفين. */
+const TherapyContractSchema = new Schema(
+  {
+    counselorId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    clientUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    /* الجلسة التي ولّدت العقد / آخر جلسة مرتبطة به */
+    sessionId: { type: Schema.Types.ObjectId, ref: "SupportSession", default: null },
+    /* لقطة نص العقد لحظة الإنشاء — لا تُحدَّث بعد توقيع الطرفين */
+    contractText: { type: String, required: true },
+    counselorName: { type: String, default: null },
+    counselorSignature: { type: String, default: null },
+    counselorSignedAt: { type: Date, default: null },
+    clientName: { type: String, default: null }, /* الاسم/الاسم المستعار للعرض */
+    clientSignature: { type: String, default: null },
+    clientSignedName: { type: String, default: null }, /* الاسم الكامل الذي كتبه العميل عند الإمضاء */
+    clientSignedAt: { type: Date, default: null },
+    status: {
+      type: String,
+      enum: ["AWAITING_CLIENT", "SIGNED"],
+      default: "AWAITING_CLIENT",
+    },
+  },
+  { timestamps: true, collection: "therapy_contracts" }
+);
+/* عقد واحد فقط لكل زوج (أخصائي × عميل) */
+TherapyContractSchema.index({ counselorId: 1, clientUserId: 1 }, { unique: true });
 
 /* ─── Message ─── */
 const MessageSchema = new Schema(
@@ -517,6 +554,10 @@ export const CounselorRating =
 export const Exercise =
   (mongoose.models.Exercise as mongoose.Model<any>) ||
   mongoose.model("Exercise", ExerciseSchema);
+
+export const TherapyContract =
+  (mongoose.models.TherapyContract as mongoose.Model<any>) ||
+  mongoose.model("TherapyContract", TherapyContractSchema);
 
 /* أنواع مساعدة خفيفة */
 export type UserDoc = mongoose.InferSchemaType<typeof UserSchema>;

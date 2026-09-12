@@ -42,6 +42,7 @@ import { RatingsDialog } from "@/components/shared/ratings-dialog";
 import { AppToast } from "@/components/shared/app-toast";
 import { BookingPopups } from "@/components/shared/booking-popup";
 import { FollowUpPopup } from "@/components/shared/followup-popup";
+import { ContractPopup } from "@/components/shared/contract-popup";
 
 const VIEWS: Record<string, React.ComponentType> = {
   landing: LandingView,
@@ -298,6 +299,9 @@ export default function Home() {
       {/* v1.5.0: نافذة «الجلسة التالية + المزاج» للعميل — تظهر فور جدولة
           الجلسة التالية من الأخصائي مهما كانت صفحة العميل */}
       <FollowUpPopup />
+      {/* v1.9.0: نافذة العقد العلاجي الإلزامية للعميل — بعد إغلاق نافذة الاطمئنان
+          مباشرة إن قبول الأخصائي جلسة ووُجد عقد بانتظار إمضاء العميل */}
+      <ContractPopup />
       {/* v2.8.0: محادثة ما قبل الجلسة — تُفتح من زر «تواصل» في أي صفحة */}
       <DmDialog />
       {/* v2.14.0: نافذة المظهر والثيمات — تُفتح من زر الهيدر والقائمة الجانبية */}

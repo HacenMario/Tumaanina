@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import { CounselorProfile, Message, SupportSession } from "@/lib/models";
+import { CounselorProfile, Message, SupportSession, TherapyContract } from "@/lib/models";
 import { attachParticipants } from "@/lib/server/sessions";
 import { notifyUser, formatWhenUTC1, displayNameOf } from "@/lib/server/notify";
 import { apiHandler } from "@/lib/server/api";
@@ -229,6 +229,53 @@ async function PATCH_impl(
       when: formatWhenUTC1(updated.scheduledAt as Date),
       name: counselorName || "—",
     }).catch(() => {});
+    /* ═ v1.9.0: العقد العلاجي — عند قبول الجلسة يُنسخ قالب الأخصائي الموقّع
+       إلى عقد مستقل بانتظار إمضاء العميل (شرط: قالب موقّع من الأخصائي).
+       العقد الممضى سابقاً للعميل نفسه لا يُمَس — وإن وُجد عقد مُنتظر قديم
+       فتُحدّث لقطة النص والإمضاء والجلسة المرتبطة فقط. */
+    try {
+      const prof = (await CounselorProfile.findOne({ userId: updated.counselorId })
+        .select("contractText contractSignature contractSignedAt fullName")
+        .lean()) as {
+        contractText?: string | null;
+        contractSignature?: string | null;
+        contractSignedAt?: Date | null;
+        fullName?: string;
+      } | null;
+      if (prof?.contractText && prof.contractSignature && prof.contractSignedAt) {
+        const existing = (await TherapyContract.findOne({
+          counselorId: updated.counselorId,
+          clientUserId: updated.victimId,
+        }).lean()) as { _id: unknown; status?: string } | null;
+        if (!existing) {
+          await TherapyContract.create({
+            counselorId: updated.counselorId,
+            clientUserId: updated.victimId,
+            sessionId: updated._id,
+            contractText: prof.contractText,
+            counselorName: prof.fullName || null,
+            counselorSignature: prof.contractSignature,
+            counselorSignedAt: prof.contractSignedAt,
+            status: "AWAITING_CLIENT",
+          });
+        } else if (existing.status === "AWAITING_CLIENT") {
+          await TherapyContract.findByIdAndUpdate(existing._id, {
+            $set: {
+              sessionId: updated._id,
+              contractText: prof.contractText,
+              counselorSignature: prof.contractSignature,
+              counselorSignedAt: prof.contractSignedAt,
+            },
+          });
+        }
+        /* إشعار خاص بالعقد يرافق إشعار القبول */
+        notifyUser(String(updated.victimId), "contractAwaiting", "/?view=client-sessions", {
+          name: counselorName || "—",
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.error("[CONTRACT] تعذر تجهيز العقد العلاجي عند القبول:", (e as Error).message);
+    }
   }
   /* اعتذار الأخصائي عن الطلب → إشعار تلقائي للعميل مع سبب التعذّر (v2.8.0).
      إلغاء العميل نفسه لطلبه → إشعار للأخصائي بتحرّر الموعد (v2.12.0) */

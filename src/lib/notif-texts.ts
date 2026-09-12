@@ -31,6 +31,8 @@ export type NotifKey =
   | "ratingReceived"
   | "counselorVerified"
   | "counselorRejected"
+  | "contractAwaiting"
+  | "contractSigned"
   | "reminder"
   | "challengeWon"
   | "test";
@@ -227,8 +229,25 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     ru: { title: "ℹ️ О проверке вашего профиля", body: "Ваша заявка на подтверждение пока не одобрена — проверьте данные диплома в настройках или свяжитесь с администрацией для повторной подачи" },
     zh: { title: "ℹ️ 关于您的档案认证", body: "您的认证申请暂时未获批准——请在设置中检查您的证书信息，或联系平台管理团队重新申请" },
   },
-/* v1.6.0: تذكير ما قبل الجلسة بساعة — يُنشأ في server.js وreminders.ts
-   ويعاد توليده هنا بلغة واجهة المستخدم الحالية في جرس الإشعارات */
+  /* v1.9.0: العقد العلاجي — إشعار للعميل عند القبول وإشعار للأخصائي عند الإمضاء */
+  contractAwaiting: {
+    ar: { title: "📜 عقد علاجي بانتظار إمضائك", body: "الأخصائي {name} قبل جلسك — يرجى قراءة العقد العلاجي وامضاؤه والضغط على «أقبل»" },
+    fr: { title: "📜 Contrat thérapeutique à signer", body: "Le professionnel {name} a accepté votre séance — veuillez lire le contrat, le signer et appuyer sur « J'accepte »" },
+    en: { title: "📜 Therapy contract awaiting your signature", body: "Specialist {name} accepted your session — please read the contract, sign it and press “I accept”" },
+    tr: { title: "📜 Terapik sözleşme imzanızı bekliyor", body: "Uzman {name} seansınızı kabul etti — lütfen sözleşmeyi okuyun, imzalayın ve «Kabul ediyorum»a basın" },
+    ru: { title: "📜 Терапевтический договор ждёт подписи", body: "Специалист {name} принял вашу сессию — прочитайте договор, подпишите и нажмите «Принимаю»" },
+    zh: { title: "📜 治疗合同等待您的签署", body: "专家 {name} 已接受您的会话——请阅读合同、签名并点击「我接受」" },
+  },
+  contractSigned: {
+    ar: { title: "📜 عقد علاجي موقّع من الطرفين", body: "العميل {name} امضى العقد العلاجي — النسخة النهائية محفوظة في إعداداتك" },
+    fr: { title: "📜 Contrat signé par les deux parties", body: "Le client {name} a signé le contrat thérapeutique — la version finale est dans vos paramètres" },
+    en: { title: "📜 Contract signed by both parties", body: "Client {name} signed the therapy contract — the final version is saved in your settings" },
+    tr: { title: "📜 Sözleşme iki tarafça imzalandı", body: "Müşteri {name} terapik sözleşmeyi imzaladı — nihai sürüm ayarlarınızda kayıtlı" },
+    ru: { title: "📜 Договор подписан обеими сторонами", body: "Клиент {name} подписал терапевтический договор — итоговая версия сохранена в ваших настройках" },
+    zh: { title: "📜 双方已签署合同", body: "客户 {name} 已签署治疗合同——最终版本已保存在您的设置中" },
+  },
+  /* v1.6.0: تذكير ما قبل الجلسة بساعة — يُنشأ في server.js وreminders.ts
+     ويعاد توليده هنا بلغة واجهة المستخدم الحالية في جرس الإشعارات */
   reminder: {
     ar: { title: "⏰ تذكير: جلستك بعد ساعة", body: "جلستك في «طمأنينة» بعد ساعة تقريباً — الغرفة تنتظركما" },
     fr: { title: "⏰ Rappel : votre séance dans une heure", body: "Votre séance sur Tumaanina commence dans une heure — la salle vous attend" },

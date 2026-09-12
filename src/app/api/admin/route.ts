@@ -198,6 +198,8 @@ async function POST_impl(req: NextRequest) {
           fullName: p?.fullName ?? null,
           whatsapp: p?.whatsapp ?? null,
           verificationStatus: p?.verificationStatus ?? null,
+          /* v1.9.0: سنوات الخبرة — يعدّلها الأدمين من تبويب الحسابات */
+          yearsExperience: Number(p?.yearsExperience) || 0,
           /* v2.9.0: الجنس — للفرز والمراجعة (v1.0.0: بلا أي توثيق للعملاء) */
           gender: (u as { gender?: string | null }).gender ?? null,
           /* v2.6.0: حالة التعليق + عدّاد التأخر في قبول الطلبات */
@@ -384,6 +386,24 @@ async function POST_impl(req: NextRequest) {
       }
     }
     return NextResponse.json({ ok: true, profileId: String(profileId), status });
+  }
+
+  /* ─── v1.9.0: تعديل سنوات خبرة أخصائي — من تبويب الحسابات ───
+     معرّف الحساب هو userId (كما في بقية صفوف القائمة)، والقيمة 0–70 سنة */
+  if (action === "set-experience") {
+    const { userId: targetUserId, years } = body;
+    if (!targetUserId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+    const y = Math.round(Number(years));
+    if (!Number.isFinite(y) || y < 0 || y > 70) {
+      return NextResponse.json({ error: "INVALID_EXPERIENCE" }, { status: 400 });
+    }
+    const prof = await CounselorProfile.findOneAndUpdate(
+      { userId: targetUserId },
+      { $set: { yearsExperience: y } },
+      { new: true }
+    ).select("userId yearsExperience");
+    if (!prof) return NextResponse.json({ error: "PROFILE_NOT_FOUND" }, { status: 404 });
+    return NextResponse.json({ ok: true, yearsExperience: prof.yearsExperience });
   }
 
   /* ─── الملاحظات والبلاغات: قائمة + حذف + تعيين كمعالجة ─── */

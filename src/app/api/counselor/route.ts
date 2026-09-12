@@ -341,6 +341,14 @@ async function POST_impl(req: NextRequest) {
       const toSet = g.length ? Array.from(new Set(g)) : ["male", "female"];
       await User.updateOne({ _id: userId }, { $set: { acceptedGenders: toSet } });
     }
+    /* ═ v1.9.0: سنوات الخبرة — يعدّلها الأخصائي من إعداداته (0–70 سنة) ═ */
+    if (body.yearsExperience !== undefined) {
+      const y = Math.round(Number(body.yearsExperience));
+      if (!Number.isFinite(y) || y < 0 || y > 70) {
+        return NextResponse.json({ error: "INVALID_EXPERIENCE" }, { status: 400 });
+      }
+      set.yearsExperience = y;
+    }
     if (Object.keys(set).length) await CounselorProfile.updateOne({ userId }, { $set: set });
     if (set.fullName) {
       await User.updateOne({ _id: userId }, { $set: { pseudonym: String(set.fullName) } });

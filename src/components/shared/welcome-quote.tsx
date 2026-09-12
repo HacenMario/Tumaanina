@@ -53,6 +53,13 @@ export function WelcomeQuote() {
   const close = useCallback(() => {
     setOpen(false);
     if (timerRef.current) clearTimeout(timerRef.current);
+    /* v1.9.0: بثّ حدث إغلاق النافذة — تنطلق بعده نافذة العقد العلاجي
+       الإلزامية إن وُجد عقد بانتظار إمضاء العميل المسجّل */
+    try {
+      window.dispatchEvent(new Event("tumaanina-welcome-closed"));
+    } catch {
+      /* تجاهل */
+    }
     /* v2.13.0: صوت طبيعة مهدئ عشوائي (مطر / نار مشتعلة / عصافير مع ماء /
        حيتان البحر / غابة وشلال) لمدة 20 ثانية يبدأ فور إغلاق نافذة
        الاطمئنان — على الصفحة الرئيسية فقط كما طلب المستخدم */

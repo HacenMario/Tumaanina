@@ -38,6 +38,7 @@ import {
   Eye,
   Crown,
   Wallet,
+  Clock3,
 } from "lucide-react";
 import { LayoutDashboard } from "lucide-react";
 import { WILAYA_LIST, WILAYA_LABELS, AGE_LABELS, SPECIALTIES } from "@/lib/constants";
@@ -107,6 +108,8 @@ interface AdminUserRow {
   fullName: string | null;
   whatsapp: string | null;
   verificationStatus: string | null;
+  /* v1.9.0: سنوات الخبرة — قابلة للتعديل من تبويب الحسابات */
+  yearsExperience?: number;
   /* v2.6.0: حالة التعليق + عدّاد التأخر في قبول الطلبات */
   suspended?: boolean;
   lateCount?: number;
@@ -387,6 +390,12 @@ export function AdminPanelView() {
   const [pwMsg, setPwMsg] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+
+  /* ═ v1.9.0: تعديل سنوات خبرة أخصائي من تبويب الحسابات ═ */
+  const [expTarget, setExpTarget] = useState<AdminUserRow | null>(null);
+  const [expValue, setExpValue] = useState("");
+  const [expBusy, setExpBusy] = useState(false);
+  const [expMsg, setExpMsg] = useState("");
 
   const [zoomImg, setZoomImg] = useState<string | null>(null);
 
@@ -808,6 +817,39 @@ export function AdminPanelView() {
       }
     } finally {
       setPwBusy(false);
+    }
+  };
+
+  /* ═ v1.9.0: حفظ سنوات الخبرة لأخصائي — من تبويب الحسابات ═ */
+  const saveExperience = async () => {
+    if (!expTarget) return;
+    setExpMsg("");
+    const y = Math.round(Number(expValue));
+    if (!Number.isFinite(y) || y < 0 || y > 70) {
+      setExpMsg(t.admin.expInvalid);
+      return;
+    }
+    setExpBusy(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({ action: "set-experience", userId: expTarget.id, years: y }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setExpMsg(t.admin.expSaved);
+        playSound("success");
+        loadUsers();
+        setTimeout(() => {
+          setExpTarget(null);
+          setExpMsg("");
+        }, 1000);
+      } else {
+        setExpMsg(data.error === "INVALID_EXPERIENCE" ? t.admin.expInvalid : t.common.error);
+      }
+    } finally {
+      setExpBusy(false);
     }
   };
 
@@ -1489,6 +1531,23 @@ export function AdminPanelView() {
                       >
                         <Inbox className="h-3.5 w-3.5" />
                         {t.admin.requestsBtn}
+                      </Button>
+                    )}
+                    {/* ═ v1.9.0: تعديل سنوات الخبرة — للأخصائيين فقط ═ */}
+                    {u.role === "COUNSELOR" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg font-bold h-8"
+                        title={t.admin.expBtn}
+                        onClick={() => {
+                          setExpTarget(u);
+                          setExpValue(String(u.yearsExperience ?? 0));
+                          setExpMsg("");
+                        }}
+                      >
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {u.yearsExperience ?? 0} {t.client.yearsExp}
                       </Button>
                     )}
                     {/* v2.6.0: تفعيل / تعطيل أي حساب أخصائي أو عميل */}
@@ -2391,6 +2450,47 @@ export function AdminPanelView() {
             <Button className="w-full gradient-primary text-white font-black rounded-xl h-11" disabled={pwBusy} onClick={setPw}>
               <KeyRound className="h-4 w-4" />
               {pwBusy ? t.common.loading : t.admin.setPwBtn}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═ v1.9.0: نافذة تعديل سنوات الخبرة ═ */}
+      <Dialog open={!!expTarget} onOpenChange={(o) => !o && setExpTarget(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-start flex items-center gap-2">
+              <Clock3 className="h-4.5 w-4.5 text-primary" />
+              {t.admin.expDialogTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {expTarget && (
+              <p className="text-xs font-bold text-muted-foreground">
+                {t.admin.setPwFor}: <span className="text-foreground">{expTarget.fullName || expTarget.pseudonym || expTarget.email}</span>
+              </p>
+            )}
+            <div className="space-y-1.5">
+              <Label className="font-bold">{t.settings.yearsExperienceLabel} *</Label>
+              <Input
+                type="number"
+                min={0}
+                max={70}
+                step={1}
+                dir="ltr"
+                value={expValue}
+                onChange={(e) => setExpValue(e.target.value)}
+                className="rounded-xl bg-card"
+              />
+            </div>
+            {expMsg && (
+              <div className={`rounded-xl text-xs font-bold px-3 py-2 ${expMsg === t.admin.expSaved ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                {expMsg}
+              </div>
+            )}
+            <Button className="w-full gradient-primary text-white font-black rounded-xl h-11" disabled={expBusy} onClick={saveExperience}>
+              <Clock3 className="h-4 w-4" />
+              {expBusy ? t.common.loading : t.common.save}
             </Button>
           </div>
         </DialogContent>

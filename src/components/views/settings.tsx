@@ -26,6 +26,10 @@ import {
   CalendarClock,
   Eraser,
   Coins,
+  FileSignature,
+  Clock3,
+  Printer,
+  PenLine,
 } from "lucide-react";
 import { useI18n, LANG_META } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -50,8 +54,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { SignaturePad } from "@/components/shared/signature-pad";
+import { formatDateTime } from "@/lib/utils";
 
 const MAX_AVATAR_BYTES = 900_000;
+
+/* ═ v1.9.0: أنواع العقد العلاجي في الإعدادات (أخصائي) ═ */
+interface CContractRow {
+  id: string;
+  clientName: string | null;
+  status: string;
+  scheduledAt: string | null;
+  counselorSignedAt: string | null;
+  clientSignedAt: string | null;
+  updatedAt: string | null;
+}
+interface CContractFull extends CContractRow {
+  text: string;
+  counselorName: string | null;
+  counselorSignature: string | null;
+  clientSignature: string | null;
+  clientSignedName: string | null;
+}
 
 /* ─── v2.7.0: نافذة تفاصيل التحدي — تظهر عند ولوج الأخصائي للإعدادات ───
    3 مرات كحد أقصى لكل مستخدم، أو تعطيل نهائي بـ«لا تظهر مجدداً» —
@@ -206,6 +231,20 @@ export function SettingsView() {
   const [prefsMsg, setPrefsMsg] = useState("");
   const [prefsErr, setPrefsErr] = useState("");
 
+  /* ═ v1.9.0: سنوات الخبرة (أخصائي) — يعدّلها من إعداداته ═ */
+  const [yearsExp, setYearsExp] = useState<string>("0");
+
+  /* ═ v1.9.0: العقد العلاجي (أخصائي) — قالب + إمضاء + قائمة العقود الممضاة ═ */
+  const [contractText, setContractText] = useState("");
+  const [contractSignature, setContractSignature] = useState<string | null>(null);
+  const [contractSignedAt, setContractSignedAt] = useState<string | null>(null);
+  const [contractBusy, setContractBusy] = useState(false);
+  const [contractMsg, setContractMsg] = useState("");
+  const [contractErr, setContractErr] = useState("");
+  const [cContracts, setCContracts] = useState<CContractRow[]>([]);
+  const [viewContract, setViewContract] = useState<CContractFull | null>(null);
+  const [viewBusy, setViewBusy] = useState(false);
+
   const availDirty = () => {
     if (!avail) return false;
     return JSON.stringify(avail) !== JSON.stringify(availOriginal);
@@ -336,7 +375,26 @@ export function SettingsView() {
           const grid = saved && typeof saved === "object" ? (saved as WeeklyAvailability) : fullAvailability();
           setAvail(grid);
           setAvailOriginal(saved && typeof saved === "object" ? (saved as WeeklyAvailability) : null);
+          /* v1.9.0: سنوات الخبرة — قابلة للتعديل من الإعدادات */
+          setYearsExp(String(Number(me.yearsExperience) || 0));
         }
+      })
+      .catch(() => {});
+    /* v1.9.0: قالب العقد العلاجي + قائمة العقود الممضاة — مسار مستقل خفيف */
+    fetch(`/api/contract?view=template&userId=${user.id}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const tpl = d?.template;
+        if (!tpl) return;
+        setContractText(tpl.text || "");
+        setContractSignature(tpl.signature || null);
+        setContractSignedAt(tpl.signedAt || null);
+      })
+      .catch(() => {});
+    fetch(`/api/contract?view=list&userId=${user.id}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.contracts)) setCContracts(d.contracts);
       })
       .catch(() => {});
   }, [user]);
@@ -471,6 +529,8 @@ export function SettingsView() {
             /* v2.9.0: روابط التواصل + جنس العملاء المقبول */
             socials,
             acceptedGenders,
+            /* v1.9.0: سنوات الخبرة — قابلة للتعديل من الإعدادات */
+            yearsExperience: Math.max(0, Math.min(70, Math.round(Number(yearsExp) || 0))),
             /* v1.3.0: أسعار الجلسة الثلاثة المستقلة */
             sessionPrices: {
               DZD: Math.round(Number(sessionPrices.DZD) || 0),
@@ -532,6 +592,68 @@ export function SettingsView() {
       setPrefsErr(t.common.error);
     } finally {
       setPrefsBusy(false);
+    }
+  };
+
+  /* ═ v1.9.0: حفظ قالب العقد العلاجي مع الإمضاء الرقمي (أخصائي) ═ */
+  const saveContract = async () => {
+    if (!user || user.role !== "COUNSELOR") return;
+    setContractErr("");
+    setContractMsg("");
+    if (!contractText || contractText.trim().length < 100) {
+      setContractErr(t.contract.textTooShort);
+      return;
+    }
+    if (!contractSignature) {
+      setContractErr(t.contract.mustSign);
+      return;
+    }
+    setContractBusy(true);
+    try {
+      const res = await fetch("/api/contract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save-template",
+          userId: user.id,
+          text: contractText,
+          signature: contractSignature,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setContractSignedAt(data.signedAt || new Date().toISOString());
+        setContractMsg(t.contract.savedOk);
+        toast({ title: t.contract.savedOk });
+        /* تحديث قائمة العقود بعد الحفظ (قد تُنشأ عقود جديدة بعد أي قبول) */
+        fetch(`/api/contract?view=list&userId=${user.id}`, { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (Array.isArray(d?.contracts)) setCContracts(d.contracts);
+          })
+          .catch(() => {});
+      } else if (data.error === "SIGNATURE_REQUIRED") setContractErr(t.contract.mustSign);
+      else if (data.error === "INVALID_TEXT") setContractErr(t.contract.textTooShort);
+      else setContractErr(t.common.error);
+    } catch {
+      setContractErr(t.common.error);
+    } finally {
+      setContractBusy(false);
+    }
+  };
+
+  /* ═ v1.9.0: عرض عقد ممضى بالتفصيل (النسخة النهائية من الطرفين) ═ */
+  const openContract = async (id: string) => {
+    if (!user?.id || viewBusy) return;
+    setViewBusy(true);
+    try {
+      const res = await fetch(`/api/contract?view=one&id=${id}&userId=${user.id}`, { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok && data.contract) setViewContract(data.contract);
+    } catch {
+      /* تجاهل */
+    } finally {
+      setViewBusy(false);
     }
   };
 
@@ -782,6 +904,29 @@ export function SettingsView() {
                     <Label className="font-bold">{t.settings.accountBio}</Label>
                     <Input value={bio} onChange={(e) => setBio(e.target.value)} className="rounded-xl bg-card" dir="auto" />
                   </div>
+                  {/* ═ v1.9.0: سنوات الخبرة — يعدّلها الأخصائي من إعداداته ═ */}
+                  {isCounselor && (
+                    <div className="space-y-1.5">
+                      <Label className="font-bold flex items-center gap-1.5">
+                        <Clock3 className="h-3.5 w-3.5 text-primary" />
+                        {t.settings.yearsExperienceLabel}
+                      </Label>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={70}
+                          step={1}
+                          dir="ltr"
+                          value={yearsExp}
+                          onChange={(e) => setYearsExp(e.target.value)}
+                          className="rounded-xl bg-card w-28"
+                        />
+                        <span className="text-xs font-bold text-muted-foreground">{t.client.yearsExp}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground font-semibold">{t.settings.yearsExperienceHint}</p>
+                    </div>
+                  )}
                   {/* إدارة التخصصات: الجاهزة (تعديل/إزالة) + الخاصة (إضافة/حذف) */}
                   <div className="space-y-2">
                     <Label className="font-bold">{t.settings.accountSpecialties}</Label>
@@ -1209,6 +1354,207 @@ export function SettingsView() {
           </CardContent>
         </Card>
       )}
+
+      {/* ═══ v1.9.0: العقد العلاجي (أخصائي فقط) — قالب يعدّله ويمضيه رقمياً
+          ويحفظه، ثم يُنسخ لكل عميل عند قبول جلسته وتُحفظ النسخ الموقّعة
+          من الطرفين هنا في حسابه ═══ */}
+      {isCounselor && (
+        <Card className="border-primary/30 bg-primary/[0.03]">
+          <CardContent className="p-6 space-y-5">
+            <h2 className="font-black flex items-center gap-2 pb-2">
+              <FileSignature className="h-4.5 w-4.5 text-primary" />
+              {t.contract.settingsTitle}
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed -mt-2">{t.contract.settingsDesc}</p>
+
+            {/* حالة القالب الحالي */}
+            <div className="flex flex-wrap items-center gap-2">
+              {contractSignedAt ? (
+                <Badge className="text-[11px] bg-primary/15 text-primary border-0 gap-1">
+                  <Check className="h-3 w-3" />
+                  {t.contract.signedBadge} · {formatDateTime(new Date(contractSignedAt))}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[11px] font-bold text-muted-foreground">
+                  {t.contract.notSignedBadge}
+                </Badge>
+              )}
+            </div>
+
+            {/* نص العقد */}
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label className="font-bold text-xs">{t.contract.templateLabel}</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[11px] font-bold rounded-lg"
+                  onClick={() => {
+                    setContractText(t.contract.suggestedTemplate);
+                    setContractMsg("");
+                    setContractErr("");
+                  }}
+                >
+                  {t.contract.useTemplate}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-semibold">{t.contract.templateHint}</p>
+              <Textarea
+                value={contractText}
+                onChange={(e) => {
+                  setContractText(e.target.value);
+                  setContractMsg("");
+                  setContractErr("");
+                }}
+                rows={10}
+                maxLength={15000}
+                dir="auto"
+                className="rounded-xl bg-card text-sm leading-relaxed min-h-52"
+                placeholder={t.contract.templatePlaceholder}
+              />
+            </div>
+
+            {/* الإمضاء الرقمي */}
+            <div className="space-y-1.5">
+              <Label className="font-bold text-xs flex items-center gap-1.5">
+                <PenLine className="h-3.5 w-3.5 text-primary" />
+                {t.contract.signLabel}
+              </Label>
+              <SignaturePad
+                onChange={setContractSignature}
+                height={150}
+              />
+              {contractSignature && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground">{t.contract.signaturePreview}</p>
+                  <img src={contractSignature} alt={t.contract.signaturePreview} className="h-16 w-auto rounded-lg border border-border bg-white/60 dark:bg-white/10 p-1" />
+                </div>
+              )}
+            </div>
+
+            {contractErr && <div className="rounded-xl bg-destructive/10 text-destructive text-xs font-bold px-3 py-2">{contractErr}</div>}
+            {contractMsg && <div className="rounded-xl bg-primary/10 text-primary text-xs font-bold px-3 py-2 flex items-center gap-1.5"><Check className="h-4 w-4 shrink-0" />{contractMsg}</div>}
+            <Button size="sm" className="gradient-primary text-white font-bold rounded-lg w-full sm:w-auto" disabled={contractBusy} onClick={saveContract}>
+              <Save className="h-4 w-4" />
+              {contractBusy ? t.common.loading : t.contract.saveBtn}
+            </Button>
+
+            {/* قائمة العقود الموقّعة من الطرفين — محفوظة في حساب الأخصائي */}
+            <div className="space-y-2 pt-3 border-t border-border/60">
+              <h3 className="font-bold text-xs">{t.contract.listTitle}</h3>
+              <p className="text-[11px] text-muted-foreground font-semibold">{t.contract.listHint}</p>
+              {cContracts.length === 0 ? (
+                <p className="text-xs text-muted-foreground font-semibold rounded-xl border border-dashed border-border px-4 py-5 text-center">
+                  {t.contract.listEmpty}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {cContracts.map((c) => (
+                    <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="font-bold text-sm truncate" dir="auto">{c.clientName || "—"}</div>
+                        <div className="text-[11px] text-muted-foreground font-semibold flex flex-wrap gap-x-3">
+                          {c.scheduledAt && <span dir="auto">{formatDateTime(new Date(c.scheduledAt))}</span>}
+                          {c.clientSignedAt && (
+                            <span className="text-primary" dir="auto">
+                              ✓ {t.contract.clientSignedOn} {formatDateTime(new Date(c.clientSignedAt))}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ms-auto">
+                        <Badge className={`text-[10px] font-black border-0 ${c.status === "SIGNED" ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-600 dark:text-amber-400"}`}>
+                          {c.status === "SIGNED" ? t.contract.statusSigned : t.contract.statusAwaiting}
+                        </Badge>
+                        <Button size="sm" variant="outline" className="h-8 rounded-lg font-bold" disabled={viewBusy} onClick={() => void openContract(c.id)}>
+                          <EyeOff className="h-3.5 w-3.5 rotate-180" />
+                          {t.contract.viewBtn}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═ v1.9.0: نافذة عرض العقد كاملاً (للطرفين فقط) ═ */}
+      <Dialog open={!!viewContract} onOpenChange={(o) => !o && setViewContract(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] p-0 gap-0 overflow-hidden">
+          <DialogHeader className="gradient-primary text-white px-5 py-4">
+            <DialogTitle className="text-white flex items-center gap-2 text-base">
+              <FileSignature className="h-4.5 w-4.5" />
+              {t.contract.viewTitle}
+            </DialogTitle>
+          </DialogHeader>
+          {viewContract && (
+            <div className="p-5 space-y-4 overflow-y-auto max-h-[calc(90vh-4.5rem)]">
+              <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 space-y-1.5 text-xs font-bold">
+                <div className="flex flex-wrap items-center justify-between gap-x-3">
+                  <span className="text-muted-foreground">{t.contract.partyCounselor}</span>
+                  <span dir="auto">{viewContract.counselorName || "—"}</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-x-3">
+                  <span className="text-muted-foreground">{t.contract.partyClient}</span>
+                  <span dir="auto">{viewContract.clientName || viewContract.clientSignedName || "—"}</span>
+                </div>
+                {viewContract.scheduledAt && (
+                  <div className="flex flex-wrap items-center justify-between gap-x-3">
+                    <span className="text-muted-foreground">{t.contract.sessionLabel}</span>
+                    <span dir="auto">{formatDateTime(new Date(viewContract.scheduledAt))}</span>
+                  </div>
+                )}
+              </div>
+              <div className="rounded-xl border border-border bg-card px-4 py-3">
+                <div className="max-h-56 overflow-y-auto rounded-lg bg-muted/20 px-3 py-2.5" dir="auto">
+                  {viewContract.text.split("\n").filter((l) => l.trim()).map((line, i) => (
+                    <p key={i} className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">{line}</p>
+                  ))}
+                </div>
+              </div>
+              {/* إمضاءا الطرفين مع التاريخين */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground">{t.contract.signedByCounselor}</p>
+                  {viewContract.counselorSignature ? (
+                    <img src={viewContract.counselorSignature} alt={t.contract.signedByCounselor} className="h-16 w-auto rounded-lg border border-border bg-white/60 dark:bg-white/10 p-1" />
+                  ) : (
+                    <div className="h-16 rounded-lg border border-dashed border-border" />
+                  )}
+                  {viewContract.counselorSignedAt && (
+                    <p className="text-[10px] font-semibold text-muted-foreground" dir="auto">{formatDateTime(new Date(viewContract.counselorSignedAt))}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black text-muted-foreground">{t.contract.signedByClient}</p>
+                  {viewContract.clientSignature ? (
+                    <img src={viewContract.clientSignature} alt={t.contract.signedByClient} className="h-16 w-auto rounded-lg border border-border bg-white/60 dark:bg-white/10 p-1" />
+                  ) : (
+                    <div className="h-16 rounded-lg border border-dashed border-border" />
+                  )}
+                  {viewContract.clientSignedAt ? (
+                    <p className="text-[10px] font-semibold text-muted-foreground" dir="auto">{formatDateTime(new Date(viewContract.clientSignedAt))}</p>
+                  ) : (
+                    <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{t.contract.statusAwaiting}</p>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-lg font-bold w-full sm:w-auto"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-4 w-4" />
+                {t.contract.printBtn}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ─── كلمة المرور (عميل + أخصائي) ─── */}
       {user && (isVictim || isCounselor) && (
