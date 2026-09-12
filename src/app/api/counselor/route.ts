@@ -425,6 +425,8 @@ async function GET_impl(req: NextRequest) {
       /* v2.7.0: فائز التحدي */
       challengeWinner,
       wonAt: challengeWinner && winner ? winner.wonAt : null,
+      /* v1.12.0: حالة إمضاء عقد المنصة — للافتة الإلزامية في لوحة الأخصائي */
+      platformContractSigned: !!(p.contractSignature && p.contractSignedAt),
     },
   });
 }

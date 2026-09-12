@@ -12,6 +12,7 @@ import { challengeStatus, getChallengeWinner } from "@/lib/server/challenge";
 import { getVictimChallengeWinner } from "@/lib/server/client-challenge";
 import { readChallengeConfig, writeChallengeConfig, type ChallengeWhich } from "@/lib/server/challenge-config";
 import { dayKeyUTC1 } from "@/lib/availability";
+import { getPlatformContract, savePlatformContract } from "@/lib/server/contract";
 import { PLATFORM_COMMISSION_RATE, CURRENCY_CODES } from "@/lib/constants";
 import type { CurrencyCode } from "@/lib/constants";
 
@@ -988,6 +989,29 @@ async function POST_impl(req: NextRequest) {
       grand: { count: grand.count, gross: bagOf(grand.gross), commission: bagOf(grand.commission), net: bagOf(grand.net), dueThisMonth: bagOf(grand.dueThisMonth) },
       counselors: rows,
     });
+  }
+
+  /* ═ v1.12.0: عقد المنصة الواحد — عقد علاجي واحد لكل المستخدمين يمثل
+     المنصة، نصه تديره الإدارة من هنا حصراً (بوابة الصلاحيات أعلاه تفرض
+     مستوى أدمين كامل للتعديل). الأخصائيون والعملاء يرونه قراءةً فقط
+     ولا يمكن لأحد منهم إنشاء عقد خاص أو تعديل نصه — الأخصائي يمضيه فقط
+     وكل حجز جديد يأخذ لقطة محمية من النص المعتمد لحظة إنشائه. ═ */
+  if (action === "platform-contract-get") {
+    const p = await getPlatformContract();
+    return NextResponse.json({ ok: true, platform: p });
+  }
+
+  if (action === "platform-contract-save") {
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    if (text.length < 100 || text.length > 15000) {
+      return NextResponse.json({ error: "INVALID_TEXT" }, { status: 400 });
+    }
+    /* اسم من عدّل — من هوية رمز الإدارة نفسها فلا انتحال */
+    const editor = (await User.findById(gate.auth.uid).select("staffName pseudonym").lean()) as
+      | { staffName?: string | null; pseudonym?: string | null }
+      | null;
+    const saved = await savePlatformContract(text, editor?.staffName || editor?.pseudonym || null);
+    return NextResponse.json({ ok: true, ...saved });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

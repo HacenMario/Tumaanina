@@ -4,7 +4,7 @@ import { Message, SupportSession, TherapyContract, User, CounselorProfile } from
 import { attachParticipants } from "@/lib/server/sessions";
 import { notifyUser, displayNameOf } from "@/lib/server/notify";
 import { apiHandler } from "@/lib/server/api";
-import { nextContractNumber } from "@/lib/server/contract";
+import { nextContractNumber, getPlatformContract } from "@/lib/server/contract";
 import { dayKeyUTC1, MAX_ACCEPTED_PER_DAY, isSlotAvailable, normalizeAvailability, weekdayOfDate } from "@/lib/availability";
 import { DEFAULT_SESSION_PRICE, priceForCurrency, CURRENCY_CODES, CURRENCIES } from "@/lib/constants";
 import type { CurrencyCode } from "@/lib/constants";
@@ -102,15 +102,14 @@ async function POST_impl(req: NextRequest) {
   /* ─── v1.0.0 (طمأنينة): التوثيق للأخصائيين فقط ───
      الحجز لا يُقبل إلا مع أخصائي موثّق من الإدارة (شهادته مراجَعة).
      حساب العميل نفسه بلا أي توثيق — التسجيل مباشر.
-     v1.10.0: جلب حقول العقد أيضاً — لإنشاء العقد لحظة الحجز مباشرة */
+     v1.12.0: حقول إمضاء الأخصائي على عقد المنصة فقط — النص من المنصة */
   const counselorProfile = (await CounselorProfile.findOne({ userId: counselorId })
-    .select("sessionPrice sessionPrices verificationStatus fullName contractText contractSignature contractSignedAt")
+    .select("sessionPrice sessionPrices verificationStatus fullName contractSignature contractSignedAt")
     .lean()) as {
     sessionPrice?: number;
     sessionPrices?: unknown;
     verificationStatus?: string;
     fullName?: string;
-    contractText?: string | null;
     contractSignature?: string | null;
     contractSignedAt?: Date | null;
   } | null;
@@ -199,43 +198,30 @@ async function POST_impl(req: NextRequest) {
     currency,
   });
 
-  /* ═ v1.10.0: العقد العلاجي لحظة الحجز مباشرة — المنطق الجديد المطلوب ═
-     إذا كان الأخصائي قد أعّد عقداً ووقّعه في إعداداته مسبقاً، يُنشأ عقد
-     هذا العميل فوراً برقم تسلسلي فريد ولقطة النص والإمضاء، فتظهر النافذة
-     المنبثقة للعميل على أي صفحة مفتوحة دون أي انتظار لقبول الأخصائي.
-     العقود الممضاة سابقاً للعميل نفسه لا تُمَس، والعقد المفتوح القديم
-     تُحدَّث لقطة النص والجلسة المرتبطة فقط. */
+  /* ═ v1.12.0: العقد العلاجي لحظة الحجز — عقد مستقل لكل جلسة ═
+     عقد المنصة واحد لكل المستخدمين (نصه تديره الإدارة حصراً) — إذا كان
+     الأخصائي قد امضى عقد المنصة، فكل جلسة يحجزها العميل تُنشئ عقدها الخاص
+     برقم تسلسلي فريد ولقطة محمية من النص المعتمد وإمضاء الأخصائي — فتظهر
+     النافذة المنبثقة بعد كل حجز مهما تكرر ولأي عميل. العقود الممضاة
+     سابقاً محفوظة كاملة كأرشيف في حساب الطرفين. */
   let contractForClient: { id: string; number: string } | null = null;
   try {
-    if (counselorProfile.contractText && counselorProfile.contractSignature && counselorProfile.contractSignedAt) {
-      const existing = (await TherapyContract.findOne({ counselorId, clientUserId: victimId }).lean()) as
-        | { _id: unknown; status?: string; number?: string | null }
-        | null;
-      if (!existing) {
-        const number = await nextContractNumber();
-        const created = await TherapyContract.create({
-          number,
-          counselorId,
-          clientUserId: victimId,
-          sessionId: session._id,
-          contractText: counselorProfile.contractText,
-          counselorName: counselorProfile.fullName || null,
-          counselorSignature: counselorProfile.contractSignature,
-          counselorSignedAt: counselorProfile.contractSignedAt,
-          status: "AWAITING_CLIENT",
-        });
-        contractForClient = { id: String(created._id), number };
-      } else if (existing.status === "AWAITING_CLIENT") {
-        await TherapyContract.findByIdAndUpdate(existing._id, {
-          $set: {
-            sessionId: session._id,
-            contractText: counselorProfile.contractText,
-            counselorSignature: counselorProfile.contractSignature,
-            counselorSignedAt: counselorProfile.contractSignedAt,
-          },
-        });
-        contractForClient = { id: String(existing._id), number: existing.number || "" };
-      }
+    if (counselorProfile.contractSignature && counselorProfile.contractSignedAt) {
+      const platform = await getPlatformContract();
+      const number = await nextContractNumber();
+      const created = await TherapyContract.create({
+        number,
+        counselorId,
+        clientUserId: victimId,
+        sessionId: session._id,
+        contractText: platform.text,
+        counselorName: counselorProfile.fullName || null,
+        clientName: victim.pseudonym || null,
+        counselorSignature: counselorProfile.contractSignature,
+        counselorSignedAt: counselorProfile.contractSignedAt,
+        status: "AWAITING_CLIENT",
+      });
+      contractForClient = { id: String(created._id), number };
     }
   } catch (e) {
     console.error("[CONTRACT] تعذر تجهيز العقد عند الحجز:", (e as Error).message);

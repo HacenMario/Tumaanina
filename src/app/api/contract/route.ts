@@ -3,34 +3,26 @@ import { connectDB } from "@/lib/db";
 import { CounselorProfile, SupportSession, TherapyContract, User } from "@/lib/models";
 import { apiHandler } from "@/lib/server/api";
 import { notifyUser } from "@/lib/server/notify";
-import { nextContractNumber, safeContractLang } from "@/lib/server/contract";
+import { getPlatformContract, nextContractNumber, safeContractLang } from "@/lib/server/contract";
 
 export const dynamic = "force-dynamic";
 
-/* v1.10.0: إسناد رقم تسلسلي للعقود المفتقرة له (القديمة) — بالعدّاد الذرّي
-   نفسه فلا تكرار؛ شرط التحديث يمنع استبدال رقم موجود بالفعل */
-async function ensureNumber(doc: { _id: unknown; number?: string | null }): Promise<string> {
-  if (doc.number) return doc.number;
-  const n = await nextContractNumber();
-  await TherapyContract.updateOne(
-    { _id: doc._id, number: { $in: [null, undefined, ""] } },
-    { $set: { number: n } }
-  );
-  return n;
-}
-
-/* ═ v1.9.0: العقد العلاجي — مسار مستقل بثلاث مهام ═
-   ① الأخصائي يكتب قالب عقد علاجي من إعداداته ويمضيه رقمياً ويحفظه
-   ② عند قبول الأخصائي لجلسة يُنسخ القالب إلى عقد مستقل بانتظار توقيع العميل
-      (يحدث داخل sessions/[id] PATCH — لا هنا)
-   ③ العميل المسجّل يرى النافذة الإلزامية، يمضي رقمياً ويكتب اسمه الكامل
-      ويضغط «أقبل» فتُحفظ النسخة الموقّعة من الطرفين في حساب الأخصائي
+/* ═ v1.12.0: العقد العلاجي — عقدٌ واحد للمنصة كاملة ═
+   ─────────────────────────────────────────────────
+   ① عقد واحد لكل المستخدمين يمثل المنصة: نصه تديره الإدارة حصراً من لوحة
+      الأدمين (مسار admin المحمي برمز الفريق)، ولا يمكن لأي أخصائي أو عميل
+      إنشاء عقد خاص أو تعديل نص العقد — نُزعت خاصية «العقد الخاص» نهائياً.
+   ② الأخصائي يقرأ عقد المنصة من إعداداته (قراءة فقط) ويمضيه رقمياً مرة
+      واحدة (counselor-sign) — نص عقد المنصة لا يقبل أي تعديل من طرفه.
+   ③ لحظة حجز العميل جلسة مع أخصائي ممضٍ يُنشأ للجلسة عقد مستقل برقم
+      تسلسلي فريد يحمل لقطة محمية من نص عقد المنصة وإمضاء الأخصائي،
+      فتظهر نافذة الامضاء للعميل فوراً بعد كل حجز مهما تكرر.
+   ④ العميل المسجّل يرى النافذة الإلزامية، يمضي رقمياً ويكتب اسمه الكامل
+      ويضغط «أقبل» فتُحفظ النسخة الموقّعة من الطرفين في حساب الأخصائي.
    الحماية المتبادلة: لقطة نص العقد وإمضاء الأخصائي تُثبَّت لحظة الإنشاء
    ولا تتغير بعد التوقيع، وكل توقيع يُخزَّن مع اسمه وتاريخه الصريحين. */
 
-const MIN_TEXT = 100;
-const MAX_TEXT = 15000;
-const MAX_SIGNATURE_B64 = 300_000; /* لوحة امضاء PNG مضغوطة تتجاوز هذا => مرفوض */
+const MAX_SIGNATURE_B64 = 300_000; /* لوحة امضاء PNG مضغوطة تتجاوز هذا => مرفوضة */
 
 function validSignature(s: unknown): s is string {
   return (
@@ -42,7 +34,8 @@ function validSignature(s: unknown): s is string {
 }
 
 /* ─── GET ───
-   ?view=template&userId=…  → قالب الأخصائي (إعداداته)
+   ?view=platform           → نص عقد المنصة (لعرضه للجميع — قراءة فقط)
+   ?view=template&userId=…  → عقد المنصة + حالة إمضاء الأخصائي (إعداداته)
    ?view=pending&userId=…   → عقد بانتظار توقيع هذا العميل (النافذة المنبثقة)
    ?view=list&userId=…      → عقود الأخصائي كلها (بيانات القائمة)
    ?view=one&id=…&userId=…  → عقد واحد كامل (للطرفين فقط) */
@@ -50,26 +43,38 @@ async function GET_impl(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const view = searchParams.get("view") || "pending";
   const userId = searchParams.get("userId") || "";
-  if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
   await connectDB();
 
+  /* view=platform متاح حتى بلا userId — قراءة عامة محمية من التعديل
+     (نص عقد المنصة معتمد ولا يحمل بيانات شخصية) */
+  if (view === "platform") {
+    const p = await getPlatformContract();
+    return NextResponse.json({ platform: p });
+  }
+
+  if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
   const user = (await User.findById(userId).select("role pseudonym").lean()) as
     | { role?: string; pseudonym?: string | null }
     | null;
   if (!user) return NextResponse.json({ error: "INVALID" }, { status: 401 });
 
   if (view === "template") {
+    /* v1.12.0: الأخصائي يرى نص عقد المنصة قراءةً فقط + حالة إمضائه هو.
+       نص العقد يأتي من المنصة (تديره الإدارة) — لا حقل تعديل لصالحه. */
     if (user.role !== "COUNSELOR") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-    const prof = (await CounselorProfile.findOne({ userId }).select("contractText contractSignature contractSignedAt").lean()) as {
-      contractText?: string | null;
-      contractSignature?: string | null;
-      contractSignedAt?: Date | null;
-    } | null;
+    const [prof, platform] = await Promise.all([
+      CounselorProfile.findOne({ userId }).select("contractSignature contractSignedAt").lean() as
+        | { contractSignature?: string | null; contractSignedAt?: Date | null }
+        | null,
+      getPlatformContract(),
+    ]);
     return NextResponse.json({
       template: {
-        text: prof?.contractText ?? null,
+        text: platform.text,
         signature: prof?.contractSignature ?? null,
         signedAt: prof?.contractSignedAt ?? null,
+        platformUpdatedAt: platform.updatedAt,
+        locked: true, /* النص محمي — للقراءة فقط، الإدارة وحدها تعدّله */
       },
     });
   }
@@ -89,7 +94,8 @@ async function GET_impl(req: NextRequest) {
       createdAt?: Date;
     } | null;
     if (!c) return NextResponse.json({ contract: null });
-    const number = await ensureNumber(c);
+    /* رقم العقد — موجّه مسبقاً عند الإنشاء؛ الاحتياط للعقود القديمة فقط */
+    const number = c.number || (await nextContractNumber());
     /* موعد الجلسة المرتبطة للعرض السياقي داخل النافذة */
     let scheduledAt: string | null = null;
     if (c.sessionId) {
@@ -117,11 +123,6 @@ async function GET_impl(req: NextRequest) {
       .limit(200)
       .select("number clientName status sessionId clientSignedAt counselorSignedAt createdAt updatedAt")
       .lean()) as Array<Record<string, unknown>>;
-    /* v1.10.0: أرقام العقود — وللعقود القديمة تُسند الآن مرة واحدة */
-    const numbers = new Map<string, string>();
-    for (const r of rows) {
-      numbers.set(String(r._id), await ensureNumber(r as { _id: unknown; number?: string | null }));
-    }
     /* مواعيد الجلسات المرتبطة — استعلام واحد */
     const sids = rows.map((r) => String(r.sessionId || "")).filter(Boolean);
     const sessions = sids.length
@@ -131,7 +132,7 @@ async function GET_impl(req: NextRequest) {
     return NextResponse.json({
       contracts: rows.map((r) => ({
         id: String(r._id),
-        number: numbers.get(String(r._id)) || null,
+        number: r.number || null,
         clientName: r.clientName || null,
         status: r.status,
         scheduledAt: r.sessionId ? whenBySid.get(String(r.sessionId)) ?? null : null,
@@ -159,7 +160,7 @@ async function GET_impl(req: NextRequest) {
     return NextResponse.json({
       contract: {
         id: String(c._id),
-        number: await ensureNumber(c as { _id: unknown; number?: string | null }),
+        number: c.number || null,
         text: c.contractText,
         lang: safeContractLang(c.lang),
         counselorName: c.counselorName || null,
@@ -179,8 +180,9 @@ async function GET_impl(req: NextRequest) {
 }
 
 /* ─── POST ───
-   action=save-template (COUNSELOR): نص + إمضاء → حفظ القالب الموقّع
-   action=client-sign   (VICTIM): إمضاء + الاسم الكامل → العقد SIGNED */
+   action=counselor-sign (COUNSELOR): إمضاء الأخصائي على عقد المنصة المعتمد
+                                       (نصه محمي — لا تعديل ولا عقد خاص)
+   action=client-sign    (VICTIM):    إمضاء العميل + الاسم الكامل → SIGNED */
 async function POST_impl(req: NextRequest) {
   const body = await req.json();
   const action = body?.action;
@@ -193,38 +195,32 @@ async function POST_impl(req: NextRequest) {
     | null;
   if (!user) return NextResponse.json({ error: "INVALID" }, { status: 401 });
 
-  /* ═① حفظ القالب من إعدادات الأخصائي — الإمضاء الرقمي إلزامي ═
-     v1.9.1: بعد الحفظ تُزوَّد كل الجلسات المقبولة سابقاً بعقود بانتظار
-     امضاء عملائها — إغلاق ثغرة الترتيب: أخصائي قبل جلسة ثم أنشأ القالب
-        بعدها كانت الجلسات القديمة تبقى بلا عقد أبداً ولا ترى النافذة. */
-  if (action === "save-template") {
+  /* ═② إمضاء الأخصائي على عقد المنصة — الامضاء فقط، النص محميّ من المنصة ═
+     بعد الإمضاء تُزوَّد كل الجلسات الحيّة بعقودها المستقلة (لقطة النص
+     المعتمد + إمضاء الأخصائي) فتصل النافذة لعملائه الحاليين فوراً. */
+  if (action === "counselor-sign") {
     if (user.role !== "COUNSELOR") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-    const text = typeof body.text === "string" ? body.text.trim() : "";
-    if (text.length < MIN_TEXT || text.length > MAX_TEXT) {
-      return NextResponse.json({ error: "INVALID_TEXT" }, { status: 400 });
-    }
     if (!validSignature(body.signature)) {
       return NextResponse.json({ error: "SIGNATURE_REQUIRED" }, { status: 400 });
     }
     const prof = (await CounselorProfile.findOne({ userId }).select("fullName").lean()) as { fullName?: string } | null;
     if (!prof) return NextResponse.json({ error: "PROFILE_NOT_FOUND" }, { status: 404 });
+    const platform = await getPlatformContract();
     await CounselorProfile.findOneAndUpdate(
       { userId },
       {
         $set: {
-          contractText: text,
           contractSignature: body.signature,
           contractSignedAt: new Date(),
         },
       }
     );
-    /* ─── v1.10.0: سدّ ثغرة الترتيب — كل الجلسات الحية (المعلّجة والمقبولة
-       والجارية) قبل وجود القالب أو قبل تحديثه تحصل على العقد فور حفظه
-       برقم تسلسلي فريد، والعقود المفتوحة تُحدَّث لقطة نصها
-       (العميل الممضي سابقاً لا يُمَس أبداً) ─── */
+    /* ─── سدّ ثغرة الترتيب: كل الجلسات الحية (المعلّجة والمقبولة والجارية)
+       قبل إمضاء الأخصائي تحصل على عقدها فور امضائه برقم تسلسلي فريد —
+       العقود المفتوحة تُحدَّث لقطة إمضائها، والعميل الممضي سابقاً لا يُمَس ─── */
     let backfilled = 0;
     try {
-      const accepted = (await SupportSession.find({
+      const live = (await SupportSession.find({
         counselorId: userId,
         status: { $in: ["PENDING", "ACCEPTED", "ACTIVE"] },
       })
@@ -232,10 +228,17 @@ async function POST_impl(req: NextRequest) {
         .limit(500)
         .select("_id victimId")
         .lean()) as unknown as Array<{ _id: unknown; victimId: unknown }>;
-      for (const s of accepted) {
+      /* أسماء العملاء دفعة واحدة */
+      const victimIds = Array.from(new Set(live.map((x) => String(x.victimId))));
+      const vdocs = victimIds.length
+        ? ((await User.find({ _id: { $in: victimIds } }).select("pseudonym fullName").lean()) as Array<{ _id: unknown; pseudonym?: string | null; fullName?: string | null }>)
+        : [];
+      const nameById = new Map(vdocs.map((v) => [String(v._id), String(v.pseudonym || v.fullName || "").trim().slice(0, 60)]));
+      for (const ses of live) {
         const existing = (await TherapyContract.findOne({
           counselorId: userId,
-          clientUserId: s.victimId,
+          clientUserId: ses.victimId,
+          sessionId: ses._id,
         })
           .select("_id status")
           .lean()) as { _id: unknown; status?: string } | null;
@@ -244,10 +247,11 @@ async function POST_impl(req: NextRequest) {
           await TherapyContract.create({
             number: await nextContractNumber(),
             counselorId: userId,
-            clientUserId: s.victimId,
-            sessionId: s._id,
-            contractText: text,
+            clientUserId: ses.victimId,
+            sessionId: ses._id,
+            contractText: platform.text,
             counselorName: prof.fullName || null,
+            clientName: nameById.get(String(ses.victimId)) || null,
             counselorSignature: body.signature,
             counselorSignedAt: new Date(),
             status: "AWAITING_CLIENT",
@@ -256,8 +260,6 @@ async function POST_impl(req: NextRequest) {
         } else {
           await TherapyContract.findByIdAndUpdate(existing._id, {
             $set: {
-              sessionId: s._id,
-              contractText: text,
               counselorSignature: body.signature,
               counselorSignedAt: new Date(),
             },
@@ -271,8 +273,8 @@ async function POST_impl(req: NextRequest) {
     return NextResponse.json({ ok: true, signedAt: new Date().toISOString(), backfilled });
   }
 
-  /* ═③ توقيع العميل — إلزامي قبل الدخول لأي خدمة مرتبطة بالعقد ═
-     v1.10.0: لغة المستند المعتمدة عند الطباعة تُحفظ مع العقد (lang) */
+  /* ═④ توقيع العميل — إلزامي قبل الدخول لأي خدمة مرتبطة بالعقد ═
+     لغة المستند المعتمدة عند الطباعة تُحفظ مع العقد (lang) */
   if (action === "client-sign") {
     if (user.role !== "VICTIM") return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
     const contractId = typeof body.contractId === "string" ? body.contractId : "";

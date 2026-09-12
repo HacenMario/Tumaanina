@@ -5,6 +5,7 @@ import { attachParticipants } from "@/lib/server/sessions";
 import { notifyUser, formatWhenUTC1, displayNameOf } from "@/lib/server/notify";
 import { apiHandler } from "@/lib/server/api";
 import { SLOT_TIMES } from "@/lib/constants";
+import { nextContractNumber, getPlatformContract } from "@/lib/server/contract";
 
 export const dynamic = "force-dynamic";
 
@@ -229,31 +230,36 @@ async function PATCH_impl(
       when: formatWhenUTC1(updated.scheduledAt as Date),
       name: counselorName || "—",
     }).catch(() => {});
-    /* ═ v1.9.0: العقد العلاجي — عند قبول الجلسة يُنسخ قالب الأخصائي الموقّع
-       إلى عقد مستقل بانتظار إمضاء العميل (شرط: قالب موقّع من الأخصائي).
-       العقد الممضى سابقاً للعميل نفسه لا يُمَس — وإن وُجد عقد مُنتظر قديم
-       فتُحدّث لقطة النص والإمضاء والجلسة المرتبطة فقط. */
+    /* ═ v1.12.0: العقد العلاجي — عند قبول الجلسة يُنشأ عقدها المستقل
+       برقم تسلسلي فريد من نص عقد المنصة المعتمد (عقد واحد لكل المستخدمين
+       تديره الإدارة) + إمضاء الأخصائي المسبق. مسار احتياطي: الإنشاء
+       الأساسي يحدث لحظة الحجز. لكل جلسة عقد مستقل — العقود الممضاة
+       سابقاً لا تُمَس، وعقد بانتظار الإمضاء لنفس الجلسة تُحدَّث لقطة
+       إمضائها فقط (النص لقطة محمية من عقد المنصة). */
     try {
       const prof = (await CounselorProfile.findOne({ userId: updated.counselorId })
-        .select("contractText contractSignature contractSignedAt fullName")
+        .select("contractSignature contractSignedAt fullName")
         .lean()) as {
-        contractText?: string | null;
         contractSignature?: string | null;
         contractSignedAt?: Date | null;
         fullName?: string;
       } | null;
-      if (prof?.contractText && prof.contractSignature && prof.contractSignedAt) {
+      if (prof?.contractSignature && prof.contractSignedAt) {
+        const platform = await getPlatformContract();
         const existing = (await TherapyContract.findOne({
           counselorId: updated.counselorId,
           clientUserId: updated.victimId,
+          sessionId: updated._id,
         }).lean()) as { _id: unknown; status?: string } | null;
         if (!existing) {
           await TherapyContract.create({
+            number: await nextContractNumber(),
             counselorId: updated.counselorId,
             clientUserId: updated.victimId,
             sessionId: updated._id,
-            contractText: prof.contractText,
+            contractText: platform.text,
             counselorName: prof.fullName || null,
+            clientName: clientName || null, /* اسم العميل محسوب أعلاه مسبقاً */
             counselorSignature: prof.contractSignature,
             counselorSignedAt: prof.contractSignedAt,
             status: "AWAITING_CLIENT",
@@ -261,8 +267,6 @@ async function PATCH_impl(
         } else if (existing.status === "AWAITING_CLIENT") {
           await TherapyContract.findByIdAndUpdate(existing._id, {
             $set: {
-              sessionId: updated._id,
-              contractText: prof.contractText,
               counselorSignature: prof.contractSignature,
               counselorSignedAt: prof.contractSignedAt,
             },

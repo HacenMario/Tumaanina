@@ -21,6 +21,7 @@ import {
   History,
   HeartPulse,
   ChevronRight,
+  FileSignature,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import type { Dict } from "@/lib/i18n/ar";
@@ -188,6 +189,8 @@ export function CounselorDashboardView() {
   const [challengeWinner, setChallengeWinner] = useState(false);
   /* v2.6.0: هل خصّص جدول التوفر الأسبوعي؟ */
   const [availConfigured, setAvailConfigured] = useState<boolean | null>(null);
+  /* v1.12.0: هل امضى الأخصائي عقد المنصة؟ (null = لم تصل البيانات بعد) */
+  const [platformContractSigned, setPlatformContractSigned] = useState<boolean | null>(null);
   /* سجل الجلسات المكتملة (v2.5.4): 5 في الصفحة + الباقي في نافذة */
   const [showAllLog, setShowAllLog] = useState(false);
 
@@ -236,6 +239,9 @@ export function CounselorDashboardView() {
         setMyVerified(me.verificationStatus === "VERIFIED");
         setAvailConfigured(!!(me as { weeklyAvailability?: unknown }).weeklyAvailability);
         setChallengeWinner(!!(me as { challengeWinner?: boolean }).challengeWinner);
+        /* v1.12.0: حالة إمضاء عقد المنصة — للافتة الإلزامية */
+        const pcs = (me as { platformContractSigned?: boolean }).platformContractSigned;
+        setPlatformContractSigned(typeof pcs === "boolean" ? pcs : null);
         setStats({ upcoming: 0, done: me.sessionsCount, rating: me.rating });
       }
       // stats
@@ -378,6 +384,29 @@ export function CounselorDashboardView() {
                 <p className="font-bold text-sm">{t.counselor.pendingTitle}</p>
                 <p className="text-xs text-muted-foreground">{t.counselor.pendingDesc}</p>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ═ v1.12.0: لافتة إمضاء عقد المنصة — بدونها لن تُنشأ عقود لعملائه ═ */}
+        {platformContractSigned === false && (
+          <Card className="border-primary/40 bg-primary/[0.04]">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center gap-4">
+                <FileSignature className="h-7 w-7 text-primary shrink-0" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-sm">{t.contract.settingsTitle}</p>
+                  <p className="text-xs text-muted-foreground">{t.contract.notSignedBadge}</p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="gradient-primary text-white font-bold rounded-lg w-full sm:w-auto"
+                onClick={() => setView("settings")}
+              >
+                <FileSignature className="h-4 w-4" />
+                {t.contract.signNowBtn}
+              </Button>
             </CardContent>
           </Card>
         )}

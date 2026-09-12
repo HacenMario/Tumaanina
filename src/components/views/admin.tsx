@@ -39,6 +39,10 @@ import {
   Crown,
   Wallet,
   Clock3,
+  FileSignature,
+  Save,
+  Lock,
+  Check,
 } from "lucide-react";
 import { LayoutDashboard } from "lucide-react";
 import { WILAYA_LIST, WILAYA_LABELS, AGE_LABELS, SPECIALTIES } from "@/lib/constants";
@@ -464,6 +468,63 @@ export function AdminPanelView() {
   const [foundersBusy, setFoundersBusy] = useState(false);
   const [foundersMsg, setFoundersMsg] = useState("");
   const [foundersErr, setFoundersErr] = useState("");
+
+  /* ═ v1.12.0: عقد المنصة الواحد — تديره الإدارة حصراً من هذا التبويب ═ */
+  const [pcText, setPcText] = useState("");
+  const [pcUpdatedAt, setPcUpdatedAt] = useState<string | null>(null);
+  const [pcUpdatedBy, setPcUpdatedBy] = useState<string | null>(null);
+  const [pcLoading, setPcLoading] = useState(true);
+  const [pcBusy, setPcBusy] = useState(false);
+  const [pcMsg, setPcMsg] = useState("");
+  const [pcErr, setPcErr] = useState("");
+
+  /* v1.12.0: تحميل نص عقد المنصة (قراءة في أي وقت — تُستدعى عند فتح التبويب) */
+  const loadPlatformContract = useCallback(async () => {
+    setPcLoading(true);
+    try {
+      const d = await fetch("/api/admin", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({ action: "platform-contract-get" }),
+      }).then((r) => r.json());
+      if (d?.ok && d.platform) {
+        setPcText(d.platform.text || "");
+        setPcUpdatedAt(d.platform.updatedAt || null);
+        setPcUpdatedBy(d.platform.updatedBy || null);
+      }
+    } catch {
+      /* الشبكة — زر التحديث يعيد المحاولة */
+    } finally {
+      setPcLoading(false);
+    }
+  }, []);
+
+  /* v1.12.0: حفظ نص عقد المنصة — الإدارة وحدها، والنسخ الموقعة سابقاً لقطات لا تُمَس */
+  const savePlatformContractText = useCallback(async () => {
+    setPcMsg("");
+    setPcErr("");
+    if (pcText.trim().length < 100) {
+      setPcErr(t.admin.contractTooShort);
+      return;
+    }
+    setPcBusy(true);
+    try {
+      const d = await fetch("/api/admin", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({ action: "platform-contract-save", text: pcText.trim() }),
+      }).then((r) => r.json());
+      if (d?.ok) {
+        setPcUpdatedAt(d.updatedAt || new Date().toISOString());
+        setPcMsg(t.admin.contractSavedOk);
+      } else if (d?.error === "INVALID_TEXT") setPcErr(t.admin.contractTooShort);
+      else setPcErr(t.common.error);
+    } catch {
+      setPcErr(t.common.error);
+    } finally {
+      setPcBusy(false);
+    }
+  }, [pcText, t]);
 
   const load = useCallback(async () => {
     const [p, f, c, s, q] = await Promise.all([
@@ -1319,6 +1380,11 @@ export function AdminPanelView() {
             <Heart className="h-3.5 w-3.5" />
             {t.gratitude.adminTab}
           </TabsTrigger>
+          {/* ═ v1.12.0: عقد المنصة الواحد — تديره الإدارة حصراً ═ */}
+          <TabsTrigger value="contract" className="font-bold flex items-center gap-1.5 shrink-0">
+            <FileSignature className="h-3.5 w-3.5" />
+            {t.admin.contractTab}
+          </TabsTrigger>
           {/* ─── v2.8.0: الطلبات الملغاة + الإشعار الجماعي + المؤسسون ─── */}
           <TabsTrigger value="cancelled" className="font-bold flex items-center gap-1.5 shrink-0">
             <Ban className="h-3.5 w-3.5" />
@@ -1899,6 +1965,29 @@ export function AdminPanelView() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* ═ v1.12.0: عقد المنصة الواحد — الإدارة تعدّل نصه هنا حصراً.
+            العقد واحد لكل المستخدمين (أخصائيين وعملاء) ويمثل المنصة:
+            الأخصائي يمضيه كما هو دون أي تعديل، وكل حجز جديد يأخذ لقطة
+            محمية من هذا النص — النسخ الموقعة سابقاً لا تُمَس أبداً. ═ */}
+        <TabsContent value="contract" className="space-y-3">
+          <PlatformContractAdminCard
+            loading={pcLoading}
+            text={pcText}
+            updatedAt={pcUpdatedAt}
+            updatedBy={pcUpdatedBy}
+            busy={pcBusy}
+            msg={pcMsg}
+            err={pcErr}
+            onTextChange={(v) => {
+              setPcText(v);
+              setPcMsg("");
+              setPcErr("");
+            }}
+            onLoad={loadPlatformContract}
+            onSave={savePlatformContractText}
+          />
         </TabsContent>
 
         {/* ─── v2.8.0: الطلبات الملغاة — كل طلب بتفاصيله في نافذة منبثقة ─── */}
@@ -2890,6 +2979,121 @@ function StaffTab() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ═ v1.12.0: بطاقة إدارة عقد المنصة الواحد — الإدارة وحدها تعدّل نص العقد
+   الذي يمثل المنصة كاملة. العقد واحد لكل المستخدمين: يُعرض على الأخصائيين
+   قراءةً فقط ليمضوه، وعلى العملاء في نافذة الامضاء الإلزامية، وكل حجز
+   جديد يأخذ لقطة محمية من النص المعتمد لحظة إنشائه. ═ */
+function PlatformContractAdminCard({
+  loading,
+  text,
+  updatedAt,
+  updatedBy,
+  busy,
+  msg,
+  err,
+  onTextChange,
+  onLoad,
+  onSave,
+}: {
+  loading: boolean;
+  text: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  busy: boolean;
+  msg: string;
+  err: string;
+  onTextChange: (v: string) => void;
+  onLoad: () => void;
+  onSave: () => void;
+}) {
+  const { t } = useI18n();
+
+  useEffect(() => {
+    onLoad();
+  }, [onLoad]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="font-black text-lg flex items-center gap-2">
+            <FileSignature className="h-5 w-5 text-primary" />
+            {t.admin.contractTab}
+          </h2>
+          <Badge variant="outline" className="text-[10px] font-bold gap-1 border-primary/40 text-primary">
+            <Lock className="h-3 w-3" />
+            {t.admin.contractLockedBadge}
+          </Badge>
+        </div>
+        <Button size="sm" variant="outline" className="rounded-lg font-bold gap-1.5" disabled={loading} onClick={onLoad}>
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          {t.admin.dashRefresh}
+        </Button>
+      </div>
+
+      <Card className="border-primary/30 bg-primary/[0.03]">
+        <CardContent className="p-5 space-y-4">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground font-bold leading-relaxed">{t.admin.contractAdminDesc}</p>
+            <p className="text-[11px] text-muted-foreground/80 font-semibold leading-relaxed">{t.admin.contractAdminNote}</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted-foreground">
+            {updatedAt ? (
+              <>
+                <Badge variant="outline" className="text-[10px] font-bold">
+                  {t.admin.contractLastUpdate}: {formatDateTime(new Date(updatedAt))}
+                </Badge>
+                {updatedBy && (
+                  <Badge variant="outline" className="text-[10px] font-bold">
+                    {t.admin.contractEditor}: {updatedBy}
+                  </Badge>
+                )}
+              </>
+            ) : (
+              <Badge variant="outline" className="text-[10px] font-bold">{t.admin.contractNeverEdited}</Badge>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="font-bold text-xs flex items-center gap-1.5">
+              <FileSignature className="h-3.5 w-3.5 text-primary" />
+              {t.admin.contractTextLabel}
+            </Label>
+            {loading ? (
+              <div className="rounded-xl bg-muted/40 h-72 animate-pulse" />
+            ) : (
+              <Textarea
+                value={text}
+                onChange={(e) => onTextChange(e.target.value)}
+                rows={16}
+                maxLength={15000}
+                dir="auto"
+                className="rounded-xl bg-card text-sm leading-relaxed min-h-80"
+                placeholder={t.admin.contractPlaceholder}
+              />
+            )}
+            <p className="text-[10px] font-bold text-muted-foreground">{text.length} / 15000</p>
+          </div>
+
+          {err && <div className="rounded-xl bg-destructive/10 text-destructive text-xs font-bold px-3 py-2">{err}</div>}
+          {msg && <div className="rounded-xl bg-primary/10 text-primary text-xs font-bold px-3 py-2 flex items-center gap-1.5"><Check className="h-4 w-4 shrink-0" />{msg}</div>}
+
+          <Button
+            size="sm"
+            className="gradient-primary text-white font-bold rounded-lg w-full sm:w-auto"
+            disabled={busy || loading || text.trim().length < 100}
+            onClick={onSave}
+          >
+            <Save className="h-4 w-4" />
+            {busy ? t.common.loading : t.admin.contractSaveBtn}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

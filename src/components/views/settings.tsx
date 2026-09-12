@@ -29,6 +29,7 @@ import {
   FileSignature,
   Clock3,
   PenLine,
+  Lock,
 } from "lucide-react";
 import { useI18n, LANG_META } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -53,10 +54,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/shared/signature-pad";
 import { ContractDocument, ContractPrintButton, type ContractDocData } from "@/components/shared/contract-document";
-import { CONTRACT_LANGS, CONTRACT_LANG_LABELS, SUGGESTED_TEMPLATE } from "@/lib/contract-template";
+/* v1.12.0: نُزعت خاصية العقد الخاص نهائياً — عقد المنصة واحد يديره الأدمين */
 import { formatDateTime } from "@/lib/utils";
 
 const MAX_AVATAR_BYTES = 900_000;
@@ -238,8 +238,11 @@ export function SettingsView() {
   /* ═ v1.9.0: سنوات الخبرة (أخصائي) — يعدّلها من إعداداته ═ */
   const [yearsExp, setYearsExp] = useState<string>("0");
 
-  /* ═ v1.9.0: العقد العلاجي (أخصائي) — قالب + إمضاء + قائمة العقود الممضاة ═ */
+  /* ═ v1.12.0: عقد المنصة (أخصائي) — نص معتمد من الإدارة قراءةً فقط
+     + إمضاء الأخصائي عليه + قائمة العقود الممضاة من الطرفين ═ */
   const [contractText, setContractText] = useState("");
+  const [contractLocked, setContractLocked] = useState(true);
+  const [contractPlatformAt, setContractPlatformAt] = useState<string | null>(null);
   const [contractSignature, setContractSignature] = useState<string | null>(null);
   const [contractSignedAt, setContractSignedAt] = useState<string | null>(null);
   const [contractBusy, setContractBusy] = useState(false);
@@ -247,8 +250,6 @@ export function SettingsView() {
   const [contractErr, setContractErr] = useState("");
   const [cContracts, setCContracts] = useState<CContractRow[]>([]);
   const [viewContract, setViewContract] = useState<CContractFull | null>(null);
-  /* v1.10.0: لغة القالب المقترح — يختارها الأخصائي فيُعبّأ المحرر بها فوراً */
-  const [templateLang, setTemplateLang] = useState<string>(lang);
   const [viewBusy, setViewBusy] = useState(false);
 
   const availDirty = () => {
@@ -393,6 +394,8 @@ export function SettingsView() {
         const tpl = d?.template;
         if (!tpl) return;
         setContractText(tpl.text || "");
+        setContractLocked(tpl.locked !== false); /* v1.12.0: النص محمي دائماً — الإدارة وحدها تعدّله */
+        setContractPlatformAt(tpl.platformUpdatedAt || null);
         setContractSignature(tpl.signature || null);
         setContractSignedAt(tpl.signedAt || null);
       })
@@ -601,15 +604,12 @@ export function SettingsView() {
     }
   };
 
-  /* ═ v1.9.0: حفظ قالب العقد العلاجي مع الإمضاء الرقمي (أخصائي) ═ */
+  /* ═ v1.12.0: إمضاء الأخصائي على عقد المنصة — النص معتمد من الإدارة
+     ولا يقبل أي تعديل؛ الأخصائي يمضي فقط فتُنشأ عقود عملائه بلقطة النص ═ */
   const saveContract = async () => {
     if (!user || user.role !== "COUNSELOR") return;
     setContractErr("");
     setContractMsg("");
-    if (!contractText || contractText.trim().length < 100) {
-      setContractErr(t.contract.textTooShort);
-      return;
-    }
     if (!contractSignature) {
       setContractErr(t.contract.mustSign);
       return;
@@ -620,9 +620,8 @@ export function SettingsView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "save-template",
+          action: "counselor-sign",
           userId: user.id,
-          text: contractText,
           signature: contractSignature,
         }),
       });
@@ -631,7 +630,7 @@ export function SettingsView() {
         setContractSignedAt(data.signedAt || new Date().toISOString());
         setContractMsg(t.contract.savedOk);
         toast({ title: t.contract.savedOk });
-        /* تحديث قائمة العقود بعد الحفظ (قد تُنشأ عقود جديدة بعد أي قبول) */
+        /* تحديث قائمة العقود بعد الحفظ (تُنشأ عقود الجلسات الحية فوراً) */
         fetch(`/api/contract?view=list&userId=${user.id}`, { cache: "no-store" })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
@@ -639,7 +638,6 @@ export function SettingsView() {
           })
           .catch(() => {});
       } else if (data.error === "SIGNATURE_REQUIRED") setContractErr(t.contract.mustSign);
-      else if (data.error === "INVALID_TEXT") setContractErr(t.contract.textTooShort);
       else setContractErr(t.common.error);
     } catch {
       setContractErr(t.common.error);
@@ -1361,9 +1359,11 @@ export function SettingsView() {
         </Card>
       )}
 
-      {/* ═══ v1.9.0: العقد العلاجي (أخصائي فقط) — قالب يعدّله ويمضيه رقمياً
-          ويحفظه، ثم يُنسخ لكل عميل عند قبول جلسته وتُحفظ النسخ الموقّعة
-          من الطرفين هنا في حسابه ═══ */}
+      {/* ═══ v1.12.0: عقد المنصة العلاجي (أخصائي فقط) — عقد واحد لكل المستخدمين
+          يمثل المنصة، نصه معتمد من الإدارة ومحمي من أي تعديل (قراءةً فقط)،
+          والأخصائي يمضيه رقمياً هنا — لحظة حجز أي عميل جلسة معه يُنشأ له
+          عقد مستقل برقم تسلسلي فوري بلقطة النص وإمضائه، وتُحفظ النسخة
+          الموقّعة من الطرفين هنا في حسابه ═══ */}
       {isCounselor && (
         <Card className="border-primary/30 bg-primary/[0.03]">
           <CardContent className="p-6 space-y-5">
@@ -1373,7 +1373,7 @@ export function SettingsView() {
             </h2>
             <p className="text-xs text-muted-foreground leading-relaxed -mt-2">{t.contract.settingsDesc}</p>
 
-            {/* حالة القالب الحالي */}
+            {/* حالة الإمضاء + وسم الحماية */}
             <div className="flex flex-wrap items-center gap-2">
               {contractSignedAt ? (
                 <Badge className="text-[11px] bg-primary/15 text-primary border-0 gap-1">
@@ -1381,67 +1381,42 @@ export function SettingsView() {
                   {t.contract.signedBadge} · {formatDateTime(new Date(contractSignedAt))}
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-[11px] font-bold text-muted-foreground">
+                <Badge variant="outline" className="text-[11px] font-bold text-amber-600 dark:text-amber-400 border-amber-500/40">
                   {t.contract.notSignedBadge}
                 </Badge>
               )}
+              <Badge variant="outline" className="text-[11px] font-bold gap-1 border-primary/40 text-primary">
+                <Lock className="h-3 w-3" />
+                {t.contract.lockedBadge}
+              </Badge>
             </div>
 
-            {/* نص العقد */}
+            {/* v1.12.0: نص عقد المنصة — قراءةً فقط، الإدارة وحدها تعدّله */}
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Label className="font-bold text-xs">{t.contract.templateLabel}</Label>
-                {/* v1.10.0: قالب مقترح سداسي اللغات — اللغة تُختار قبل التعبئة */}
-                <div className="flex items-center gap-2">
-                  <Select value={templateLang} onValueChange={setTemplateLang}>
-                    <SelectTrigger className="h-8 w-28 text-[11px] rounded-lg font-bold">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CONTRACT_LANGS.map((l) => (
-                        <SelectItem key={l} value={l}>
-                          {CONTRACT_LANG_LABELS[l]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[11px] font-bold rounded-lg"
-                    onClick={() => {
-                      setContractText(SUGGESTED_TEMPLATE[(templateLang as keyof typeof SUGGESTED_TEMPLATE) || "ar"] || SUGGESTED_TEMPLATE.ar);
-                      setContractMsg("");
-                      setContractErr("");
-                    }}
-                  >
-                    {t.contract.useTemplate}
-                  </Button>
-                </div>
+                {contractPlatformAt && (
+                  <span className="text-[10px] font-bold text-muted-foreground">
+                    {t.contract.platformUpdatedAt}: {formatDateTime(new Date(contractPlatformAt))}
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground font-semibold">{t.contract.templateHint}</p>
-              <Textarea
-                value={contractText}
-                onChange={(e) => {
-                  setContractText(e.target.value);
-                  setContractMsg("");
-                  setContractErr("");
-                }}
-                rows={10}
-                maxLength={15000}
+              <div
                 dir="auto"
-                className="rounded-xl bg-card text-sm leading-relaxed min-h-52"
-                placeholder={t.contract.templatePlaceholder}
-              />
+                className="rounded-xl border border-border bg-card text-sm leading-relaxed max-h-72 overflow-y-auto p-4 whitespace-pre-wrap select-text"
+              >
+                {contractText || t.contract.loadingText}
+              </div>
             </div>
 
-            {/* الإمضاء الرقمي */}
+            {/* الإمضاء الرقمي على عقد المنصة — لا تعديل ولا عقد خاص */}
             <div className="space-y-1.5">
               <Label className="font-bold text-xs flex items-center gap-1.5">
                 <PenLine className="h-3.5 w-3.5 text-primary" />
                 {t.contract.signLabel}
               </Label>
+              <p className="text-[11px] text-muted-foreground font-semibold">{t.contract.signHintLocked}</p>
               <SignaturePad
                 onChange={setContractSignature}
                 height={280} /* v1.10.0: مساحة امضاء أطول وأوسع — راحة كاملة في الرسم */

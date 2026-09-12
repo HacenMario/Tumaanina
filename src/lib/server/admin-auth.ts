@@ -67,6 +67,9 @@ const ACTION_MIN_LEVEL: Record<string, StaffLevel> = {
   "challenge-reset": 2,
   /* v1.7.0: مستحقات المختصين — قراءة فقط (نسخة إدارية من «إحصائياتي») */
   "counselors-earnings": 1,
+  /* v1.12.0: عقد المنصة الواحد — قراءة للمسير، وتعديل النص لأدمين كامل */
+  "platform-contract-get": 1,
+  "platform-contract-save": 2,
 };
 
 function secret(): string {

@@ -194,19 +194,21 @@ const SupportSessionSchema = new Schema(
   { timestamps: true, collection: "sessions" }
 );
 
-/* ═ v1.9.0: TherapyContract — العقد العلاجي المستقل لكل (أخصائي × عميل) ═
-   v1.10.0: يُنشأ تلقائياً لحظة حجز العميل جلسة مع الأخصائي (وبقية مسار القبول
-   احتياطاً) بلقطة نص القالب وإمضاء الأخصائي المسبق من إعداداته — فتظهر
-   النافذة للعميل مباشرة بعد الحجز على أي صفحة مفتوحة. كل عقد يحمل رقماً
-   تسلسلياً فريداً (TC-YYYY-00001) يُولَّد ذرياً من عدّاد مركزي فلا تكرار،
-   ولغة مستند معتمدة عند الطباعة/الحفظ PDF. */
+/* ═ v1.11.0: TherapyContract — العقد العلاجي المستقل لكل جلسة ═
+   v1.10.0 كانت قاعدة «عقد واحد لكل زوج (أخصائي × عميل)» — بعد إمضاء العميل
+   الأول لم يُنشأ له عقدٌ أبداً في الحجوزات التالية فتوقفت النافذة المنبثقة
+   (بلاغ المستخدم: «تظهر فقط في المرة الأولى»). الإصلاح: كل جلسة محجوزة
+   تُنشئ عقدها المستقل برقمه التسلسلي ولقطة نص الأخصائي وإمضائه — فتظهر
+   النافذة المنبثقة بعد كل حجز مهما تكرر، وسجل العقود الممضية كامل لدى
+   الطرفين. كل عقد يحمل رقماً تسلسلياً فريداً (TC-YYYY-00001) يُولّد ذرياً
+   من عدّاد مركزي فلا تكرار، ولغة مستند معتمدة عند الطباعة/الحفظ PDF. */
 const TherapyContractSchema = new Schema(
   {
     /* v1.10.0: الرقم التسلسلي الرسمي للعقد — فريد (يُولَّد من العدّاد الذرّي) */
     number: { type: String, unique: true, sparse: true },
     counselorId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     clientUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    /* الجلسة التي ولّدت العقد / آخر جلسة مرتبطة به */
+    /* v1.11.0: الجلسة صاحبة هذا العقد — كل جلسة لعقدها المستقل */
     sessionId: { type: Schema.Types.ObjectId, ref: "SupportSession", default: null },
     /* لقطة نص العقد لحظة الإنشاء — لا تُحدَّث بعد توقيع الطرفين */
     contractText: { type: String, required: true },
@@ -229,6 +231,20 @@ const TherapyContractSchema = new Schema(
   { timestamps: true, collection: "therapy_contracts" }
 );
 
+/* ═ v1.12.0: عقد المنصة الواحد — مستند مفرد (singleton) يمثل المنصة كاملة ═
+   عقد علاجي واحد لكل المستخدمين، نصه تديره الإدارة حصراً من لوحة الأدمين،
+   ولا يمكن لأي أخصائي أو عميل إنشاء عقد خاص أو تعديل نصه — الأخصائي
+   يكتفي بالإمضاء عليه، والعقد يُنسخ كلقطة محمية إلى كل جلسة محجوزة. */
+const PlatformContractSchema = new Schema(
+  {
+    /* مستند مفرد دائماً بمعرّف ثابت "platform" */
+    _id: { type: String, default: "platform" },
+    text: { type: String, required: true },
+    updatedBy: { type: String, default: null }, /* اسم من عدّل من فريق الإدارة */
+  },
+  { timestamps: true, collection: "platform_contract" }
+);
+
 /* ═ v1.10.0: عدّاد ذرّي لأرقام العقود — findOneAndUpdate مع $inc ذرّية
    فلا يمكن أن يحصل عقدان على نفس الرقم حتى مع تزامن كامل ═ */
 const ContractCounterSchema = new Schema(
@@ -238,8 +254,11 @@ const ContractCounterSchema = new Schema(
   },
   { collection: "contract_counters" }
 );
-/* عقد واحد فقط لكل زوج (أخصائي × عميل) */
-TherapyContractSchema.index({ counselorId: 1, clientUserId: 1 }, { unique: true });
+/* v1.11.0: فهرس استعلام للثلاثية (أخصائي × عميل × جلسة) — عقد مستقل لكل جلسة.
+   ملاحظة: الفهرس الفريد القديم على الزوج (v1.10.0) يُسقَط تلقائياً عند
+   الإقلاع عبر ensureContractIndexes() في lib/server/contract.ts — وإلا
+   لمنع إنشاء عقد ثانٍ لنفس الزوج بعد إمضاء الأول فتتوقف النافذة مجدداً. */
+TherapyContractSchema.index({ counselorId: 1, clientUserId: 1, sessionId: 1 });
 
 /* ─── Message ─── */
 const MessageSchema = new Schema(
@@ -574,6 +593,11 @@ export const Exercise =
 export const TherapyContract =
   (mongoose.models.TherapyContract as mongoose.Model<any>) ||
   mongoose.model("TherapyContract", TherapyContractSchema);
+
+/* v1.12.0: عقد المنصة الواحد — تديره الإدارة حصراً */
+export const PlatformContract =
+  (mongoose.models.PlatformContract as mongoose.Model<any>) ||
+  mongoose.model("PlatformContract", PlatformContractSchema);
 
 /* v1.10.0: عدّاد أرقام العقود الذرّي */
 export const ContractCounter =

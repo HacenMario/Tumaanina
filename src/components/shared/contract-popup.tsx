@@ -1,15 +1,17 @@
 "use client";
 
 /**
- * v1.10.0 — النافذة المنبثقة الإلزامية للعقد العلاجي (جهة العميل).
+ * v1.12.0 — النافذة المنبثقة الإلزامية للعقد العلاجي (جهة العميل).
  *
- * المنطق الجديد (طلب المستخدم الحرفي):
- * • تُنشأ نسخة العقد لحظة حجز العميل الجلسة (بإمضاء الأخصائي المسبق
- *   من إعداداته) — فتظهر النافذة للعميل مباشرة بعد الحجز في نفس الصفحة
- *   عبر حدث tumaanina-contract-arrived، أو على أي صفحة أخرى مفتوحة
- *   عبر استقصاء كل 6 ثوانٍ — دون إعادة فتح المنصة أو التطبيق إطلاقاً.
- * • مسار القبول الاحتياطي (أخصائي أعّد عقده بعد الحجز) يغطيه الاستقصاء
- *   نفسه فلا يفوت أي عقد أبداً.
+ * المنطق (عقد المنصة الواحد):
+ * • عقد المنصة واحد لكل المستخدمين (تديره الإدارة) — الأخصائي يمضيه،
+ *   ولحظة حجز العميل جلسة معه يُنشأ للجلسة عقد مستقل برقم تسلسلي فريد
+ *   فيظهر للعميل مباشرة بعد الحجز في نفس الصفحة عبر حدث
+ *   tumaanina-contract-arrived، أو على أي صفحة أخرى مفتوحة عبر استقصاء
+ *   كل 6 ثوانٍ — دون إعادة فتح المنصة أو التطبيق إطلاقاً.
+ * • v1.12.0 (إصلاح «تظهر مرة واحدة فقط»): الحالة مربوطة بمعرّف العقد
+ *   لا بعَلَم عام — كل عقد بانتظار جديد (حجز جديد لأي جلسة) يفتح النافذة
+ *   من جديد ويُصفّر الإمضاء والاسم، بغض النظر عن أي عقد سابق مُمضى.
  * • النافذة إلزامية (بلا إغلاق): قراءة المستند الرسمي برقمه التسلسلي ←
  *   اختيار لغة المستند ← الامضاء بلوحة واسعة ← كتابة الاسم الكامل ←
  *   زر «أقبل» — فتُحفظ النسخة الموقّعة من الطرفين في حساب الأخصائي.
@@ -60,9 +62,23 @@ export function ContractPopup() {
   const contractRef = useRef<PendingContract | null>(null);
   const loadRef = useRef<(() => void) | null>(null);
   const busyRef = useRef(false);
+  const lastOpenedIdRef = useRef<string | null>(null); /* آخر عقد فُتحت له النافذة */
 
+  /* v1.12.0: الافتتاح مربوط بمعرّف العقد — كل عقد بانتظار جديد (معرّف
+     مختلف عن آخر عقد فُتحت له النافذة) يفتح النافذة من جديد ويصفّر
+     خطوات الامضاء — فهذا هو إصلاح «تظهر فقط في المرة الأولى»: لا عَلَم
+     عام يُطفئ النافذة بعد أول عرض، والاستقصاء مستمر طالما العميل مسجّل */
   const maybeOpen = useCallback(() => {
-    if (armedRef.current && contractRef.current) setContract(contractRef.current);
+    const c = contractRef.current;
+    if (!armedRef.current || !c) return;
+    if (lastOpenedIdRef.current !== c.id) {
+      /* عقد جديد — تصفير كامل لخطوات الامضاء قبل العرض */
+      setSignature(null);
+      setFullName("");
+      setErr("");
+      lastOpenedIdRef.current = c.id;
+    }
+    setContract(c);
   }, []);
 
   const arm = useCallback(() => {
@@ -177,6 +193,7 @@ export function ContractPopup() {
         contractRef.current = null;
         setSignature(null);
         setFullName("");
+        lastOpenedIdRef.current = null; /* الحجز القادم (عقد جديد) يفتح النافذة من جديد */
         toast({ title: t.contract.acceptSuccess, description: t.contract.acceptSuccessDesc });
       } else if (data.error === "NAME_REQUIRED") setErr(t.contract.nameRequired);
       else if (data.error === "SIGNATURE_REQUIRED") setErr(t.contract.mustSign);

@@ -1,16 +1,18 @@
 "use client";
 
 /**
- * v1.10.0 — مستند العقد العلاجي الاحترافي (WYSIWYG) + نظام الطباعة/حفظ PDF.
+ * v1.11.0 — مستند العقد العلاجي الاحترافي (WYSIWYG) + نظام الطباعة/حفظ PDF.
  * ─────────────────────────────────────────────────────────────────
  * • يُرسم المستند بهيكل وثيقة رسمية كاملة: ترويسة المنصة، رقم العقد
  *   التسلسلي، تاريخ الإبرام، الأطراف، البنود، الإقرار، توقيعا الطرفين
  *   بتاريخيهما، وتذييل التوثيق — بنفس الشكل تماماً على الشاشة وعلى الورق.
  * • اللغة تُختار قبل الطباعة من قائمة الست لغات فتتغير ترويسة المستند
  *   وبنيته لغوياً فوراً (معاينة حية قبل الطباعة).
- * • الطباعة تعزل المستند وحده في صفحة A4 بأسلوب مضغوط احترافي —
- *   يخرج في صفحة واحدة (أو حسب طول نص الأخصائي) بدل صفحات مبعثرة،
- *   عبر طبقة #tumaanina-contract-print وcss @media print في globals.css.
+ * • v1.11.0 — مستويان للرسم:
+ *   variant="screen" للمعاينة داخل النوافذ (خطوط صغيرة مضغوطة)،
+ *   variant="print" للطباعة بخطوط مضبوطة لصفحة A4 فتمتلئ الصفحة
+ *   بمقاس مريح للمطالعة — والمستند يخرج بصفحة واحدة أو بعدد صفحات
+ *   نص العقد الحقيقي فقط، بلا أي صفحات فارغة (إصلاح بلاغ المستخدم).
  */
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -50,10 +52,28 @@ function blocksOf(text: string): { heading: string | null; body: string[] }[] {
   });
 }
 
+/* ═══ v1.12.0: مقاسا الرسم — شاشة (معاينة مضغوطة) وطباعة (A4 مريح) ═══
+   طباعة: خط أساس 13px ≈ 9.8pt على عرض محتوى A4 (حوالي 184مم) — مقاس
+   وثيقة رسمية مريح للمطالعة، والمحتوى يتدفق طبيعياً على عدد صفحات
+   نص العقد الحقيقي فقط بلا أي صفحات فارغة (إصلاح بلاغ المستخدم). */
+const SIZES = {
+  screen: {
+    platform: 9.5, title: 15, meta: 9.5, intro: 10.5, partyLabel: 8.5, partyName: 10.5,
+    clauseBody: 10, clauseHead: 10, clauseLine: 1.42, sectionTitle: 11.5,
+    declText: 9.5, sigLabel: 8.5, sigName: 8.5, sigBox: 46, sigImg: 42, footer: 7.5,
+  },
+  print: {
+    platform: 11, title: 19, meta: 11.5, intro: 12.5, partyLabel: 10, partyName: 12.5,
+    clauseBody: 13, clauseHead: 13, clauseLine: 1.6, sectionTitle: 14,
+    declText: 12.5, sigLabel: 10, sigName: 11.5, sigBox: 64, sigImg: 56, footer: 9,
+  },
+} as const;
+
 /* ═══ المستند نفسه — ألوان صريحة ثابتة ليطبع كما يُرى ═══ */
-export function ContractDocument({ data, lang }: { data: ContractDocData; lang: string }) {
+export function ContractDocument({ data, lang, variant = "screen" }: { data: ContractDocData; lang: string; variant?: "screen" | "print" }) {
   const d = docTexts(lang);
   const dir = docDir(lang);
+  const S = SIZES[variant];
   const issued = docDate(data.createdAt || data.counselorSignedAt, lang);
   const blocks = blocksOf(data.text);
   const clientDisplayName = data.clientSignedName || data.clientName || "—";
@@ -61,15 +81,15 @@ export function ContractDocument({ data, lang }: { data: ContractDocData; lang: 
   return (
     <div dir={dir} lang={lang} style={{ background: "#ffffff", color: "#141414", fontFamily: lang === "ar" ? "'Noto Naskh Arabic', 'Amiri', serif" : "Georgia, 'Times New Roman', serif" }}>
       {/* الترويسة */}
-      <div style={{ textAlign: "center", borderBottom: "3px double #1a1a1a", paddingBottom: "8px", marginBottom: "10px" }}>
-        <div style={{ fontSize: "9.5px", letterSpacing: "0.08em", color: "#3f6212", fontWeight: 700, marginBottom: "2px" }}>{d.platform}</div>
-        <h1 style={{ fontSize: "15px", fontWeight: 800, lineHeight: 1.3, margin: 0 }}>{d.title}</h1>
+      <div data-nosplit="true" style={{ textAlign: "center", borderBottom: "3px double #1a1a1a", paddingBottom: "8px", marginBottom: "12px" }}>
+        <div style={{ fontSize: `${S.platform}px`, letterSpacing: "0.1em", color: "#3f6212", fontWeight: 700, marginBottom: "3px" }}>{d.platform}</div>
+        <h1 style={{ fontSize: `${S.title}px`, fontWeight: 800, lineHeight: 1.3, margin: 0 }}>{d.title}</h1>
       </div>
 
       {/* سطر البيانات: رقم العقد + تاريخ الإبرام + الحالة */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", justifyContent: "space-between", alignItems: "center", fontSize: "9.5px", background: "#f4f7ec", border: "1px solid #d9e3c8", borderRadius: "6px", padding: "5px 8px", marginBottom: "8px" }}>
+      <div data-nosplit="true" style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", justifyContent: "space-between", alignItems: "center", fontSize: `${S.meta}px`, background: "#f4f7ec", border: "1px solid #d9e3c8", borderRadius: "6px", padding: "6px 10px", marginBottom: "10px" }}>
         <span style={{ fontWeight: 800 }}>
-          {d.docNo}: <span style={{ fontFamily: "monospace", fontSize: "10px", letterSpacing: "0.04em" }} dir="ltr">{data.number || "—"}</span>
+          {d.docNo}: <span style={{ fontFamily: "monospace", fontSize: `${S.meta + 0.5}px`, letterSpacing: "0.04em" }} dir="ltr">{data.number || "—"}</span>
         </span>
         <span style={{ fontWeight: 600 }}>
           {d.issuedOn}: <span dir="ltr">{issued}</span>
@@ -80,65 +100,65 @@ export function ContractDocument({ data, lang }: { data: ContractDocData; lang: 
       </div>
 
       {/* الأطراف */}
-      <p style={{ fontSize: "10.5px", fontWeight: 600, margin: "0 0 6px" }}>{(d.intro || "").replace("{date}", issued)}</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
-        <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "5px 8px", fontSize: "9.5px" }}>
-          <div style={{ color: "#4b5563", fontSize: "8.5px", fontWeight: 700, marginBottom: "2px" }}>{d.party1}</div>
-          <div style={{ fontWeight: 800, fontSize: "10.5px" }} dir="auto">{data.counselorName || "—"}</div>
+      <p data-nosplit="true" style={{ fontSize: `${S.intro}px`, fontWeight: 600, margin: "0 0 7px", lineHeight: 1.55 }}>{(d.intro || "").replace("{date}", issued)}</p>
+      <div data-nosplit="true" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+        <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "6px 10px", fontSize: `${S.partyLabel}px` }}>
+          <div style={{ color: "#4b5563", fontSize: `${S.partyLabel}px`, fontWeight: 700, marginBottom: "3px" }}>{d.party1}</div>
+          <div style={{ fontWeight: 800, fontSize: `${S.partyName}px` }} dir="auto">{data.counselorName || "—"}</div>
         </div>
-        <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "5px 8px", fontSize: "9.5px" }}>
-          <div style={{ color: "#4b5563", fontSize: "8.5px", fontWeight: 700, marginBottom: "2px" }}>{d.party2}</div>
-          <div style={{ fontWeight: 800, fontSize: "10.5px" }} dir="auto">{clientDisplayName}</div>
+        <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "6px 10px", fontSize: `${S.partyLabel}px` }}>
+          <div style={{ color: "#4b5563", fontSize: `${S.partyLabel}px`, fontWeight: 700, marginBottom: "3px" }}>{d.party2}</div>
+          <div style={{ fontWeight: 800, fontSize: `${S.partyName}px` }} dir="auto">{clientDisplayName}</div>
         </div>
       </div>
 
       {/* البنود */}
-      <div style={{ fontSize: "10px", lineHeight: 1.42 }}>
-        <h2 style={{ fontSize: "11.5px", fontWeight: 800, margin: "0 0 4px", borderBottom: "1px solid #d1d5db", paddingBottom: "2px" }}>{d.clausesTitle}</h2>
+      <div style={{ fontSize: `${S.clauseBody}px`, lineHeight: S.clauseLine }}>
+        <h2 style={{ fontSize: `${S.sectionTitle}px`, fontWeight: 800, margin: "0 0 6px", borderBottom: "1px solid #d1d5db", paddingBottom: "3px" }}>{d.clausesTitle}</h2>
         {blocks.map((b, i) => (
-          <div key={i} style={{ marginBottom: "5px" }}>
-            {b.heading && <div style={{ fontWeight: 800, fontSize: "10px", marginBottom: "1px", color: "#27351a" }}>{b.heading}</div>}
+          <div key={i} style={{ marginBottom: "7px" }}>
+            {b.heading && <div style={{ fontWeight: 800, fontSize: `${S.clauseHead}px`, marginBottom: "2px", color: "#27351a" }}>{b.heading}</div>}
             {b.body.map((line, j) => (
-              <p key={j} style={{ margin: "0 0 2px", textAlign: "justify", whiteSpace: "pre-wrap" }}>{line}</p>
+              <p key={j} style={{ margin: "0 0 3px", textAlign: "justify", whiteSpace: "pre-wrap" }}>{line}</p>
             ))}
           </div>
         ))}
       </div>
 
-      {/* الإقرار والتوقيعات */}
-      <div style={{ marginTop: "8px", borderTop: "1px solid #d1d5db", paddingTop: "6px" }}>
-        <h2 style={{ fontSize: "11.5px", fontWeight: 800, margin: "0 0 3px" }}>{d.declarationTitle}</h2>
-        <p style={{ fontSize: "9.5px", lineHeight: 1.45, margin: "0 0 8px", textAlign: "justify" }}>{d.declaration}</p>
+      {/* الإقرار والتوقيعات — اللوحة كاملة لا تنقسم بين صفحتين */}
+      <div data-nosplit="true" style={{ marginTop: "10px", borderTop: "1px solid #d1d5db", paddingTop: "8px" }}>
+        <h2 style={{ fontSize: `${S.sectionTitle}px`, fontWeight: 800, margin: "0 0 4px" }}>{d.declarationTitle}</h2>
+        <p style={{ fontSize: `${S.declText}px`, lineHeight: 1.55, margin: "0 0 10px", textAlign: "justify" }}>{d.declaration}</p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
           {/* إمضاء الأخصائي */}
-          <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "6px 8px" }}>
-            <div style={{ fontSize: "8.5px", fontWeight: 800, color: "#4b5563", marginBottom: "3px" }}>{d.signCounselor}</div>
-            <div style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid #9ca3af", marginBottom: "3px" }}>
+          <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "8px 10px" }}>
+            <div style={{ fontSize: `${S.sigLabel}px`, fontWeight: 800, color: "#4b5563", marginBottom: "4px" }}>{d.signCounselor}</div>
+            <div style={{ height: `${S.sigBox}px`, display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid #9ca3af", marginBottom: "4px" }}>
               {data.counselorSignature ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={data.counselorSignature} alt={d.signCounselor} style={{ maxHeight: "42px", maxWidth: "80%", objectFit: "contain" }} />
+                <img src={data.counselorSignature} alt={d.signCounselor} style={{ maxHeight: `${S.sigImg}px`, maxWidth: "80%", objectFit: "contain" }} />
               ) : (
                 <span style={{ fontSize: "8px", color: "#9ca3af" }}>—</span>
               )}
             </div>
-            <div style={{ fontSize: "8.5px", display: "flex", justifyContent: "space-between", gap: "6px" }}>
+            <div style={{ fontSize: `${S.sigName}px`, display: "flex", justifyContent: "space-between", gap: "6px" }}>
               <span style={{ fontWeight: 700 }} dir="auto">{data.counselorName || "—"}</span>
               {data.counselorSignedAt && <span dir="ltr" style={{ color: "#4b5563" }}>{docDate(data.counselorSignedAt, lang)}</span>}
             </div>
           </div>
           {/* إمضاء العميل */}
-          <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "6px 8px" }}>
-            <div style={{ fontSize: "8.5px", fontWeight: 800, color: "#4b5563", marginBottom: "3px" }}>{d.signClient}</div>
-            <div style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid #9ca3af", marginBottom: "3px" }}>
+          <div style={{ border: "1px solid #cfd8c2", borderRadius: "6px", padding: "8px 10px" }}>
+            <div style={{ fontSize: `${S.sigLabel}px`, fontWeight: 800, color: "#4b5563", marginBottom: "4px" }}>{d.signClient}</div>
+            <div style={{ height: `${S.sigBox}px`, display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid #9ca3af", marginBottom: "4px" }}>
               {data.clientSignature ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={data.clientSignature} alt={d.signClient} style={{ maxHeight: "42px", maxWidth: "80%", objectFit: "contain" }} />
+                <img src={data.clientSignature} alt={d.signClient} style={{ maxHeight: `${S.sigImg}px`, maxWidth: "80%", objectFit: "contain" }} />
               ) : (
-                <span style={{ color: data.status === "SIGNED" ? "#9ca3af" : "#b45309", fontWeight: 700, fontSize: "8.5px" }}>{d.awaiting}</span>
+                <span style={{ color: data.status === "SIGNED" ? "#9ca3af" : "#b45309", fontWeight: 700, fontSize: `${S.sigLabel}px` }}>{d.awaiting}</span>
               )}
             </div>
-            <div style={{ fontSize: "8.5px", display: "flex", justifyContent: "space-between", gap: "6px" }}>
+            <div style={{ fontSize: `${S.sigName}px`, display: "flex", justifyContent: "space-between", gap: "6px" }}>
               <span style={{ fontWeight: 700 }} dir="auto">{clientDisplayName}</span>
               {data.clientSignedAt && <span dir="ltr" style={{ color: "#4b5563" }}>{docDate(data.clientSignedAt, lang)}</span>}
             </div>
@@ -147,7 +167,7 @@ export function ContractDocument({ data, lang }: { data: ContractDocData; lang: 
       </div>
 
       {/* التذييل */}
-      <p style={{ marginTop: "8px", paddingTop: "4px", borderTop: "1px solid #e5e7eb", fontSize: "7.5px", color: "#6b7280", textAlign: "center", lineHeight: 1.4 }}>{d.footer}</p>
+      <p style={{ marginTop: "10px", paddingTop: "5px", borderTop: "1px solid #e5e7eb", fontSize: `${S.footer}px`, color: "#6b7280", textAlign: "center", lineHeight: 1.5 }}>{d.footer}</p>
     </div>
   );
 }
@@ -175,48 +195,78 @@ export function ContractLangSelect({ value, onChange, compact }: { value: string
   );
 }
 
-/* ═══ محرّك الطباعة — يعزل المستند وحده في طبقة مخصصة ثم يطبع A4 ═══
-   ينتظر تحميل صور الإمضاء قبل فتح حوار الطباعة حتى تخرج كاملة في PDF */
+/* ═══ محرّك الطباعة v1.12.0 — iframe معزول يحمل المستند وحده ═══
+   الجذر السابق للأخطاء (بلاغ المستخدم: صفحة أولى مضغوطة بفراغ سفلي كبير
+   + 6 صفحات فارغة): طباعة الصفحة الحية نفسها تخلط تخطيط المنصة بتخطيط
+   المستند مهما عزلنا بالـ CSS — قواعد الشاشة المتبقية (ارتفاعات شاشة
+   كاملة، طبقات ثابتة، تحجيمات) تولّد صفحات فارغة وفراغاً في الأسفل.
+   الحل الجذري: مستند مستقل نظيف داخل iframe مخفي يحمل المستند وحده
+   بقواعد ‎@page A4 الخاصة به — التخطيط للورق حصراً، المحتوى يتدفق
+   طبيعياً على عدد صفحات نص العقد الحقيقي فقط: لا فراغ سفلي ولا صفحات
+   فارغة إطلاقاً، وحجم الخط مضبوط للصفحة (نفس آلية طباعة الشهادات
+   المجرّبة في المنصة). */
 export function printContractDocument(render: (lang: string) => React.ReactElement, lang: string) {
   if (typeof document === "undefined") return;
-  const host = document.createElement("div");
-  host.id = "tumaanina-contract-print";
-  host.style.position = "fixed";
-  host.style.left = "-10000px";
-  host.style.top = "0";
-  host.style.width = "210mm";
-  host.style.background = "#fff";
-  document.body.appendChild(host);
-  const root = createRoot(host);
+  const dir = docDir(lang);
+  let frame: HTMLIFrameElement | null = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  document.body.appendChild(frame);
+  const doc = frame.contentDocument;
+  if (!doc) {
+    frame.remove();
+    frame = null;
+    return;
+  }
+  doc.open();
+  /* مستند نظيف بلا أي CSS من المنصة — هوامش الورق من @page مباشرة */
+  doc.write(
+    `<!DOCTYPE html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"><style>` +
+      `@page{size:A4 portrait;margin:14mm 13mm}` +
+      `html,body{margin:0;padding:0;background:#fff}` +
+      `body{-webkit-print-color-adjust:exact;print-color-adjust:exact}` +
+      `img{max-height:56px}` +
+      `</style></head><body></body></html>`
+  );
+  doc.close();
+
+  const root = createRoot(doc.body);
   root.render(render(lang));
 
   let printed = false;
-  const doPrint = () => {
+  const cleanup = () => {
+    try {
+      root.unmount();
+    } catch {
+      /* تجاهل */
+    }
+    frame?.remove();
+    frame = null;
+  };
+  const go = () => {
     if (printed) return;
     printed = true;
-    window.print();
-    /* تنظيف بعد انتهاء الطباعة (afterprint لا يُطلق في كل المتصفحات) */
-    setTimeout(() => {
-      try {
-        root.unmount();
-      } catch {
-        /* تجاهل */
-      }
-      host.remove();
-    }, 800);
+    try {
+      frame?.contentWindow?.focus();
+      frame?.contentWindow?.print(); /* ← حوار الطباعة القياسي — الورق A4 حصراً */
+    } catch {
+      /* المتصفح منع الطباعة من الإطار — ننظف فقط */
+    }
+    setTimeout(cleanup, 1500);
   };
-  /* انتظار صور الإمضاء + إطارا رسم قبل الطباعة */
+  /* انتظار صور الإمضاء + إطارا رسم قبل فتح حوار الطباعة،
+     واحتياط زمني يضمن عدم العلقة إن تعذّر تحميل صورة */
   setTimeout(() => {
-    const imgs = Array.from(host.querySelectorAll("img"));
+    const imgs = Array.from(doc.querySelectorAll("img"));
     const pending = imgs.filter((i) => !i.complete);
-    if (pending.length === 0) {
-      requestAnimationFrame(() => requestAnimationFrame(doPrint));
-    } else {
+    const start = () => requestAnimationFrame(() => requestAnimationFrame(go));
+    if (pending.length === 0) start();
+    else
       Promise.all(
         pending.map((i) => new Promise<void>((res) => { i.onload = () => res(); i.onerror = () => res(); }))
-      ).then(() => requestAnimationFrame(() => requestAnimationFrame(doPrint)));
-    }
+      ).then(start);
   }, 150);
+  setTimeout(go, 2500); /* شبكة أمان — لا انسداد أبداً */
 }
 
 /* زر الطباعة جاهز الاستعمال — معاينة + اختيار اللغة ثم طباعة صفحة واحدة */
@@ -230,11 +280,7 @@ export function ContractPrintButton({ data, defaultLang }: { data: ContractDocDa
 
   const print = () =>
     printContractDocument(
-      (l) => (
-        <div style={{ padding: "12mm 12mm 0" }}>
-          <ContractDocument data={data} lang={l} />
-        </div>
-      ),
+      (l) => <ContractDocument data={data} lang={l} variant="print" />,
       docLang
     );
 
