@@ -3,7 +3,7 @@
    والمبلغ المُمرَّر هنا مخزَّن أصلاً بعملة العرض — نُنسّق الرقم فقط.
    لا توجد أي عملية تحويل عملات في المنصة كلها. */
 
-import { CurrencyCode } from "./constants";
+import { CurrencyCode, PLATFORM_COMMISSION_RATE } from "./constants";
 
 /** رمز العملة حسب لغة الواجهة: الدج «دج» بالعربية و«DZD» بغيرها، والبقية رموزها العالمية */
 export function currencySymbol(cur: CurrencyCode, lang?: string): string {
@@ -21,7 +21,7 @@ export function fmtMoney(amount: number, cur: CurrencyCode = "DZD", lang?: strin
   return `${formatted} ${currencySymbol(cur, lang)}`;
 }
 
-/** نص عمولة المنصة (15%) عن مبلغ بعملته — للمختص فقط */
+/** نص عمولة المنصة (20%) عن مبلغ بعملته — للمختص فقط */
 export function fmtCommission(amount: number, cur: CurrencyCode = "DZD", lang?: string): string {
-  return fmtMoney(Math.round(Number(amount) * 0.15 * 100) / 100, cur, lang);
+  return fmtMoney(Math.round(Number(amount) * PLATFORM_COMMISSION_RATE * 100) / 100, cur, lang);
 }

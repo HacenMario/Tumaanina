@@ -443,7 +443,7 @@ export const en: Dict = {
     whatsappLabel: "WhatsApp number for sessions",
     whatsappHint: "Local (0555123456) or international (213555123456) format — the client will contact you directly",
     sessionPriceLabel: "Session price per currency *",
-    sessionPriceHint: "Set the price in each currency — clients see their chosen currency only; a 15% platform commission applies per completed session.",
+    sessionPriceHint: "Set the price in each currency — clients see their chosen currency only; a 20% platform commission applies per completed session.",
     whatsappInvalid: "Invalid WhatsApp number — e.g. 0555123456 or 213555123456",
     loginDescPassword: "Your email + the password you created at registration",
     keepRecoveryHint: "🔑 Keep your recovery phrase — it's your only way to regain access if you forget your password.",
@@ -586,7 +586,7 @@ export const en: Dict = {
     /* ─── v1.7.0: counselor earnings — the admin version of "My Stats" ─── */
     earningsTab: "Counselor Earnings",
     earningsTitle: "Counselor Earnings",
-    earningsDesc: "For each counselor: completed sessions with per-currency prices and the platform's 15% share — same principle as their own \"My Stats\" page",
+    earningsDesc: "For each counselor: completed sessions with per-currency prices and the platform's 20% share — same principle as their own \"My Stats\" page",
     earningsAllCompleted: "Completed sessions (all)",
     earningsNetHis: "Counselor's net",
     earningsLastCompleted: "Last completed session",
@@ -787,7 +787,7 @@ export const en: Dict = {
     socialTitle: "Social media links",
     socialHint: "Paste your page links — they appear with their real icons on your directory card and public profile (leave empty to hide)",
     priceTitle: "Your session price",
-    priceHint: "Set your session price per currency — clients see only the price of the currency they choose (no conversion). When a session completes, the platform commission (15%) is shown to you in My stats.",
+    priceHint: "Set your session price per currency — clients see only the price of the currency they choose (no conversion). When a session completes, the platform commission (20%) is shown to you in My stats.",
     soundLabel: "Interface sounds",
     /* v2.14.0: الأصوات مطفأة افتراضياً */
     /* v2.14.0: الأصوات مطفأة افتراضياً */
@@ -1428,7 +1428,7 @@ export const en: Dict = {
     commission: "Platform commission",
     net: "Your net earnings",
     dueTitle: "Platform dues this month",
-    dueHint: "15% of your completed sessions' prices this month — settled as arranged with the administration.",
+    dueHint: "20% of your completed sessions' prices this month — settled as arranged with the administration.",
     chartTitle: "Revenue by period",
     recentTitle: "Recent completed sessions",
     empty: "No completed sessions yet",

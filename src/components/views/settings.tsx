@@ -1502,7 +1502,11 @@ export function SettingsView() {
                         number: viewContract.number,
                         text: viewContract.text,
                         counselorName: viewContract.counselorName,
-                        clientName: viewContract.clientName || viewContract.clientSignedName,
+                        /* v1.13.0: الطرف الثاني في المستند هو الاسم الكامل القانوني
+                           الذي كتبه العميل عند الإمضاء — والاسم المستعار احتياط فقط
+                           للعقود غير الممضاة بعد */
+                        clientName: viewContract.clientSignedName || viewContract.clientName,
+                        clientSignedName: viewContract.clientSignedName,
                         counselorSignature: viewContract.counselorSignature,
                         clientSignature: viewContract.clientSignature,
                         counselorSignedAt: viewContract.counselorSignedAt,
@@ -1523,7 +1527,9 @@ export function SettingsView() {
                     number: viewContract.number,
                     text: viewContract.text,
                     counselorName: viewContract.counselorName,
-                    clientName: viewContract.clientName || viewContract.clientSignedName,
+                    /* v1.13.0: نفس الأولوية — الاسم القانوني للطباعة */
+                    clientName: viewContract.clientSignedName || viewContract.clientName,
+                    clientSignedName: viewContract.clientSignedName,
                     counselorSignature: viewContract.counselorSignature,
                     clientSignature: viewContract.clientSignature,
                     counselorSignedAt: viewContract.counselorSignedAt,

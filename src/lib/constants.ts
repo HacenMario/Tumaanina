@@ -64,9 +64,9 @@ export function priceForCurrency(
   return buildSessionPrices(p, legacyDzd)[cur];
 }
 
-/** ═ v1.2.0: عمولة المنصة على كل جلسة مكتملة (15%) —
+/** ═ v1.13.0: عمولة المنصة على كل جلسة مكتملة (20%) —
     تُحسب وتُعرض للمختص حصراً في لوحة حسابه، ولا تظهر للعميل أبداً */
-export const PLATFORM_COMMISSION_RATE = 0.15;
+export const PLATFORM_COMMISSION_RATE = 0.20;
 
 /** المواضيع العامة للاستشارة — النسخة التجارية لأي شخص (بلا ارتباط بالكوارث) */
 export const TOPICS = [

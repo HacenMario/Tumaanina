@@ -194,6 +194,12 @@ const SupportSessionSchema = new Schema(
   { timestamps: true, collection: "sessions" }
 );
 
+/* v1.13.0: فهارس مركّبة للاستعلامات الساخنة — لوحات الأخصائي/العميل والنافذة
+   المنبثقة تستعلم بهذه التوليفات باستمرار، فتُنشأ مرة واحدة وتسرّع القاعدة
+   بلا أي تغيير في منطق العمل */
+SupportSessionSchema.index({ counselorId: 1, status: 1 });
+SupportSessionSchema.index({ victimId: 1, status: 1 });
+
 /* ═ v1.11.0: TherapyContract — العقد العلاجي المستقل لكل جلسة ═
    v1.10.0 كانت قاعدة «عقد واحد لكل زوج (أخصائي × عميل)» — بعد إمضاء العميل
    الأول لم يُنشأ له عقدٌ أبداً في الحجوزات التالية فتوقفت النافذة المنبثقة
@@ -259,6 +265,10 @@ const ContractCounterSchema = new Schema(
    الإقلاع عبر ensureContractIndexes() في lib/server/contract.ts — وإلا
    لمنع إنشاء عقد ثانٍ لنفس الزوج بعد إمضاء الأول فتتوقف النافذة مجدداً. */
 TherapyContractSchema.index({ counselorId: 1, clientUserId: 1, sessionId: 1 });
+/* v1.13.0: نافذة العقد للعميل تستعلم بـ (clientUserId + status) مرتّبة بالأحدث */
+TherapyContractSchema.index({ clientUserId: 1, status: 1, createdAt: -1 });
+/* قائمة عقود الأخصائي في إعداداته مرتّبة بالتحديث */
+TherapyContractSchema.index({ counselorId: 1, updatedAt: -1 });
 
 /* ─── Message ─── */
 const MessageSchema = new Schema(

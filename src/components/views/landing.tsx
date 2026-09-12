@@ -37,6 +37,10 @@ const fadeUp = {
 export function LandingView() {
   const { t, lang } = useI18n();
   const { setView, user } = useApp();
+  const Arrow = lang === "ar" ? ArrowLeft : ArrowRight;
+  /* v1.13.0: العميل المسجّل يضغط «ابدأ رحلة التعافي» فينتقل مباشرة إلى
+     «ما الذي يسكن قلبك اليوم؟» — دون المرور بصفحة «من أنت اليوم؟» */
+  const startJourney = () => setView(user?.role === "VICTIM" ? "client-topics" : "roles");
   const [stats, setStats] = useState({ counselors: 0, sessions: 0, victims: 0 });
 
   useEffect(() => {
@@ -45,8 +49,6 @@ export function LandingView() {
       .then(setStats)
       .catch(() => {});
   }, []);
-
-  const Arrow = lang === "ar" ? ArrowLeft : ArrowRight;
 
   return (
     <div className="overflow-hidden">
@@ -72,7 +74,7 @@ export function LandingView() {
               {t.landing.heroSubtitle}
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button size="lg" className="gradient-primary text-white font-bold h-13 px-7 rounded-2xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-shadow" onClick={() => setView("roles")}>
+              <Button size="lg" className="gradient-primary text-white font-bold h-13 px-7 rounded-2xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-shadow" onClick={startJourney}>
                 {t.landing.ctaPrimary}
                 <Arrow className="h-5 w-5" />
               </Button>
@@ -264,7 +266,7 @@ export function LandingView() {
             {t.landing.finalText}
           </motion.p>
           <motion.div {...fadeUp}>
-            <Button size="lg" variant="secondary" className="h-13 px-8 rounded-2xl font-black text-base bg-white text-violet-700 dark:text-violet-300 hover:bg-white/90 shadow-xl" onClick={() => setView("roles")}>
+            <Button size="lg" variant="secondary" className="h-13 px-8 rounded-2xl font-black text-base bg-white text-violet-700 dark:text-violet-300 hover:bg-white/90 shadow-xl" onClick={startJourney}>
               {t.landing.finalCta}
               <Arrow className="h-5 w-5" />
             </Button>

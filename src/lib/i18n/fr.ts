@@ -443,7 +443,7 @@ export const fr: Dict = {
     whatsappLabel: "Numéro WhatsApp pour les séances",
     whatsappHint: "Format local (0555123456) ou international (213555123456) — la client vous contactera directement",
     sessionPriceLabel: "Prix de la séance par devise *",
-    sessionPriceHint: "Définissez le prix dans chaque devise — le client voit celui de sa devise ; une commission de 15% s'applique par séance terminée.",
+    sessionPriceHint: "Définissez le prix dans chaque devise — le client voit celui de sa devise ; une commission de 20% s'applique par séance terminée.",
     whatsappInvalid: "Numéro WhatsApp invalide — ex. : 0555123456 ou 213555123456",
     loginDescPassword: "Votre e-mail + le mot de passe créé lors de l'inscription",
     keepRecoveryHint: "🔑 Conservez votre phrase de récupération — c'est votre seul moyen de retrouver l'accès en cas d'oubli du mot de passe.",
@@ -586,7 +586,7 @@ export const fr: Dict = {
     /* ─── v1.7.0 : revenus des spécialistes — la version admin de « Mes statistiques » ─── */
     earningsTab: "Revenus des spécialistes",
     earningsTitle: "Revenus des spécialistes",
-    earningsDesc: "Pour chaque spécialiste : séances terminées avec prix par devise et part de la plateforme (15 %) — même principe que sa page « Mes statistiques »",
+    earningsDesc: "Pour chaque spécialiste : séances terminées avec prix par devise et part de la plateforme (20 %) — même principe que sa page « Mes statistiques »",
     earningsAllCompleted: "Séances terminées (total)",
     earningsNetHis: "Net du spécialiste",
     earningsLastCompleted: "Dernière séance terminée",
@@ -787,7 +787,7 @@ export const fr: Dict = {
     socialTitle: "Liens des réseaux sociaux",
     socialHint: "Collez les liens de vos pages — ils apparaissent avec leurs vraies icônes sur votre carte du répertoire et votre profil public (laissez vide pour masquer)",
     priceTitle: "Tarif de votre séance",
-    priceHint: "Définissez le prix de votre séance pour chaque devise — le client ne voit que le prix de la devise qu'il choisit (aucune conversion). À la fin de chaque séance, la commission de la plateforme (15%) est calculée et affichée dans Mes statistiques.",
+    priceHint: "Définissez le prix de votre séance pour chaque devise — le client ne voit que le prix de la devise qu'il choisit (aucune conversion). À la fin de chaque séance, la commission de la plateforme (20%) est calculée et affichée dans Mes statistiques.",
     soundLabel: "Sons de l'interface",
     /* v2.14.0: الأصوات مطفأة افتراضياً */
     /* v2.14.0: الأصوات مطفأة افتراضياً */
@@ -1428,7 +1428,7 @@ export const fr: Dict = {
     commission: "Commission de la plateforme",
     net: "Votre revenu net",
     dueTitle: "Dû à la plateforme ce mois",
-    dueHint: "15% des prix de vos séances terminées ce mois — réglé selon accord avec l'administration.",
+    dueHint: "20% des prix de vos séances terminées ce mois — réglé selon accord avec l'administration.",
     chartTitle: "Revenus par période",
     recentTitle: "Séances terminées récentes",
     empty: "Aucune séance terminée",

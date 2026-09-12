@@ -434,7 +434,7 @@ export const zh = {
     whatsappLabel: "接收会话申请的 WhatsApp 号码",
     whatsappHint: "可填写本地格式（0555123456）或国际格式（213555123456）——来访者将用它联系您",
     sessionPriceLabel: "每种货币的咨询价格 *",
-    sessionPriceHint: "请分别设定每种货币的价格——客户只看到自己货币的价格；每次完成的咨询收取15%平台佣金。",
+    sessionPriceHint: "请分别设定每种货币的价格——客户只看到自己货币的价格；每次完成的咨询收取20%平台佣金。",
     whatsappInvalid: "WhatsApp 号码无效——请按 0555123456 或 213555123456 格式输入",
     loginDescPassword: "您的邮箱 + 注册时创建的密码",
     keepRecoveryHint: "🔑 保存好您的恢复短语——这是忘记密码时找回账户的唯一途径。",
@@ -573,7 +573,7 @@ export const zh = {
     /* ─── v1.7.0: 专家收益 —— “我的统计”的管理版 ─── */
     earningsTab: "专家收益",
     earningsTitle: "专家收益",
-    earningsDesc: "每位专家：已完成咨询、按币种计价及平台15%分成——与其个人“我的统计”页面同一原理",
+    earningsDesc: "每位专家：已完成咨询、按币种计价及平台20%分成——与其个人“我的统计”页面同一原理",
     earningsAllCompleted: "已完成咨询（全部）",
     earningsNetHis: "专家净额",
     earningsLastCompleted: "最近完成的咨询",
@@ -769,7 +769,7 @@ export const zh = {
     socialTitle: "社交媒体链接",
     socialHint: "粘贴您的页面链接——它们将以真实图标显示在专家名录卡片和公开档案中（留空则隐藏）",
     priceTitle: "您的会话价格",
-    priceHint: "请为每种货币分别设定咨询价格——客户只看到自己所选货币的价格（无任何换算）。每次咨询完成后，平台佣金（15%）会显示在「我的统计」中。",
+    priceHint: "请为每种货币分别设定咨询价格——客户只看到自己所选货币的价格（无任何换算）。每次咨询完成后，平台佣金（20%）会显示在「我的统计」中。",
     soundLabel: "界面声音",
     /* v2.14.0: الأصوات مطفأة افتراضياً */
     /* v2.14.0: الأصوات مطفأة افتراضياً */
@@ -1396,7 +1396,7 @@ export const zh = {
     commission: "平台佣金",
     net: "您的净收入",
     dueTitle: "本月应付平台款项",
-    dueHint: "本月已完成咨询价格的15%——与管理部门协商支付。",
+    dueHint: "本月已完成咨询价格的20%——与管理部门协商支付。",
     chartTitle: "按期收入",
     recentTitle: "最近完成的咨询",
     empty: "暂无已完成的咨询",

@@ -31,7 +31,9 @@ const STEP_ICONS = [UserRound, Flame, Compass, CalendarCheck, MessagesSquare, Sp
 
 export function HowItWorksView() {
   const { t, lang } = useI18n();
-  const { setView } = useApp();
+  const { setView, user } = useApp();
+  /* v1.13.0: العميل المسجّل ينتقل مباشرة إلى «ما الذي يسكن قلبك اليوم؟» */
+  const startJourney = () => setView(user?.role === "VICTIM" ? "client-topics" : "roles");
   const Arrow = lang === "ar" ? ArrowLeft : ArrowRight;
 
   const steps = [
@@ -127,7 +129,7 @@ export function HowItWorksView() {
 
       {/* أزرار البداية */}
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <Button size="lg" className="gradient-primary text-white font-black rounded-xl h-13 px-8" onClick={() => setView("roles")}>
+        <Button size="lg" className="gradient-primary text-white font-black rounded-xl h-13 px-8" onClick={startJourney}>
           {t.how.ctaStart}
           <Arrow className="h-5 w-5" />
         </Button>

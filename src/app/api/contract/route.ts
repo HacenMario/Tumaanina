@@ -307,6 +307,9 @@ async function POST_impl(req: NextRequest) {
     c.status = "SIGNED";
     c.clientSignature = body.signature;
     c.clientSignedName = fullName;
+    /* v1.13.0: الطرف الثاني في المستند المطبوع هو الاسم الكامل القانوني الذي
+       كتبه العميل عند الإمضاء — يُعتمد رسمياً في العقد وقوائمه بدل الاسم المستعار */
+    c.clientName = fullName;
     c.clientSignedAt = new Date();
     c.lang = safeContractLang(body.lang);
     await c.save();

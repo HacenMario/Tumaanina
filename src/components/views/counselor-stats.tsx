@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LayoutDashboard, CalendarCheck, Wallet, Landmark, TrendingUp, RefreshCw } from "lucide-react";
 import { fmtMoney } from "@/lib/money";
-import { CURRENCY_CODES, TopicKey } from "@/lib/constants";
+import { CURRENCY_CODES, TopicKey, PLATFORM_COMMISSION_RATE } from "@/lib/constants";
 import type { CurrencyCode } from "@/lib/constants";
 
 type Period = "day" | "week" | "month";
@@ -147,7 +147,7 @@ export function CounselorStats() {
           <CardContent className="p-4 space-y-1.5">
             <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <Landmark className="h-4 w-4" />
-              <span className="text-xs font-bold">{t.cdash.commission} (15%)</span>
+              <span className="text-xs font-bold">{t.cdash.commission} ({Math.round(PLATFORM_COMMISSION_RATE * 100)}%)</span>
             </div>
             <p className="text-base md:text-lg font-black text-amber-600 dark:text-amber-400" dir="ltr">
               {bagText(data?.totals.commission, lang)}

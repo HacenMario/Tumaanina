@@ -214,6 +214,9 @@ export function ContractPopup() {
     text: contract.text,
     counselorName: contract.counselorName,
     clientName: user.fullName || user.pseudonym || "—",
+    /* v1.13.0: معاينة حية — الاسم الكامل القانوني يظهر كطرف ثاني في المستند
+       لحظة كتابته، وهو نفسه الذي يُعتمد رسمياً في العقد المطبوع بعد القبول */
+    clientSignedName: fullName.trim() || null,
     counselorSignature: contract.counselorSignature, /* إمضاء الأخصائي المسبق يظهر في المستند */
     clientSignature: null,
     counselorSignedAt: contract.counselorSignedAt,

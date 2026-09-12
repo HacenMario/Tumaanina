@@ -439,7 +439,7 @@ export const tr = {
     whatsappLabel: "Seans talepleri için WhatsApp numarası",
     whatsappHint: "Yerel (0555123456) ya da uluslararası (213555123456) biçimde yazabilirsiniz — danışan sizinle iletişim için kullanır",
     sessionPriceLabel: "Para birimi başına seans ücreti *",
-    sessionPriceHint: "Her para birimi için fiyat belirleyin — müşteri yalnızca kendi para birimini görür; her tamamlanan seansta %15 platform komisyonu uygulanır.",
+    sessionPriceHint: "Her para birimi için fiyat belirleyin — müşteri yalnızca kendi para birimini görür; her tamamlanan seansta %20 platform komisyonu uygulanır.",
     whatsappInvalid: "WhatsApp numarası geçersiz — 0555123456 ya da 213555123456 biçiminde girin",
     loginDescPassword: "E-postanız + kayıt olurken oluşturduğunuz şifre",
     keepRecoveryHint: "🔑 Kurtarma cümlenizi saklayın — şifreyi unuttuğunuzda hesabı geri getirmenin tek yoludur.",
@@ -581,7 +581,7 @@ export const tr = {
     /* ─── v1.7.0: uzman kazançları — "İstatistiklerim"in yönetici sürümü ─── */
     earningsTab: "Uzman Kazançları",
     earningsTitle: "Uzman Kazançları",
-    earningsDesc: "Her uzman için: tamamlanan seanslar, para birimi bazında fiyatlar ve platformun %15 payı — kendi \"İstatistiklerim\" sayfasıyla aynı mantık",
+    earningsDesc: "Her uzman için: tamamlanan seanslar, para birimi bazında fiyatlar ve platformun %20 payı — kendi \"İstatistiklerim\" sayfasıyla aynı mantık",
     earningsAllCompleted: "Tamamlanan seanslar (toplam)",
     earningsNetHis: "Uzmanın neti",
     earningsLastCompleted: "Son tamamlanan seans",
@@ -778,7 +778,7 @@ export const tr = {
     socialTitle: "Sosyal medya bağlantıları",
     socialHint: "Sayfa bağlantılarınızı yapıştırın — uzman rehberi kartınızda ve genel profilinizde gerçek simgeleriyle görünür (gizlemek için boş bırakın)",
     priceTitle: "Seans ücretiniz",
-    priceHint: "Seans ücretinizi her para birimi için ayrı ayrı belirleyin — müşteri yalnızca seçtiği para biriminin fiyatını görür (dönüşüm yok). Her tamamlanan seansta platform komisyonu (%15) İstatistiklerim'de gösterilir.",
+    priceHint: "Seans ücretinizi her para birimi için ayrı ayrı belirleyin — müşteri yalnızca seçtiği para biriminin fiyatını görür (dönüşüm yok). Her tamamlanan seansta platform komisyonu (%20) İstatistiklerim'de gösterilir.",
     soundLabel: "Arayüz sesleri",
     /* v2.14.0: الأصوات مطفأة افتراضياً */
     /* v2.14.0: الأصوات مطفأة افتراضياً */
@@ -1405,7 +1405,7 @@ export const tr = {
     commission: "Platform komisyonu",
     net: "Net kazancınız",
     dueTitle: "Bu ay platforma ödenecek",
-    dueHint: "Bu ay tamamlanan seans ücretlerinin %15'i — yönetimle anlaşmaya göre ödenir.",
+    dueHint: "Bu ay tamamlanan seans ücretlerinin %20'i — yönetimle anlaşmaya göre ödenir.",
     chartTitle: "Döneme göre gelir",
     recentTitle: "Son tamamlanan seanslar",
     empty: "Henüz tamamlanan seans yok",

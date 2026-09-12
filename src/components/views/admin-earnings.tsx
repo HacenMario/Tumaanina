@@ -2,7 +2,7 @@
 
 /* ═══ v1.7.0 — تبويب «مستحقات المختصين» في لوحة الإدارة ═══
    النسخة الإدارية من صفحة «إحصائياتي» الخاصة بكل مختص:
-   • ملخّص عام: كل الجلسات المكتملة + إجمالي المبيعات + عمولة المنصة 15% + مستحق هذا الشهر
+   • ملخّص عام: كل الجلسات المكتملة + إجمالي المبيعات + عمولة المنصة 20% + مستحق هذا الشهر
    • بطاقة لكل مختص: عدد جلساته المكتملة والمبالغ بعملتها (DZD/EUR/USD بلا أي تحويل)
      + صافي المختص + مستحق المنصة هذا الشهر + آخر جلسة مكتملة
    • تفاصيل قابلة للطي: آخر 8 جلسات (العميل، الموضوع، النمط، السعر، العمولة، التاريخ)
@@ -25,7 +25,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fmtMoney } from "@/lib/money";
-import { CURRENCY_CODES } from "@/lib/constants";
+import { CURRENCY_CODES, PLATFORM_COMMISSION_RATE } from "@/lib/constants";
 import type { CurrencyCode } from "@/lib/constants";
 
 /* v1.4.0: رمز الإدارة — يُرفق مع كل نداءات اللوحة (بوابة خادمية إلزامية) */
@@ -149,7 +149,7 @@ export function AdminEarningsTab() {
             <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <Landmark className="h-4 w-4" />
               <span className="text-xs font-bold">
-                {t.cdash.commission} ({Math.round((data?.commissionRate ?? 0.15) * 100)}%)
+                {t.cdash.commission} ({Math.round((data?.commissionRate ?? PLATFORM_COMMISSION_RATE) * 100)}%)
               </span>
             </div>
             <p className="text-sm md:text-base font-black text-amber-600 dark:text-amber-400" dir="ltr">
@@ -224,7 +224,7 @@ export function AdminEarningsTab() {
                         <p className="text-xs font-black text-primary truncate" dir="ltr">{bagText(c.gross, lang)}</p>
                       </div>
                       <div className="rounded-xl bg-amber-500/10 px-3 py-2">
-                        <p className="text-[9px] font-bold text-amber-700 dark:text-amber-400">{t.cdash.commission} (15%)</p>
+                        <p className="text-[9px] font-bold text-amber-700 dark:text-amber-400">{t.cdash.commission} ({Math.round(PLATFORM_COMMISSION_RATE * 100)}%)</p>
                         <p className="text-xs font-black text-amber-600 dark:text-amber-400 truncate" dir="ltr">{bagText(c.commission, lang)}</p>
                       </div>
                       <div className="rounded-xl bg-muted/50 px-3 py-2">

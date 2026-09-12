@@ -14,6 +14,12 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // v1.13.0 — تسريع: بلا ترويسة X-Powered-By + تحسين استيراد الحزم الثقيلة
+  // (تحريك شجري أدق للأيقونات وحركات ورسوم البيانات => حزمة أصغر)
+  poweredByHeader: false,
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "recharts"],
+  },
   // فصل الواجهة عن الخادم (مثلاً: واجهة على Vercel + خادم على Railway):
   // اضبط NEXT_PUBLIC_API_URL بعنوان الخادم، فتُمرَّر كل طلبات /api و/socket.io إليه
   // تلقائياً من جهة الخادم — بلا أي تعديل في المكونات وبلا مشاكل CORS.

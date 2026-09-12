@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 /* ═══ v1.3.0 — لوحة أخصائي: إحصائيات الجلسات المكتملة والمستحقات ═══
    GET /api/counselor/stats?userId=...&period=day|week|month
    • كل مبلغ يُجمَع بعملته الخاصة (DZD/EUR/USD) — بلا أي تحويل بين العملات
-   • عمولة المنصة 15% تُحسب هنا وتُعرض للمختص حصراً
+   • عمولة المنصة 20% تُحسب هنا وتُعرض للمختص حصراً
    • buckets: تفصيل زمني حسب الفلتر (يومي: 30 يوماً | أسبوعي: 12 أسبوعاً | شهري: 12 شهراً)
      — العدّادات بأعداد الجلسات والمبالغ بكائن لكل عملة
    • dueThisMonth: مستحق الشهر الحالي (عمولة جلسات الشهر المكتملة) لكل عملة */
@@ -127,7 +127,7 @@ async function GET_impl(req: NextRequest) {
         commission: bagOf(totalCommission),
         net: bagOf(totalNet),
       },
-      /* مستحق المنصة للشهر الحالي (عمولة 15%) لكل عملة */
+      /* مستحق المنصة للشهر الحالي (عمولة 20%) لكل عملة */
       dueThisMonth: bagOf(dueThisMonth),
       buckets,
       recent: completed.slice(0, 12).map((s) => {
