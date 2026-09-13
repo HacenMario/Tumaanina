@@ -71,9 +71,20 @@ async function GET_impl(req: NextRequest) {
   const clinic = (await Clinic.findOne({ ownerUserId: userId }).select("_id").lean()) as { _id?: unknown } | null;
   if (!clinic) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
 
-  const rows = await ClinicBooking.find({ clinicId: clinic._id }).sort({ date: 1, slot: 1 }).limit(200).lean();
+  const rows = await ClinicBooking.find({ clinicId: clinic._id }).limit(200).lean();
+  /* v1.15.0: ترتيب واقعي — بانتظار التأكيد أولاً (الأحدث)، ثم المؤكد،
+     ثم المكتمل، والملغى في الأسفل */
+  const ORDER: Record<string, number> = { PENDING: 0, CONFIRMED: 1, COMPLETED: 2, CANCELLED: 3 };
+  const sorted = [...rows].sort((a, b) => {
+    const ra = a as unknown as { status: string; createdAt: string; date: string; slot: string };
+    const rb = b as unknown as { status: string; createdAt: string; date: string; slot: string };
+    const oa = ORDER[ra.status] ?? 9;
+    const ob = ORDER[rb.status] ?? 9;
+    if (oa !== ob) return oa - ob;
+    return new Date(rb.createdAt).getTime() - new Date(ra.createdAt).getTime();
+  });
   return NextResponse.json({
-    bookings: rows.map((r) => {
+    bookings: sorted.map((r) => {
       const rec = r as Record<string, unknown>;
       return {
         id: String(rec._id),

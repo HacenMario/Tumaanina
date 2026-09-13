@@ -21,6 +21,9 @@ async function GET_impl(req: NextRequest) {
   const specialty = searchParams.get("specialty");
   const minYears = Number(searchParams.get("minYears")) || 0;
   const q = (searchParams.get("q") || "").trim();
+  /* v1.15.0: ترقيم صفحات من الخادم — 8 عيادات لكل صفحة */
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const PER = 8;
 
   await connectDB();
 
@@ -31,7 +34,7 @@ async function GET_impl(req: NextRequest) {
   }
 
   const clinics = await Clinic.find(query)
-    .select("-logo")
+    .select("-logo -gallery")
     .sort({ rating: -1, ratingsCount: -1, name: 1 })
     .limit(200)
     .lean();
@@ -73,8 +76,10 @@ async function GET_impl(req: NextRequest) {
         rating: Math.round((Number(rec.rating) || 5) * 10) / 10,
         ratingsCount: Number(rec.ratingsCount) || 0,
         bookingsCount: Number(rec.bookingsCount) || 0,
+        /* v1.15.0: حقل الشعار المحفوظ فعلياً — كان يُشتق من حقل مستبعد
+           من الاستعلام فكان دائماً false ولا يظهر الشعار في الدليل */
         logoUrl: `/api/clinics/${String(rec._id)}/logo?v=${rec.updatedAt ? new Date(rec.updatedAt as string).getTime() : 0}`,
-        hasLogo: !!rec.logo,
+        hasLogo: rec.hasLogo === true,
         createdAt: rec.createdAt,
       };
     })
@@ -91,7 +96,17 @@ async function GET_impl(req: NextRequest) {
       return true;
     });
 
-  return NextResponse.json({ clinics: mapped });
+  /* v1.15.0: ترقيم الصفحات بعد الفلترة — يُعاد الإجمالي والصفحات */
+  const total = mapped.length;
+  const pages = Math.max(1, Math.ceil(total / PER));
+  const safePage = Math.min(page, pages);
+
+  return NextResponse.json({
+    clinics: mapped.slice((safePage - 1) * PER, safePage * PER),
+    total,
+    page: safePage,
+    pages,
+  });
 }
 
 export const GET = apiHandler(GET_impl);

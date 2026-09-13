@@ -44,6 +44,8 @@ import { ExercisesView } from "@/components/views/exercises";
 import { DmDialog } from "@/components/shared/dm-dialog";
 import { ThemeStudio } from "@/components/shared/theme-studio";
 import { RatingsDialog } from "@/components/shared/ratings-dialog";
+import { ClinicRatingsDialog } from "@/components/shared/clinic-ratings-dialog";
+import { FloatingAdPopup } from "@/components/shared/floating-ad";
 import { AppToast } from "@/components/shared/app-toast";
 import { BookingPopups } from "@/components/shared/booking-popup";
 import { FollowUpPopup } from "@/components/shared/followup-popup";
@@ -327,6 +329,10 @@ export default function Home() {
       <ThemeStudio />
       {/* v2.14.0: نافذة التقييمات — تُفتح من زر «التقييمات» في بطاقات المختصين وجلساتي */}
       <RatingsDialog />
+      {/* v1.15.0: نافذة تقييمات العيادة — بنفس نمط تقييمات الأخصائيين */}
+      <ClinicRatingsDialog />
+      {/* v1.15.0: نافذة الإعلان العائم — للعملاء والمختصين فقط، بحد تكرار وإغلاق تلقائي */}
+      <FloatingAdPopup />
       {/* v2.12.0: إشعار نجاح العمليات (تسجيل الدخول/الخروج) */}
       <AppToast />
       {/* نافذة «لحظة اطمئنان» — تظهر عند كل ولوج للموقع وتختفي تلقائياً بعد 7 ثوانٍ */}

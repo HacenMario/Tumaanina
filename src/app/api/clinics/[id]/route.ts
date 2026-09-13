@@ -60,6 +60,10 @@ async function GET_impl(_req: NextRequest, ctx: { params: Promise<{ id: string }
       rating: Math.round((Number(clinic.rating) || 5) * 10) / 10,
       ratingsCount: Number(clinic.ratingsCount) || 0,
       bookingsCount: Number(clinic.bookingsCount) || 0,
+      /* v1.15.0: مواعيد الحجز الخاصة بالعيادة + المعرض + الموقع */
+      slots: (clinic.slots as string[]) || [],
+      galleryCount: ((clinic.gallery as string[]) || []).length,
+      location: (clinic.location as { lat: number | null; lng: number | null }) ?? { lat: null, lng: null },
       createdAt: clinic.createdAt,
     },
   });

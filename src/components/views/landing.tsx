@@ -39,8 +39,13 @@ export function LandingView() {
   const { setView, user } = useApp();
   const Arrow = lang === "ar" ? ArrowLeft : ArrowRight;
   /* v1.13.0: العميل المسجّل يضغط «ابدأ رحلة التعافي» فينتقل مباشرة إلى
-     «ما الذي يسكن قلبك اليوم؟» — دون المرور بصفحة «من أنت اليوم؟» */
-  const startJourney = () => setView(user?.role === "VICTIM" ? "client-topics" : "roles");
+     «ما الذي يسكن قلبك اليوم؟» — دون المرور بصفحة «من أنت اليوم؟»
+     v1.15.0: المختص المسجّل أيضاً يتخطى «من أنت اليوم» وينتقل للوحته
+     مباشرة عند الضغط على زر الحجز (طلب المستخدم) */
+  const startJourney = () =>
+    setView(
+      user?.role === "VICTIM" ? "client-topics" : user?.role === "COUNSELOR" ? "counselor-dashboard" : "roles"
+    );
   const [stats, setStats] = useState({ counselors: 0, sessions: 0, victims: 0 });
 
   useEffect(() => {

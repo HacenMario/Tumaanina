@@ -43,6 +43,8 @@ export type NotifKey =
   | "clinicVisitCompleted"
   | "clinicAdApproved"
   | "clinicAdRejected"
+  | /* v1.15.0: مستحقات الإعلان */ "clinicAdDues"
+  | "clinicAdPaidConfirmed"
   | "test";
 
 export type NotifLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh";
@@ -321,6 +323,22 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     tr: { title: "🏁 Ziyaretiniz tamamlandı", body: "“{clinic}” kliniği randevunuzu tamamladı — deneyiminiz nasıldı? Kliniği kendi sayfasından değerlendirin" },
     ru: { title: "🏁 Ваш визит завершён", body: "Клиника «{clinic}» закрыла ваш приём — как всё прошло? Оцените клинику на её странице" },
     zh: { title: "🏁 您的就诊已完成", body: "「{clinic}」已完成您的预约——体验如何？请在诊所页面进行评价" },
+  },
+  clinicAdDues: {
+    ar: { title: "💳 مستحقات نشر إعلانك", body: "حددت الإدارة مستحقات نشر إعلانك «{title}» بمبلغ {amount} دج — تواصلي مع الإدارة لسدادها وتأكيد نشر إعلانك" },
+    fr: { title: "💳 Frais de publication de votre annonce", body: "L'administration a fixé les frais de votre annonce « {title} » à {amount} DZD — contactez l'administration pour les régler et confirmer la publication" },
+    en: { title: "💳 Ad publication fees due", body: "Administration set the publication fee for your ad “{title}” at {amount} DZD — contact administration to pay and confirm publication" },
+    tr: { title: "💳 İlan yayınlama ücreti", body: "Yönetim “{title}” ilanınız için {amount} DZD ücret belirledi — yayını onaylamak için yönetimle iletişime geçin" },
+    ru: { title: "💳 Оплата за публикацию объявления", body: "Администрация установила оплату за объявление «{title}» в размере {amount} DZD — свяжитесь с администрацией для оплаты и подтверждения публикации" },
+    zh: { title: "💳 广告发布费用", body: "管理员已将您的广告「{title}」发布费用定为 {amount} DZD——请联系管理员付款以确认发布" },
+  },
+  clinicAdPaidConfirmed: {
+    ar: { title: "✅ تم تأكيد سداد المستحقات", body: "أكدت الإدارة سداد مستحقات إعلانك «{title}» — سيتم نشر إعلانك قريباً إن لم يُنشَر بعد" },
+    fr: { title: "✅ Paiement confirmé", body: "L'administration a confirmé le règlement des frais de votre annonce « {title} » — votre annonce sera publiée prochainement" },
+    en: { title: "✅ Payment confirmed", body: "Administration confirmed the fees payment for your ad “{title}” — your ad will be published soon" },
+    tr: { title: "✅ Ödeme onaylandı", body: "Yönetim “{title}” ilanınızın ücretinin ödendiğini onayladı — ilanınız yakında yayınlanacak" },
+    ru: { title: "✅ Оплата подтверждена", body: "Администрация подтвердила оплату за объявление «{title}» — оно будет опубликовано в ближайшее время" },
+    zh: { title: "✅ 付款已确认", body: "管理员已确认您的广告「{title}」的费用已付——您的广告即将发布" },
   },
   clinicAdApproved: {
     ar: { title: "✅ نُشر إعلان عيادتك", body: "«{title}» — أُكد نشر الإعلان بعد التأكد من السداد، وهو الآن ظاهر للجمهور في صفحة الإعلانات" },

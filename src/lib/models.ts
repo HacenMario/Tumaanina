@@ -68,6 +68,9 @@ const UserSchema = new Schema(
     /* v2.9.0: تفضيل الأخصائي بشأن جنس العميلين الذين يقبل التعامل معهم —
        ["male","female"] افتراضياً (لا قيد) — يُفلتر به قوائم الحجز والمطابقة */
     acceptedGenders: { type: [String], default: ["male", "female"] },
+    /* v1.15.0: رفض الإعلانات المدفوعة — حق العميل من إعداداته: نافذة
+       الإعلان العائم لا تظهر له إطلاقاً */
+    adsOptOut: { type: Boolean, default: false },
     /* ═ v1.4.0: حسابات فريق الإدارة ═
        لحسابات role=ADMIN فقط: المالك SUPER (يدير الفريق)، مدير المنصة ADMIN
        (كل الإدارة عدا الفريق)، المسير MANAGER (قراءة ومحتوى وإشعارات فقط).
@@ -635,6 +638,23 @@ const ClinicSchema = new Schema(
     rating: { type: Number, default: 5.0 },
     ratingsCount: { type: Number, default: 0 },
     bookingsCount: { type: Number, default: 0 },
+
+    /* ══ v1.15.0 ══ */
+    /* هل يوجد شعار؟ — يُحفظ كحقل فعلي لأن الاستعلامات التي تستبعد
+       الحقل الثقيل (logo) لا تستطيع اشتقاقه منها (علّة ظهور الشعار في الدليل) */
+    hasLogo: { type: Boolean, default: false },
+    /* مواعيد الحجز التي تحددها العيادة بنفسها (HH:MM) — تظهر للعميل
+       في نافذة الحجز الحضوري؛ فارغة = المواعيد الافتراضية للمنصة */
+    slots: { type: [String], default: [] },
+    /* معرض صور العيادة — حتى 8 صور (data URLs مصغّرة من لوحتها) */
+    gallery: { type: [String], default: [] },
+    /* موقع العيادة على الخريطة — يحدده صاحبها بدقة من لوحته (GPS)
+       وزر «الموقع على الخريطة» في صفحتها يفتح Google Maps للتوجيه */
+    location: {
+      lat: { type: Number, default: null, min: -90, max: 90 },
+      lng: { type: Number, default: null, min: -180, max: 180 },
+      _id: false,
+    },
   },
   { timestamps: true, collection: "clinics" }
 );
@@ -648,8 +668,64 @@ const ClinicAdSchema = new Schema(
     clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true, index: true },
     title: { type: String, required: true, trim: true, maxlength: 120 },
     body: { type: String, required: true, trim: true, maxlength: 1200 },
-    /* صورة الإعلان base64 (data URL) — اختيارية */
+    /* صورة الإعلان base64 (data URL) — اختيارية (توافق قديم — الجديد في media) */
     image: { type: String, default: null },
+
+    /* ══ v1.15.0 ══ */
+    /* وسائط الإعلان: حتى 5 صور + فيديو واحد (data URLs) — تُعرض
+       بنافذة سحب يمين/يسار في صفحة الإعلانات والإعلان العائم */
+    media: {
+      type: [{ type: String }],
+      default: [],
+      validate: {
+        validator: (v: unknown[]) => Array.isArray(v) && v.length <= 6,
+        message: "MAX_6_MEDIA",
+      },
+    },
+    /* الإعلان العائم: يظهر تلقائياً في صفحات المنصة للعملاء والمختصين
+       (لا يظهر للعيادات الأخرى ولا لمن رفض الإعلانات من إعداداته) */
+    float: { type: Boolean, default: false },
+    /* كم مرة يظهر الإعلان العائم لكل مستخدم (حد يمنع الإزعاج) */
+    floatPerUser: { type: Number, default: 3, min: 1, max: 20 },
+    /* مدة صلاحية العرض بالأيام من لحظة النشر — بعدها يختفي تلقائياً */
+    floatDays: { type: Number, default: 7, min: 1, max: 365 },
+    /* ينتهي عند: يُحسب عند الموافقة = reviewedAt + floatDays */
+    expiresAt: { type: Date, default: null, index: true },
+    /* مستحقات الإعلان: يحدّدها الأدمين وتُدار سدادها مع الإدارة —
+       بيانات سرّية بين العيادة والإدارة ولا تُرسَل للعموم أبداً */
+    amountDue: { type: Number, default: 0, min: 0 },
+    paid: { type: Boolean, default: false },
+    paidAt: { type: Date, default: null },
+    /* تفاعلات الجمهور: مشاهدات فريدة + إعجابات + تعليقات (مع حجب ورد) */
+    views: { type: Number, default: 0 },
+    viewers: { type: [Schema.Types.ObjectId], default: [] },
+    likes: { type: [Schema.Types.ObjectId], default: [] },
+    comments: {
+      type: [
+        {
+          userId: { type: Schema.Types.ObjectId, ref: "User" },
+          name: { type: String, default: "—", maxlength: 80 },
+          text: { type: String, required: true, maxlength: 300 },
+          /* حجب التعليق من صاحب العيادة — يختفي من العرض العمومي */
+          hidden: { type: Boolean, default: false },
+          /* رد العيادة على التعليق */
+          reply: {
+            text: { type: String, default: null, maxlength: 300 },
+            at: { type: Date, default: null },
+            _id: false,
+          },
+          createdAt: { type: Date, default: Date.now },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
+    /* عدّاد مرات الظهور لكل مستخدم (حد الإزعاج للإعلان العائم) */
+    impressions: {
+      type: [{ userId: { type: Schema.Types.ObjectId }, count: { type: Number, default: 0 } }],
+      default: [],
+      _id: false,
+    },
     /* PENDING = بانتظار مراجعة الإدارة | APPROVED = منشور | REJECTED = مرفوض */
     status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING", index: true },
     /* مرجع سداد مستحقات الإعلان الذي أكده الأدمين عند الموافقة */

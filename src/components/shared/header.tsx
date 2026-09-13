@@ -99,29 +99,39 @@ export function AppHeader() {
   };
 
   const role = user?.role;
-  /* wide: روابط ثانوية تظهر فقط على الشاشات العريضة (≥1536px) — بالفرنسية والإنجليزية
-     تستهلك مساحة كبيرة وتضغط القائمة، وهي متوفرة في قائمة الهاتف والفوتر دائماً */
-  const navItems: { label: string; view: ViewName; show: boolean; wide?: boolean }[] = [
-    { label: t.nav.home, view: "landing", show: true },
-    { label: t.nav.how, view: "how", show: true, wide: true },
-    { label: t.nav.findHelp, view: "roles", show: !role || role === "VICTIM" },
-    { label: t.nav.counselors, view: "counselors-directory", show: true, wide: true },
-    { label: t.nav.clinics, view: "clinics-directory", show: true },
-    { label: t.nav.ads, view: "ads", show: true, wide: true },
-    { label: t.nav.community, view: "community", show: true },
-    { label: t.nav.exercises, view: "exercises", show: true, wide: true },
+  /* v1.15.0: القائمة الجانبية حسب الدور — الصفحات المهمة لكل نوع حساب
+     تظهر أولاً في الأعلى، ثم باقي الصفحات العامة تحتها */
+  const roleImportant: { label: string; view: ViewName; show: boolean; wide?: boolean }[] = [
+    /* عميل */
     { label: t.nav.sessions, view: "client-sessions", show: role === "VICTIM" },
+    /* مختص */
     { label: t.nav.dashboard, view: "counselor-dashboard", show: role === "COUNSELOR" },
     { label: t.nav.myStats, view: "counselor-stats", show: role === "COUNSELOR" },
     { label: t.nav.adminChat, view: "admin-chat", show: role === "COUNSELOR" },
+    /* عيادة */
     { label: t.nav.clinicDash, view: "clinic-dashboard", show: role === "CLINIC" },
+    { label: t.nav.ads, view: "ads", show: role === "CLINIC" },
+    /* إدارة */
     { label: t.nav.admin, view: "admin-panel", show: role === "ADMIN" },
+  ];
+  const generalItems: { label: string; view: ViewName; show: boolean; wide?: boolean }[] = [
+    { label: t.nav.home, view: "landing", show: true },
+    /* v1.15.0: «احجز استشارتك» — لمن له حساب عميل يفتح مسار الحجز مباشرة
+       بتخطي صفحة «من أنت اليوم» تماماً (طلب المستخدم) */
+    { label: t.nav.findHelp, view: role === "VICTIM" ? "client-topics" : "roles", show: !role || role === "VICTIM" },
+    { label: t.nav.counselors, view: "counselors-directory", show: true, wide: true },
+    { label: t.nav.clinics, view: "clinics-directory", show: true },
+    { label: t.nav.ads, view: "ads", show: role !== "CLINIC" },
+    { label: t.nav.community, view: "community", show: true },
+    { label: t.nav.exercises, view: "exercises", show: true, wide: true },
+    { label: t.nav.how, view: "how", show: true, wide: true },
     { label: t.nav.settings, view: "settings", show: true },
     { label: t.nav.thanks, view: "gratitude", show: true, wide: true },
     { label: t.nav.about, view: "about", show: true, wide: true },
     { label: t.nav.faq, view: "faq", show: true, wide: true },
     { label: t.nav.feedback, view: "feedback", show: true, wide: true },
   ];
+  const navItems = [...roleImportant, ...generalItems];
   /* روابط إضافية في قائمة الهاتف — نستبعد ما ظهر فعلاً في القائمة الرئيسية
      (الأخصائيون/الشكر مثلاً) حتى لا تتكرر الصفحة نفسها مرتين في sidebar */
   const shownViews = new Set(navItems.filter((n) => n.show).map((n) => n.view));

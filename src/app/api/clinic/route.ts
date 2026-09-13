@@ -87,6 +87,10 @@ interface UpdateProfileBody {
   workingHours?: string | null;
   priceNote?: string | null;
   licenseNumber?: string | null;
+  /* v1.15.0: مواعيد الحجز + معرض الصور + الموقع على الخريطة */
+  slots?: string[];
+  gallery?: string[] | null;
+  location?: { lat: number | null; lng: number | null } | null;
 }
 
 interface ChangePasswordBody {
@@ -313,11 +317,53 @@ async function POST_impl(req: NextRequest) {
 
     /* الشعار: data URL للتعيين، null للحذف، غائب = دون تغيير */
     if (body.logo !== undefined) {
-      if (body.logo === null || body.logo === "") set.logo = null;
-      else if (typeof body.logo === "string" && body.logo.startsWith("data:image/")) {
+      if (body.logo === null || body.logo === "") {
+        set.logo = null;
+        set.hasLogo = false;
+      } else if (typeof body.logo === "string" && body.logo.startsWith("data:image/")) {
         if (body.logo.length > MAX_LOGO_B64) return NextResponse.json({ error: "INVALID_LOGO" }, { status: 400 });
         set.logo = body.logo;
+        set.hasLogo = true;
       } else return NextResponse.json({ error: "INVALID_LOGO" }, { status: 400 });
+    }
+
+    /* ══ v1.15.0 ══ */
+    /* مواعيد الحجز المعرفة من العيادة — HH:MM فريدة مرتبة حتى 24 موعداً؛
+       مصفوفة فارغة = العودة للمواعيد الافتراضية للمنصة */
+    if (body.slots !== undefined) {
+      const raw = Array.isArray(body.slots) ? body.slots : [];
+      const clean = Array.from(
+        new Set(raw.map((s) => String(s ?? "").trim()).filter((s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s)))
+      )
+        .sort()
+        .slice(0, 24);
+      set.slots = clean;
+    }
+    /* معرض الصور: حتى 8 صور data URL (نفس قاعدة الشعار)؛ null أو [] = حذف الكل */
+    if (body.gallery !== undefined) {
+      if (body.gallery === null) set.gallery = [];
+      else if (Array.isArray(body.gallery)) {
+        const clean = body.gallery
+          .filter((g) => typeof g === "string" && g.startsWith("data:image/"))
+          .slice(0, 8);
+        if (clean.some((g) => (g as string).length > MAX_LOGO_B64)) {
+          return NextResponse.json({ error: "INVALID_GALLERY" }, { status: 400 });
+        }
+        set.gallery = clean;
+      } else return NextResponse.json({ error: "INVALID_GALLERY" }, { status: 400 });
+    }
+    /* الموقع على الخريطة: إحداثيات دقيقة من GPS — null لإزالته */
+    if (body.location !== undefined) {
+      if (body.location === null) {
+        set.location = { lat: null, lng: null };
+      } else {
+        const lat = Number(body.location?.lat);
+        const lng = Number(body.location?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          return NextResponse.json({ error: "INVALID_LOCATION" }, { status: 400 });
+        }
+        set.location = { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+      }
     }
 
     if (body.workingHours !== undefined) set.workingHours = body.workingHours ? String(body.workingHours).trim().slice(0, 400) : null;
@@ -378,6 +424,12 @@ async function GET_impl(req: NextRequest) {
       rating: Math.round((Number(c.rating) || 5) * 10) / 10,
       ratingsCount: Number(c.ratingsCount) || 0,
       bookingsCount: Number(c.bookingsCount) || 0,
+      /* v1.15.0: المواعيد والمعرض والموقع */
+      slots: (c.slots as string[]) || [],
+      /* المعرض يُعاد كاملاً لصاحب العيادة فقط — لتحريره من لوحته */
+      gallery: (c.gallery as string[]) || [],
+      galleryCount: ((c.gallery as string[]) || []).length,
+      location: (c.location as { lat: number | null; lng: number | null }) ?? { lat: null, lng: null },
     },
   });
 }

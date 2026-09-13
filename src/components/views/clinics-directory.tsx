@@ -8,6 +8,7 @@ import { useApp } from "@/lib/store";
 import { WILAYA_LIST, SPECIALTIES, type SpecialtyKey } from "@/lib/constants";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
 import { waLink } from "@/lib/whatsapp";
+import { openClinicRatings } from "@/components/shared/clinic-ratings-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BackButton } from "@/components/shared/back-button";
 import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from "@/components/shared/social-glyphs";
-
-const PER_PAGE = 8;
 
 /* ═ v1.14.0 — دليل العيادات النفسية ═
    صفحة عامة تشبه دليل الأخصائيين: بطاقات العيادات النشطة (شعارها،
@@ -50,8 +49,15 @@ export interface ClinicCard {
   hasLogo: boolean;
 }
 
-export function openClinicPage(slug: string | null, id: string) {
+export function openClinicPage(slug: string | null, id: string, autoBook = false) {
   const st = useApp.getState();
+  if (autoBook) {
+    try {
+      sessionStorage.setItem("tumaanina-clinic-book", "1");
+    } catch {
+      /* تجاهل */
+    }
+  }
   st.setActiveClinic(slug || id);
   st.setView("clinic-page");
 }
@@ -61,7 +67,10 @@ export function ClinicsDirectoryView() {
   const { setView } = useApp();
   const [clinics, setClinics] = useState<ClinicCard[]>([]);
   const [loading, setLoading] = useState(true);
+  /* v1.15.0: ترقيم الصفحات من الخادم — تُحمَّل 8 عيادات فقط لكل صفحة */
   const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
 
   /* الفلاتر */
@@ -75,6 +84,7 @@ export function ClinicsDirectoryView() {
     if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
+      params.set("page", String(page));
       if (fWilaya !== "all") params.set("wilaya", fWilaya);
       if (fCity.trim()) params.set("city", fCity.trim());
       if (fSpecialty !== "all") params.set("specialty", fSpecialty);
@@ -83,21 +93,23 @@ export function ClinicsDirectoryView() {
       const res = await fetch(`/api/clinics?${params.toString()}`);
       const data = await res.json();
       setClinics(data.clinics || []);
+      setPages(data.pages || 1);
+      setTotal(data.total || 0);
     } catch {
       setClinics([]);
+      setPages(1);
     } finally {
       setLoading(false);
     }
-  }, [fWilaya, fCity, fSpecialty, fMinYears, fQuery]);
+  }, [fWilaya, fCity, fSpecialty, fMinYears, fQuery, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => load(), 250);
     return () => clearTimeout(timer);
   }, [load]);
 
-  const pages = Math.max(1, Math.ceil(clinics.length / PER_PAGE));
   const safePage = Math.min(page, pages);
-  const visible = clinics.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  const visible = clinics;
 
   const gridRef = useRef<HTMLDivElement>(null);
   const firstPage = useRef(true);
@@ -288,11 +300,32 @@ export function ClinicsDirectoryView() {
                           </a>
                         );
                       })()}
+                      {/* v1.15.0: زر التقييمات — نافذة تقييمات العيادة بنمط الأخصائيين */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg font-bold border-amber-400/50 text-amber-600 dark:text-amber-400 gap-1.5 shrink-0"
+                        title={t.clinics.ratingsBtn}
+                        onClick={() => openClinicRatings(c.id, c.name)}
+                      >
+                        <Star className="h-4 w-4" />
+                        <span className="hidden sm:inline">{t.clinics.ratingsBtn}</span>
+                      </Button>
                       <Button size="sm" className="gradient-primary text-white font-bold rounded-lg flex-1 justify-center" onClick={() => openClinicPage(c.slug, c.id)}>
                         <Building2 className="h-4 w-4" />
                         {t.clinics.viewClinic}
                       </Button>
                     </div>
+                    {/* v1.15.0: زر «احجز الآن جلسة حضورية» بجانب زر عرض العيادة */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full rounded-lg font-black border-primary/50 text-primary justify-center gap-1.5"
+                      onClick={() => openClinicPage(c.slug, c.id, true)}
+                    >
+                      <CalendarCheck2 className="h-4 w-4" />
+                      {t.clinics.bookNow}
+                    </Button>
                   </CardContent>
                 </Card>
               </motion.div>

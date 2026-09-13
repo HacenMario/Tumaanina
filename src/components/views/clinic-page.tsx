@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Building2, MapPin, Phone, Globe, Clock, Wallet, FileCheck2, Star, CalendarClock,
-  BadgeCheck, MessageSquareHeart, Send, Loader2, LogIn, Users, Info,
+  BadgeCheck, MessageSquareHeart, Send, Loader2, LogIn, Users, Info, Images, Navigation, X,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { WILAYA_LIST, SLOT_TIMES, SPECIALTIES, type SpecialtyKey } from "@/lib/constants";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
 import { waLink, formatWhatsapp } from "@/lib/whatsapp";
+import { openClinicRatings } from "@/components/shared/clinic-ratings-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,10 @@ interface ClinicProfile {
   rating: number;
   ratingsCount: number;
   bookingsCount: number;
+  /* v1.15.0: مواعيد العيادة + المعرض + الموقع على الخريطة */
+  slots: string[];
+  galleryCount: number;
+  location: { lat: number | null; lng: number | null };
 }
 
 interface ReviewItem {
@@ -109,6 +114,12 @@ export function ClinicPageView() {
   const [bBusy, setBBusy] = useState(false);
   const [bError, setBError] = useState("");
 
+  /* v1.15.0: معرض الصور — يُجلب عند فتح النافذة */
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [lightbox, setLightbox] = useState<number | null>(null);
+
   const loadClinic = useCallback(async () => {
     if (!activeClinicSlug) {
       setMissing(true);
@@ -152,6 +163,42 @@ export function ClinicPageView() {
     loadClinic();
     loadReviews(1);
   }, [loadClinic, loadReviews]);
+
+  /* v1.15.0: «احجز الآن» من بطاقة العيادة بالدليل يفتح نافذة الحجز فور وصول الملف */
+  useEffect(() => {
+    try {
+      if (clinic && sessionStorage.getItem("tumaanina-clinic-book") === "1") {
+        sessionStorage.removeItem("tumaanina-clinic-book");
+        setBookOpen(true);
+      }
+    } catch {
+      /* تجاهل */
+    }
+  }, [clinic]);
+
+  /* مواعيد الحجز: مواعيد العيادة نفسها إن عرّفت — وإلا الافتراضية */
+  const bookingSlots = clinic?.slots?.length ? clinic.slots : SLOT_TIMES;
+
+  const openGallery = async () => {
+    setGalleryOpen(true);
+    setGalleryLoading(true);
+    try {
+      const res = await fetch(`/api/clinics/${clinic?.id}/gallery`);
+      const data = await res.json();
+      setGalleryImages(data.images || []);
+    } catch {
+      setGalleryImages([]);
+    } finally {
+      setGalleryLoading(false);
+    }
+  };
+
+  /* v1.15.0: زر الموقع على الخريطة — يفتح Google Maps بتوجيه مباشر نحو العيادة */
+  const openMaps = () => {
+    const loc = clinic?.location;
+    if (!loc?.lat || !loc?.lng) return;
+    window.open(`https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`, "_blank", "noopener,noreferrer");
+  };
 
   /* ساعات اليوم المختار المحجوزة */
   useEffect(() => {
@@ -400,6 +447,27 @@ export function ClinicPageView() {
               })()}
             </div>
 
+            {/* v1.15.0: أزرار المعرض والخريطة والتقييمات */}
+            <div className="flex flex-wrap items-center gap-2">
+              {clinic.galleryCount > 0 ? (
+                <Button size="sm" variant="outline" className="rounded-xl font-bold gap-1.5 border-primary/40 text-primary" onClick={() => void openGallery()}>
+                  <Images className="h-4 w-4" />
+                  {t.clinics.galleryBtn}
+                  <span className="text-[10px] font-black text-muted-foreground">({clinic.galleryCount})</span>
+                </Button>
+              ) : null}
+              {clinic.location?.lat && clinic.location?.lng ? (
+                <Button size="sm" variant="outline" className="rounded-xl font-bold gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400" onClick={openMaps}>
+                  <Navigation className="h-4 w-4" />
+                  {t.clinics.mapBtn}
+                </Button>
+              ) : null}
+              <Button size="sm" variant="outline" className="rounded-xl font-bold gap-1.5 border-amber-400/50 text-amber-600 dark:text-amber-400" onClick={() => openClinicRatings(clinic.id, clinic.name)}>
+                <Star className="h-4 w-4" />
+                {t.clinics.ratingsBtn}
+              </Button>
+            </div>
+
             {/* زر الحجز الحضوري */}
             {(!user || user.role === "VICTIM") ? (
               <Button
@@ -483,6 +551,55 @@ export function ClinicPageView() {
         )}
       </div>
 
+      {/* v1.15.0: نافذة معرض الصور */}
+      <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-start flex items-center gap-2 text-base">
+              <Images className="h-4.5 w-4.5 text-primary" />
+              {t.clinics.galleryTitle.replace("{clinic}", clinic.name)}
+            </DialogTitle>
+          </DialogHeader>
+          {galleryLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : galleryImages.length === 0 ? (
+            <p className="text-center text-sm font-bold text-muted-foreground py-8">{t.clinics.galleryEmpty}</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {galleryImages.map((src, i) => (
+                <button key={i} type="button" className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square" onClick={() => setLightbox(i)}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt={`${clinic.name} ${i + 1}`} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* v1.15.0: عارض الصورة الكاملة (Lightbox) */}
+      {lightbox !== null && galleryImages[lightbox] ? (
+        <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
+          <button type="button" className="absolute top-4 end-4 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" onClick={() => setLightbox(null)} aria-label={t.common.close}>
+            <X className="h-5 w-5" />
+          </button>
+          {lightbox > 0 ? (
+            <button type="button" className="absolute start-3 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-2xl font-black" onClick={(e) => { e.stopPropagation(); setLightbox(lightbox - 1); }} aria-label="prev">
+              {lang === "ar" ? "›" : "‹"}
+            </button>
+          ) : null}
+          {lightbox < galleryImages.length - 1 ? (
+            <button type="button" className="absolute end-3 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-2xl font-black" onClick={(e) => { e.stopPropagation(); setLightbox(lightbox + 1); }} aria-label="next">
+              {lang === "ar" ? "‹" : "›"}
+            </button>
+          ) : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={galleryImages[lightbox]} alt={`${clinic.name} ${lightbox + 1}`} className="max-h-[85vh] max-w-full object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
+        </div>
+      ) : null}
+
       {/* نافذة الحجز الحضوري */}
       <Dialog open={bookOpen} onOpenChange={setBookOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
@@ -501,7 +618,7 @@ export function ClinicPageView() {
             <div className="space-y-1.5">
               <Label className="font-bold">{t.clinics.pickSlotLabel} *</Label>
               <div className="grid grid-cols-4 gap-1.5">
-                {SLOT_TIMES.map((s) => {
+                {bookingSlots.map((s: string) => {
                   const taken = bTaken.includes(s);
                   return (
                     <button

@@ -18,6 +18,7 @@ import {
   Volume2,
   Save,
   ShieldCheck,
+  Megaphone,
   ALargeSmall,
   ImagePlus,
   Plus,
@@ -168,6 +169,31 @@ export function SettingsView() {
   const { user, setUser, reset, fontScale, setFontScale, setView } = useApp();
   const [pushOn, setPushOn] = useState(false);
   const [installable, setInstallable] = useState(false);
+  /* v1.15.0: رفض الإعلانات المدفوعة — حق العميل */
+  const [adsOptOut, setAdsOptOut] = useState(false);
+
+  /* جلب حالة رفض الإعلانات عند الولوج */
+  useEffect(() => {
+    if (!user?.id || user.role !== "VICTIM") return;
+    fetch(`/api/user-ads-status?userId=${user.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAdsOptOut(!!d?.adsOptOut))
+      .catch(() => {});
+  }, [user?.id, user?.role]);
+
+  const saveAdsOptOut = async (v: boolean) => {
+    if (!user?.id) return;
+    setAdsOptOut(v);
+    try {
+      await fetch("/api/ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ads-optout", userId: user.id, optOut: v }),
+      });
+    } catch {
+      setAdsOptOut(!v);
+    }
+  };
   /* v2.8.0: كشف التثبيت الحقيقي — وضع standalone فقط يعني أن التطبيق مثبّت فعلاً.
      العبارة «التطبيق مثبّت على جهازك» لا تظهر الآن إلا في هذه الحالة الوحيدة */
   const [standalone, setStandalone] = useState(false);
@@ -1772,6 +1798,29 @@ export function SettingsView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* v1.15.0: الإعلانات المدفوعة — حق العميل في رفضها من إعداداته */}
+      {isVictim && (
+        <Card className="border-border/70">
+          <CardContent className="p-6 space-y-5">
+            <h2 className="font-black flex items-center gap-2 pb-2">
+              <Megaphone className="h-4.5 w-4.5 text-primary" />
+              {t.settings.adsSection}
+            </h2>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-sm font-bold">{t.settings.adsOptOut}</span>
+                <p className="text-xs text-muted-foreground leading-relaxed">{t.settings.adsOptOutHint}</p>
+              </div>
+              <Switch
+                checked={adsOptOut}
+                onCheckedChange={(v) => void saveAdsOptOut(v)}
+                aria-label={t.settings.adsOptOut}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notifications */}
       <Card className="border-border/70">

@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Building2, CalendarClock, Megaphone, Loader2, Plus, Trash2, MapPin, Phone, Globe,
-  Clock, Wallet, FileCheck2, Upload, X, Check, Ban, Flag, RefreshCw, Star, Users,
+  Building2, CalendarClock, Loader2, Plus, Trash2, MapPin, Globe,
+  Clock, Wallet, FileCheck2, Upload, X, Check, Ban, RefreshCw, Star, Users, Images,
+  Navigation, CalendarClock as SlotIcon, List, LocateFixed,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
-import { WILAYA_LIST, SPECIALTIES, type SpecialtyKey } from "@/lib/constants";
+import { WILAYA_LIST, SPECIALTIES, SLOT_TIMES, type SpecialtyKey } from "@/lib/constants";
+import { ClinicAdsTab, ClinicDuesTab } from "./clinic-dashboard-ads";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,13 +23,11 @@ import { BackButton } from "@/components/shared/back-button";
 import { showAppToast } from "@/components/shared/app-toast";
 
 /* ═ v1.14.0 — لوحة العيادة (دخول عيادة) ═
-   ثلاثة تبويبات:
-   • معلومات العيادة — كل حقول الملف (الاسم، سنة الإنشاء، التخصصات،
-     العنوان، الهواتف، واتساب، بريد، موقع، سوشيال، شعار، ساعات العمل،
-     ملاحظة الأسعار، الترخيص) + رابط الصفحة العامة للنسخ.
-   • الحجوزات — طلبات الجلسات الحضورية: تأكيد / إلغاء بسببه / إتمام.
-   • إعلاناتي — صياغة إعلان (عنوان + نص + صورة) يبقى «بانتظار المراجعة»
-     حتى تؤكد الإدارة نشره بعد التأكد من السداد، وتتبع حالات الإعلانات. */
+   أربعة تبويبات:
+   • معلومات العيادة — كل حقول الملف + مواعيد الحجز + معرض الصور + الموقع على الخريطة
+   • الحجوزات — بانتظار التأكيد أولاً (5 تظهر والباقي بنافذة)
+   • إعلاناتي — صياغة إعلان بوسائط (5 صور + فيديو) وتتبعه وإحصاءاته
+   • المستحقات — ما دفعته العيادة للإدارة مقابل الإعلانات بفلاتر زمنية */
 
 const MAX_LOGO_B64 = 1_400_000;
 const MAX_ADIMG_B64 = 3_400_000;
@@ -97,6 +97,10 @@ interface ClinicProfile {
   rating: number;
   ratingsCount: number;
   bookingsCount: number;
+  /* v1.15.0 */
+  slots: string[];
+  gallery: string[];
+  location: { lat: number | null; lng: number | null };
 }
 
 interface BookingRow {
@@ -111,22 +115,10 @@ interface BookingRow {
   cancelledBy: string | null;
 }
 
-interface AdRow {
-  id: string;
-  title: string;
-  body: string;
-  hasImage: boolean;
-  imageUrl: string | null;
-  status: string;
-  adminNote: string | null;
-  paymentNote: string | null;
-  createdAt: string;
-}
-
 export function ClinicDashboardView() {
   const { t, lang } = useI18n();
   const { user, setUser, setView } = useApp();
-  const [tab, setTab] = useState<"info" | "bookings" | "ads">("info");
+  const [tab, setTab] = useState<"info" | "bookings" | "ads" | "dues">("info");
 
   /* ─── الملف ─── */
   const [clinic, setClinic] = useState<ClinicProfile | null>(null);
@@ -156,21 +148,24 @@ export function ClinicDashboardView() {
   const [fPriceNote, setFPriceNote] = useState("");
   const [fLicense, setFLicense] = useState("");
 
+  /* ══ v1.15.0: مواعيد الحجز + معرض الصور + الموقع ══ */
+  const [fSlots, setFSlots] = useState<string[]>([]);          /* فارغة = الافتراضية */
+  const [slotDirty, setSlotDirty] = useState(false);
+  const [fGallery, setFGallery] = useState<string[]>([]);
+  const [galleryDirty, setGalleryDirty] = useState(false);
+  const [fLat, setFLat] = useState<number | null>(null);
+  const [fLng, setFLng] = useState<number | null>(null);
+  const [locDirty, setLocDirty] = useState(false);
+  const [locBusy, setLocBusy] = useState(false);
+  const [customSlot, setCustomSlot] = useState("");
+
   /* ─── الحجوزات ─── */
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [bookLoading, setBookLoading] = useState(false);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [cancelNote, setCancelNote] = useState("");
-
-  /* ─── الإعلانات ─── */
-  const [ads, setAds] = useState<AdRow[]>([]);
-  const [adsLoading, setAdsLoading] = useState(false);
-  const [adOpen, setAdOpen] = useState(false);
-  const [adTitle, setAdTitle] = useState("");
-  const [adBody, setAdBody] = useState("");
-  const [adImage, setAdImage] = useState<string | null>(null);
-  const [adBusy, setAdBusy] = useState(false);
-  const [adError, setAdError] = useState("");
+  /* v1.15.0: نافذة «إظهار الباقي» — تظهر 5 فقط والباقي بنافذة منبثقة */
+  const [showAllBookings, setShowAllBookings] = useState(false);
 
   const loadClinic = useCallback(async () => {
     if (!user?.id) return;
@@ -201,6 +196,14 @@ export function ClinicDashboardView() {
         setFHours(c.workingHours || "");
         setFPriceNote(c.priceNote || "");
         setFLicense(c.licenseNumber || "");
+        /* v1.15.0 */
+        setFSlots(c.slots || []);
+        setSlotDirty(false);
+        setFGallery(c.gallery || []);
+        setGalleryDirty(false);
+        setFLat(c.location?.lat ?? null);
+        setFLng(c.location?.lng ?? null);
+        setLocDirty(false);
       }
     } finally {
       setLoading(false);
@@ -219,26 +222,13 @@ export function ClinicDashboardView() {
     }
   }, [user?.id]);
 
-  const loadAds = useCallback(async () => {
-    if (!user?.id) return;
-    setAdsLoading(true);
-    try {
-      const res = await fetch(`/api/ads?userId=${user.id}`);
-      const data = await res.json();
-      setAds(data.ads || []);
-    } finally {
-      setAdsLoading(false);
-    }
-  }, [user?.id]);
-
   useEffect(() => {
     loadClinic();
   }, [loadClinic]);
 
   useEffect(() => {
     if (tab === "bookings") loadBookings();
-    if (tab === "ads") loadAds();
-  }, [tab, loadBookings, loadAds]);
+  }, [tab, loadBookings]);
 
   const saveProfile = async () => {
     if (!user?.id) return;
@@ -265,6 +255,10 @@ export function ClinicDashboardView() {
         licenseNumber: fLicense.trim() || null,
       };
       if (logoDirty) payload.logo = fLogo;
+      /* v1.15.0: المواعيد والمعرض والموقع — تُرسل فقط عند تغييرها */
+      if (slotDirty) payload.slots = fSlots;
+      if (galleryDirty) payload.gallery = fGallery;
+      if (locDirty) payload.location = { lat: fLat, lng: fLng };
       const res = await fetch("/api/clinic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -302,6 +296,69 @@ export function ClinicDashboardView() {
     }
   };
 
+  /* ══ v1.15.0 ══ */
+  /* معرض الصور: رفع صور متعددة حتى 8 */
+  const pickGallery = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const room = 8 - fGallery.length;
+    const list = Array.from(files).slice(0, Math.max(0, room));
+    if (list.length === 0) {
+      showAppToast(t.clinicDash.galleryFull, "");
+      return;
+    }
+    const added: string[] = [];
+    for (const f of list) {
+      try {
+        added.push(await compressImage(f, 1000, MAX_LOGO_B64));
+      } catch {
+        showAppToast(t.clinicDash.logoTooBig, "");
+      }
+    }
+    if (added.length) {
+      setFGallery((p) => [...p, ...added]);
+      setGalleryDirty(true);
+    }
+  };
+
+  /* تحديد موقع العيادة بدقة — يطلب إذن الموقع ويحفظ الإحداثيات */
+  const locateClinic = () => {
+    if (!navigator.geolocation) {
+      showAppToast(t.clinicDash.locUnsupported, "");
+      return;
+    }
+    setLocBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setFLat(Math.round(pos.coords.latitude * 1e6) / 1e6);
+        setFLng(Math.round(pos.coords.longitude * 1e6) / 1e6);
+        setLocDirty(true);
+        setLocBusy(false);
+        showAppToast(t.clinicDash.locSaved, t.clinicDash.locSavedSub);
+      },
+      () => {
+        setLocBusy(false);
+        showAppToast(t.clinicDash.locDenied, "");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
+  /* تبديل موعد من قائمة المواعيد */
+  const toggleSlot = (s: string) => {
+    setFSlots((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+    setSlotDirty(true);
+  };
+  const addCustomSlot = () => {
+    const v = customSlot.trim();
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) {
+      showAppToast(t.clinicDash.slotInvalid, "");
+      return;
+    }
+    if (!fSlots.includes(v) && fSlots.length < 24) setFSlots((p) => [...p, v].sort());
+    setCustomSlot("");
+    setSlotDirty(true);
+  };
+
   const bookingAction = async (id: string, action: string, note?: string) => {
     if (!user?.id) return;
     const res = await fetch("/api/clinics/bookings", {
@@ -320,52 +377,6 @@ export function ClinicDashboardView() {
     }
   };
 
-  const submitAd = async () => {
-    if (!user?.id) return;
-    setAdError("");
-    if (!adTitle.trim() || !adBody.trim()) {
-      setAdError(t.clinicDash.adMissing);
-      return;
-    }
-    setAdBusy(true);
-    try {
-      const res = await fetch("/api/ads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", userId: user.id, title: adTitle.trim(), body: adBody.trim(), image: adImage || undefined }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setAdOpen(false);
-        setAdTitle("");
-        setAdBody("");
-        setAdImage(null);
-        showAppToast(t.clinicDash.adSent, t.clinicDash.adSentSub);
-        loadAds();
-      } else if (data.error === "ADS_LIMIT") {
-        setAdError(t.clinicDash.adLimit);
-      } else {
-        setAdError(t.common.errorServer);
-      }
-    } finally {
-      setAdBusy(false);
-    }
-  };
-
-  const deleteAd = async (id: string) => {
-    if (!user?.id) return;
-    const res = await fetch("/api/ads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete", userId: user.id, id }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      showAppToast(t.clinicDash.adDeleted, "");
-      loadAds();
-    }
-  };
-
   if (!user || user.role !== "CLINIC") {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
@@ -377,12 +388,6 @@ export function ClinicDashboardView() {
       </div>
     );
   }
-
-  const statusBadge = (s: string) => {
-    if (s === "APPROVED") return <Badge className="bg-primary/12 text-primary border-0 gap-1"><Check className="h-3 w-3" />{t.clinicDash.adApproved}</Badge>;
-    if (s === "REJECTED") return <Badge className="bg-destructive/10 text-destructive border-0 gap-1"><Ban className="h-3 w-3" />{t.clinicDash.adRejected}</Badge>;
-    return <Badge className="bg-amber-400/12 text-amber-600 dark:text-amber-400 border-0 gap-1"><Flag className="h-3 w-3" />{t.clinicDash.adPending}</Badge>;
-  };
 
   const bookingBadge = (s: string) => {
     if (s === "CONFIRMED") return <Badge className="bg-primary/12 text-primary border-0">{t.clinicDash.bConfirmed}</Badge>;
@@ -410,7 +415,7 @@ export function ClinicDashboardView() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-3 gap-2 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
         <button onClick={() => setTab("info")} className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs sm:text-sm font-black transition-all ${tab === "info" ? "gradient-primary text-white shadow" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
           <Building2 className="h-4 w-4 shrink-0" />
           <span className="truncate">{t.clinicDash.tabInfo}</span>
@@ -420,8 +425,12 @@ export function ClinicDashboardView() {
           <span className="truncate">{t.clinicDash.tabBookings}</span>
         </button>
         <button onClick={() => setTab("ads")} className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs sm:text-sm font-black transition-all ${tab === "ads" ? "gradient-primary text-white shadow" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
-          <Megaphone className="h-4 w-4 shrink-0" />
+          <List className="h-4 w-4 shrink-0" />
           <span className="truncate">{t.clinicDash.tabAds}</span>
+        </button>
+        <button onClick={() => setTab("dues")} className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs sm:text-sm font-black transition-all ${tab === "dues" ? "gradient-primary text-white shadow" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
+          <Wallet className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t.clinicDash.tabDues}</span>
         </button>
       </div>
 
@@ -629,6 +638,113 @@ export function ClinicDashboardView() {
                   </div>
                 </div>
 
+                {/* ══ v1.15.0: مواعيد الحجز ══ */}
+                <div className="space-y-2 rounded-2xl border border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <SlotIcon className="h-4 w-4 text-primary" />
+                    <Label className="font-bold">{t.clinicDash.slotsTitle}</Label>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-semibold leading-relaxed">{t.clinicDash.slotsHint}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SLOT_TIMES.map((s) => {
+                      const on = fSlots.includes(s);
+                      return (
+                        <button key={s} type="button" onClick={() => toggleSlot(s)} dir="ltr"
+                          className={`rounded-lg px-2.5 py-1.5 text-xs font-black border transition-all ${on ? "gradient-primary text-white border-transparent shadow" : "bg-card border-border/70 text-muted-foreground hover:border-primary/40"}`}>
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input value={customSlot} onChange={(e) => setCustomSlot(e.target.value)} className="rounded-xl bg-card w-28" placeholder="08:30" dir="ltr" maxLength={5} />
+                    <Button type="button" variant="outline" size="sm" className="rounded-lg font-black shrink-0" onClick={addCustomSlot}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {fSlots.length > 0 ? (
+                    <div className="flex items-center flex-wrap gap-1.5">
+                      {fSlots.filter((s) => !(SLOT_TIMES as readonly string[]).includes(s)).map((s) => (
+                        <span key={s} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-bold" dir="ltr">
+                          {s}
+                          <button type="button" onClick={() => { setFSlots((p) => p.filter((x) => x !== s)); setSlotDirty(true); }} aria-label="remove"><X className="h-3 w-3" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="text-[10px] font-bold text-primary">{fSlots.length ? t.clinicDash.slotsCustom.replace("{n}", String(fSlots.length)) : t.clinicDash.slotsDefault}</p>
+                </div>
+
+                {/* ══ v1.15.0: معرض الصور ══ */}
+                <div className="space-y-2 rounded-2xl border border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <Images className="h-4 w-4 text-primary" />
+                    <Label className="font-bold">{t.clinicDash.galleryTitle}</Label>
+                    <span className="text-[10px] font-black text-muted-foreground">({fGallery.length}/8)</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-semibold">{t.clinicDash.galleryHint}</p>
+                  {fGallery.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {fGallery.map((g, i) => (
+                        <div key={i} className="relative rounded-lg overflow-hidden border border-border/60 aspect-square">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={g} alt={`gallery ${i + 1}`} className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            className="absolute top-1 end-1 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                            onClick={() => { setFGallery((p) => p.filter((_, j) => j !== i)); setGalleryDirty(true); }}
+                            aria-label="remove"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={fGallery.length >= 8} onClick={() => document.getElementById("clinic-gallery-input")?.click()}>
+                    <Upload className="h-3.5 w-3.5" />
+                    {t.clinicDash.galleryAdd}
+                  </Button>
+                  <input id="clinic-gallery-input" type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void pickGallery(e.target.files); e.currentTarget.value = ""; }} />
+                </div>
+
+                {/* ══ v1.15.0: الموقع على الخريطة ══ */}
+                <div className="space-y-2 rounded-2xl border border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    <Label className="font-bold">{t.clinicDash.locTitle}</Label>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-semibold leading-relaxed">{t.clinicDash.locHint}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button type="button" className="gradient-primary text-white font-black rounded-xl gap-1.5" disabled={locBusy} onClick={locateClinic}>
+                      {locBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+                      {t.clinicDash.locBtn}
+                    </Button>
+                    {fLat && fLng ? (
+                      <Button type="button" variant="outline" className="rounded-xl font-bold text-destructive border-destructive/40" onClick={() => { setFLat(null); setFLng(null); setLocDirty(true); }}>
+                        <X className="h-4 w-4" />
+                        {t.clinicDash.locRemove}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {fLat && fLng ? (
+                    <div className="rounded-xl overflow-hidden border border-border/60">
+                      <iframe
+                        title="clinic-location"
+                        src={`https://www.google.com/maps?q=${fLat},${fLng}&z=16&output=embed`}
+                        className="w-full h-48 sm:h-56"
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                      <p className="text-[10px] font-bold text-muted-foreground bg-card px-3 py-1.5" dir="ltr">
+                        {fLat.toFixed(6)}, {fLng.toFixed(6)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">{t.clinicDash.locNone}</p>
+                  )}
+                </div>
+
                 <Button className="w-full gradient-primary text-white font-black rounded-xl h-12" disabled={saving} onClick={saveProfile}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                   {t.clinicDash.saveBtn}
@@ -653,7 +769,9 @@ export function ClinicDashboardView() {
               </CardContent>
             </Card>
           ) : (
-            bookings.map((b) => (
+            <>
+              {/* v1.15.0: أول 5 حجوزات فقط — بانتظار التأكيد أولاً (الترتيب من الخادم) */}
+              {bookings.slice(0, 5).map((b) => (
               <Card key={b.id} className="border-border/70">
                 <CardContent className="p-4 space-y-2.5">
                   <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -694,6 +812,15 @@ export function ClinicDashboardView() {
                 </CardContent>
               </Card>
             ))
+            }
+              {/* v1.15.0: زر «إظهار الباقي» — البقية بنافذة منبثقة */}
+              {bookings.length > 5 ? (
+                <Button variant="outline" className="w-full rounded-xl font-black gap-1.5" onClick={() => setShowAllBookings(true)}>
+                  <List className="h-4 w-4" />
+                  {t.clinicDash.showRest.replace("{n}", String(bookings.length - 5))}
+                </Button>
+              ) : null}
+            </>
           )}
           {!bookLoading && bookings.length > 0 ? (
             <Button variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" onClick={loadBookings}>
@@ -704,58 +831,11 @@ export function ClinicDashboardView() {
         </div>
       ) : null}
 
-      {/* ════ إعلاناتي ════ */}
-      {tab === "ads" ? (
-        <div className="space-y-4">
-          <div className="rounded-xl bg-amber-400/[0.07] border border-amber-400/40 px-4 py-3 text-xs font-bold text-amber-700 dark:text-amber-400 leading-relaxed">
-            {t.clinicDash.adsNotice}
-          </div>
-          <Button className="gradient-primary text-white font-black rounded-xl gap-2" onClick={() => setAdOpen(true)}>
-            <Plus className="h-4 w-4" />
-            {t.clinicDash.newAd}
-          </Button>
+      {/* ════ إعلاناتي ════ — v1.15.0: مكوّن مستقل بترقيم صفحات وإحصاءات وإدارة تعليقات */}
+      {tab === "ads" && user ? <ClinicAdsTab userId={user.id} /> : null}
 
-          {adsLoading ? (
-            <Card className="h-40 animate-pulse bg-muted/50 border-border/50" />
-          ) : ads.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="p-10 text-center space-y-3 text-muted-foreground">
-                <Megaphone className="h-10 w-10 mx-auto opacity-40" />
-                <p className="font-semibold">{t.clinicDash.noAds}</p>
-              </CardContent>
-            </Card>
-          ) : (
-            ads.map((a) => (
-              <Card key={a.id} className="border-border/70">
-                <CardContent className="p-4 space-y-2.5">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <p className="font-black text-sm min-w-0">{a.title}</p>
-                    {statusBadge(a.status)}
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{a.body}</p>
-                  {a.imageUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={a.imageUrl} alt={a.title} className="rounded-lg max-h-40 w-auto object-cover" />
-                  ) : null}
-                  {a.status === "REJECTED" && a.adminNote ? (
-                    <p className="text-xs text-destructive font-semibold rounded-lg bg-destructive/10 px-3 py-2">{t.clinicDash.rejectReason}: {a.adminNote}</p>
-                  ) : null}
-                  {a.status === "APPROVED" && a.paymentNote ? (
-                    <p className="text-[11px] text-muted-foreground font-semibold">{t.clinicDash.paymentRef}: {a.paymentNote}</p>
-                  ) : null}
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-[10px] text-muted-foreground/70 font-semibold">{new Date(a.createdAt).toLocaleDateString()}</span>
-                    <Button size="sm" variant="ghost" className="rounded-lg text-destructive font-bold gap-1" onClick={() => deleteAd(a.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                      {t.common.delete}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      ) : null}
+      {/* ════ المستحقات المدفوعة للمنصة مقابل الإعلانات ════ */}
+      {tab === "dues" && user ? <ClinicDuesTab userId={user.id} /> : null}
 
       {/* نافذة إلغاء الحجز بسبب */}
       <Dialog open={!!cancelId} onOpenChange={(v) => { if (!v) setCancelId(null); }}>
@@ -774,50 +854,53 @@ export function ClinicDashboardView() {
         </DialogContent>
       </Dialog>
 
-      {/* نافذة إعلان جديد */}
-      <Dialog open={adOpen} onOpenChange={setAdOpen}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+      {/* v1.15.0: نافذة «إظهار الباقي» — كل الحجوزات المتبقية */}
+      <Dialog open={showAllBookings} onOpenChange={setShowAllBookings}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-start flex items-center gap-2 text-base">
-              <Megaphone className="h-4.5 w-4.5 text-primary" />
-              {t.clinicDash.newAdTitle}
+            <DialogTitle className="text-start text-base flex items-center gap-2">
+              <CalendarClock className="h-4.5 w-4.5 text-primary" />
+              {t.clinicDash.allBookingsTitle}
             </DialogTitle>
-            <DialogDescription className="text-start text-xs leading-relaxed">{t.clinicDash.newAdDesc}</DialogDescription>
+            <DialogDescription className="text-start text-xs leading-relaxed">{t.clinicDash.allBookingsDesc}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="font-bold">{t.clinicDash.adTitle} *</Label>
-              <Input value={adTitle} onChange={(e) => setAdTitle(e.target.value)} className="rounded-xl bg-card" maxLength={120} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="font-bold">{t.clinicDash.adBody} *</Label>
-              <Textarea value={adBody} onChange={(e) => setAdBody(e.target.value)} className="rounded-xl min-h-28" maxLength={1200} placeholder={t.clinicDash.adBodyPh} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="font-bold">{t.clinicDash.adImage}</Label>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" onClick={() => document.getElementById("ad-img-input")?.click()}>
-                  <Upload className="h-3.5 w-3.5" />
-                  {t.clinicDash.logoPick}
-                </Button>
-                {adImage ? (
-                  <Button type="button" variant="ghost" size="sm" className="rounded-lg font-bold text-destructive gap-1" onClick={() => setAdImage(null)}>
-                    <X className="h-3.5 w-3.5" />
-                    {t.clinicDash.logoRemove}
-                  </Button>
-                ) : null}
-              </div>
-              <input id="ad-img-input" type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.currentTarget.value = ""; if (f) { try { setAdImage(await compressImage(f, 1200, MAX_ADIMG_B64)); } catch { showAppToast(t.clinicDash.logoTooBig, ""); } } }} />
-              {adImage ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={adImage} alt="ad" className="rounded-lg max-h-36 w-auto object-cover" />
-              ) : null}
-            </div>
-            {adError ? <div className="rounded-xl bg-destructive/10 text-destructive text-sm font-bold px-4 py-3">{adError}</div> : null}
-            <Button className="w-full gradient-primary text-white font-black rounded-xl h-12" disabled={adBusy} onClick={submitAd}>
-              {adBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
-              {t.clinicDash.adSubmit}
-            </Button>
+          <div className="space-y-2.5">
+            {bookings.map((b) => (
+              <Card key={b.id} className="border-border/60">
+                <CardContent className="p-3.5 space-y-2">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="font-black text-sm">{b.clientName}</p>
+                      {b.clientPhone ? (
+                        <a href={`tel:${b.clientPhone}`} className="text-xs font-bold text-primary hover:underline" dir="ltr">{b.clientPhone}</a>
+                      ) : null}
+                    </div>
+                    {bookingBadge(b.status)}
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1 text-xs font-bold" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date} — {b.slot}</span>
+                  {b.reason ? <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 rounded-lg px-3 py-2">{b.reason}</p> : null}
+                  {b.status === "PENDING" || b.status === "CONFIRMED" ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {b.status === "PENDING" ? (
+                        <Button size="sm" className="gradient-primary text-white font-black rounded-lg" onClick={() => bookingAction(b.id, "confirm")}>
+                          <Check className="h-3.5 w-3.5" />
+                          {t.clinicDash.confirm}
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="rounded-lg font-black border-emerald-500/40 text-emerald-600 dark:text-emerald-400" onClick={() => bookingAction(b.id, "complete")}>
+                          <Check className="h-3.5 w-3.5" />
+                          {t.clinicDash.complete}
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" className="rounded-lg font-black text-destructive border-destructive/40" onClick={() => { setCancelId(b.id); setCancelNote(""); }}>
+                        <Ban className="h-3.5 w-3.5" />
+                        {t.clinicDash.cancel}
+                      </Button>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </DialogContent>
       </Dialog>

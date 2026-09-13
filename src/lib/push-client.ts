@@ -178,7 +178,7 @@ async function ensureSubscription(registration: ServiceWorkerRegistration, publi
 
 export async function enablePush(
   userId: string,
-  role: "VICTIM" | "COUNSELOR" | "ADMIN"
+  role: "VICTIM" | "COUNSELOR" | "ADMIN" | "CLINIC"
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     /* v1.8.0: بوابة iOS — على الآيفون غير المثبّت الاشتراك يفشل دائماً،
@@ -221,7 +221,7 @@ export async function enablePush(
  */
 export async function syncPushSubscription(
   userId?: string,
-  role?: "VICTIM" | "COUNSELOR" | "ADMIN"
+  role?: "VICTIM" | "COUNSELOR" | "ADMIN" | "CLINIC"
 ): Promise<void> {
   try {
     if (typeof window === "undefined" || !pushSupported()) return;
@@ -235,7 +235,7 @@ export async function syncPushSubscription(
       state = JSON.parse(localStorage.getItem(PUSH_STATE_STORE) || "null");
     } catch {}
     const targetUser = userId || state?.userId;
-    const targetRole = role || (state?.role as "VICTIM" | "COUNSELOR" | "ADMIN" | undefined);
+    const targetRole = role || (state?.role as "VICTIM" | "COUNSELOR" | "ADMIN" | "CLINIC" | undefined);
     if (!targetUser) return;
 
     const reg =

@@ -19,6 +19,7 @@ async function GET_impl(req: NextRequest, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const { searchParams } = new URL(req.url);
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const viewerId = searchParams.get("viewerId");
   await connectDB();
 
   if (!/^[a-f0-9]{24}$/i.test(String(id || ""))) {
@@ -32,10 +33,23 @@ async function GET_impl(req: NextRequest, ctx: { params: Promise<{ id: string }>
     ClinicRating.countDocuments({ clinicId: id }),
   ]);
 
-  /* المتوسط يُحسب مباشرة من التقييمات — ومتوسط الملف يبقى مرجعاً محدثاً */
-  const all = await ClinicRating.find({ clinicId: id }).select("stars").lean();
+  /* المتوسط والتوزيع من كل التقييمات — ومتوسط الملف يبقى مرجعاً محدثاً */
+  const all = await ClinicRating.find({ clinicId: id }).select("stars clientUserId comment").lean();
   const n = all.length;
   const avg = n ? Math.round((all.reduce((s, r) => s + (Number((r as { stars?: number }).stars) || 0), 0) / n) * 10) / 10 : 5;
+  /* v1.15.0: توزيع النجوم — نمط نافذة تقييمات الأخصائيين */
+  const distribution = [5, 4, 3, 2, 1].map((s) => ({
+    stars: s,
+    count: all.filter((r) => Math.round(Number((r as { stars?: number }).stars) || 0) === s).length,
+  }));
+  /* تقييم المشاهد نفسه — لتعبئة النموذج في النافذة */
+  let myRating: { stars: number; comment: string | null } | null = null;
+  if (viewerId && /^[a-f0-9]{24}$/i.test(viewerId)) {
+    const mine = all.find((r) => String((r as unknown as { clientUserId: { toString(): string } }).clientUserId) === viewerId) as
+      | { stars?: number; comment?: string | null }
+      | undefined;
+    if (mine) myRating = { stars: Number(mine.stars) || 0, comment: mine.comment ?? null };
+  }
 
   const userIds = items.map((r) => (r as unknown as { clientUserId: unknown }).clientUserId).filter(Boolean);
   const users = userIds.length ? await User.find({ _id: { $in: userIds } }).select("pseudonym").lean() : [];
@@ -57,6 +71,8 @@ async function GET_impl(req: NextRequest, ctx: { params: Promise<{ id: string }>
     pages: Math.max(1, Math.ceil(total / PAGE)),
     avg,
     count: n,
+    distribution,
+    myRating,
   });
 }
 

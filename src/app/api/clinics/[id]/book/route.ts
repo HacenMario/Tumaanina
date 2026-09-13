@@ -45,7 +45,7 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     reason?: string;
   };
 
-  if (!userId || !/^[a-f0-9]{24}$/i.test(String(userId || "")) || !/^[a-f0-9]{24}$/i.test(String(id || ""))) {
+  if (!/^[a-f0-9]{24}$/i.test(String(userId || "")) || !/^[a-f0-9]{24}$/i.test(String(id || ""))) {
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
   }
   const nm = String(name || "").trim().slice(0, 120);
@@ -53,7 +53,7 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
   if (!nm || ph.length < 7 || ph.length > 15) {
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) || !(SLOT_TIMES as readonly string[]).includes(String(slot))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
     return NextResponse.json({ error: "BAD_SLOT" }, { status: 400 });
   }
   /* التاريخ: من اليوم إلى +60 يوماً (بتوقيت الجزائر UTC+1) */
@@ -65,13 +65,21 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
 
   const [user, clinic] = await Promise.all([
     User.findById(userId).select("role suspended").lean(),
-    Clinic.findById(id).select("_id name slug isActive ownerUserId address wilaya city").lean(),
+    Clinic.findById(id).select("_id name slug isActive ownerUserId address wilaya city slots").lean(),
   ]);
   if (!user || (user as { role?: string }).role !== "VICTIM" || (user as { suspended?: boolean }).suspended) {
     return NextResponse.json({ error: "INVALID" }, { status: 401 });
   }
   if (!clinic || (clinic as { isActive?: boolean }).isActive === false) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  /* v1.15.0: الساعة يجب أن تكون من مواعيد العيادة نفسها إن عرّفت مواعيد،
+     وإلا من المواعيد الافتراضية للمنصة */
+  const clinicSlots = ((clinic as unknown as { slots?: string[] }).slots || []) as string[];
+  const allowed = clinicSlots.length ? clinicSlots : (SLOT_TIMES as readonly string[]);
+  if (!(allowed as readonly string[]).includes(String(slot))) {
+    return NextResponse.json({ error: "BAD_SLOT" }, { status: 400 });
   }
 
   /* تصادم ذري: هل الوقت محجوز بحجز حي؟ */
