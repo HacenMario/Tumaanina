@@ -23,6 +23,11 @@ import { CounselorRegisterView } from "@/components/views/counselor-register";
 import { CounselorLoginView } from "@/components/views/counselor-login";
 import { CounselorAuthView } from "@/components/views/counselor-auth";
 import { CounselorsDirectoryView } from "@/components/views/counselors-directory";
+import { ClinicsDirectoryView } from "@/components/views/clinics-directory";
+import { ClinicPageView } from "@/components/views/clinic-page";
+import { ClinicAuthView } from "@/components/views/clinic-auth";
+import { ClinicDashboardView } from "@/components/views/clinic-dashboard";
+import { AdsView } from "@/components/views/ads";
 import { CommunityView } from "@/components/views/community";
 import { CounselorDashboardView } from "@/components/views/counselor-dashboard";
 import { CounselorStats } from "@/components/views/counselor-stats";
@@ -60,6 +65,11 @@ const VIEWS: Record<string, React.ComponentType> = {
   "counselor-stats": CounselorStats,
   "admin-chat": AdminChatView,
   "counselors-directory": CounselorsDirectoryView,
+  "clinics-directory": ClinicsDirectoryView,
+  "clinic-page": ClinicPageView,
+  "clinic-auth": ClinicAuthView,
+  "clinic-dashboard": ClinicDashboardView,
+  ads: AdsView,
   community: CommunityView,
   "admin-login": AdminLoginView,
   "admin-panel": AdminPanelView,
@@ -105,6 +115,7 @@ export default function Home() {
         !!sp.get("session") ||
         !!sp.get("dm") ||
         !!sp.get("admin-chat") ||
+        !!sp.get("clinic") ||
         !!sp.get("view") ||
         !!sessionStorage.getItem("tumaanina-pending-book") ||
         !!sessionStorage.getItem("tumaanina-open-session") ||
@@ -187,13 +198,21 @@ export default function Home() {
       const notifDm = sp.get("dm");
       /* v2.10.0: رابط إشعار محادثة الإدارة — يفتح الصفحة مباشرة للمختص */
       const notifAdminChat = sp.get("admin-chat");
-      if (notifSession || notifDm || notifAdminChat) {
+      /* v1.14.0: رابط صفحة عيادة (?clinic={slug}) — من إشعار اقتراح المختص
+         أو من الرابط العام /clinic/{slug} — يفتح صفحة العيادة مباشرة */
+      const notifClinic = sp.get("clinic");
+      if (notifSession || notifDm || notifAdminChat || notifClinic) {
         if (notifSession) sessionStorage.setItem("tumaanina-open-session", notifSession.slice(0, 80));
         if (notifDm) sessionStorage.setItem("tumaanina-open-dm", notifDm.slice(0, 80));
         if (notifAdminChat) sessionStorage.setItem("tumaanina-open-admin-chat", "1");
+        if (notifClinic) {
+          useApp.getState().setActiveClinic(notifClinic.slice(0, 120));
+          useApp.getState().setView("clinic-page");
+        }
         sp.delete("session");
         sp.delete("dm");
         sp.delete("admin-chat");
+        sp.delete("clinic");
         const qs = sp.toString();
         window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
       }

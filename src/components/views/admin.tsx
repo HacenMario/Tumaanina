@@ -63,6 +63,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardTab } from "@/components/views/admin-dashboard";
 import { AdminInboxTab } from "@/components/views/admin-inbox";
 import { AdminEarningsTab } from "@/components/views/admin-earnings";
+import { AdminClinicAdsTab } from "@/components/views/admin-clinic-ads";
 import { showAppToast } from "@/components/shared/app-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -1369,6 +1370,11 @@ export function AdminPanelView() {
             {t.admin.earningsTab}
           </TabsTrigger>
           <TabsTrigger value="crisis" className="font-bold shrink-0">{t.admin.tabCrisis}</TabsTrigger>
+          {/* ═ v1.14.0: إعلانات العيادات — موافقة الإدارة بعد التأكد من السداد ═ */}
+          <TabsTrigger value="clinic-ads" className="font-bold flex items-center gap-1.5 shrink-0">
+            <Megaphone className="h-3.5 w-3.5" />
+            {t.admin.clinicAdsTab}
+          </TabsTrigger>
           <TabsTrigger value="quotes" className="font-bold flex items-center gap-1.5 shrink-0">
             <Sparkles className="h-3.5 w-3.5" />
             {t.quote.adminTab}
@@ -1775,6 +1781,11 @@ export function AdminPanelView() {
         {/* ─── v1.7.0: مستحقات المختصين — لكل مختص جلساته المكتملة وأسعارها ومستحقات المنصة ─── */}
         <TabsContent value="earnings" className="space-y-3">
           <AdminEarningsTab />
+        </TabsContent>
+
+        {/* ═ v1.14.0: إعلانات العيادات — لا تُنشر قبل تأكيد الإدارة السداد ═ */}
+        <TabsContent value="clinic-ads" className="space-y-3">
+          <AdminClinicAdsTab />
         </TabsContent>
 
         {/* ─── سجل الأزمات ─── */}

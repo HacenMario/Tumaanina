@@ -17,6 +17,7 @@ import {
   TrendingUp,
   ChevronDown,
   UsersRound,
+  Building2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -31,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ChatPanel } from "@/components/session/chat-panel";
 import { WhatsAppPanel, WhatsAppGlyph } from "@/components/session/whatsapp-panel";
+import { ClinicSuggestDialog } from "@/components/session/clinic-suggest-dialog";
 import { BackButton } from "@/components/shared/back-button";
 import { waLink } from "@/lib/whatsapp";
 import { formatWhatsapp } from "@/lib/whatsapp";
@@ -171,6 +173,32 @@ export function SessionRoomView() {
       cancelled = true;
     };
   }, [activeSessionId, myRole, user?.id]);
+
+  /* v1.14.0: اقتراح عيادة — نافذة المختص + شريط «العيادات المقترحة» للطرفين */
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [clinicSugg, setClinicSugg] = useState<
+    { id: string; clinicId: string; clinicName: string; clinicSlug: string | null; wilaya: string | null; city: string | null; specialties: string[]; customSpecialties: string[]; yearsExperience: number | null; note: string | null }[]
+  >([]);
+
+  const loadClinicSugg = useCallback(async () => {
+    if (!activeSessionId || !user?.id) return;
+    try {
+      const res = await fetch(`/api/clinic-suggestions?sessionId=${activeSessionId}&userId=${user.id}`);
+      if (!res.ok) return;
+      const d = await res.json();
+      setClinicSugg(d.suggestions || []);
+    } catch {
+      /* تجاهل */
+    }
+  }, [activeSessionId, user?.id]);
+
+  useEffect(() => {
+    setClinicSugg([]);
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    loadClinicSugg();
+  }, [loadClinicSugg]);
 
   /* عند تفعيل الجلسة: اطوِ الملخص تلقائياً — الدردشة تبدأ بمساحتها الكاملة */
   useEffect(() => {
@@ -740,6 +768,19 @@ export function SessionRoomView() {
               <MessageSquareText className="h-4 w-4" />
               <span className="hidden sm:inline">{t.session.openChat}</span>
             </Button>
+            {/* v1.14.0: اقتراح عيادة — للمختص حصراً في جلساته: يفتح نافذة الفلترة */}
+            {myRole === "COUNSELOR" && session.status !== "COMPLETED" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-lg font-black border-primary/40 text-primary"
+                title={t.suggest.title}
+                onClick={() => setSuggestOpen(true)}
+              >
+                <Building2 className="h-4 w-4" />
+                <span className="hidden md:inline">{t.suggest.btn}</span>
+              </Button>
+            )}
             {myRole === "COUNSELOR" && session.status === "ACCEPTED" && (
               <Button size="sm" variant="outline" className="gradient-primary text-white font-bold rounded-lg" onClick={activate}>
                 {t.counselor.startSession}
@@ -859,6 +900,45 @@ export function SessionRoomView() {
       </Card>
       </div>
 
+      {/* ═ v1.14.0: العيادات المقترحة — شريط يظهر للطرفين بعد اقتراح المختص ═
+          الضغط يفتح صفحة العيادة: تصفح + حجز حضوري + تقييم + واتساب */}
+      {clinicSugg.length > 0 ? (
+        <div className="w-full max-w-2xl mx-auto px-4 pb-1">
+          <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary shrink-0" />
+              <p className="text-sm font-black text-primary">{t.suggest.stripTitle}</p>
+            </div>
+            <div className="space-y-2">
+              {clinicSugg.map((s) => (
+                <div key={s.id} className="rounded-xl border border-border/60 bg-card px-3.5 py-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-sm">{s.clinicName}</p>
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground font-semibold">
+                        {s.yearsExperience ? <span>{s.yearsExperience} {t.clinics.yearsExp}</span> : null}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="gradient-primary text-white font-black rounded-lg shrink-0"
+                      onClick={() => {
+                        const st = useApp.getState();
+                        st.setActiveClinic(s.clinicSlug || s.clinicId);
+                        st.setView("clinic-page");
+                      }}
+                    >
+                      {t.suggest.openClinic}
+                    </Button>
+                  </div>
+                  {s.note ? <p className="text-[11px] text-muted-foreground leading-relaxed rounded-lg bg-muted/50 px-2.5 py-1.5">{s.note}</p> : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Waiting note — نصها يتناسب مع نوع الحساب */}
       {!partnerPresent && (
         <p className="text-center text-xs text-muted-foreground font-semibold pt-3">
@@ -868,6 +948,16 @@ export function SessionRoomView() {
 
       {/* خطة ما بعد الجلسة — نافذة مشتركة (غرفة الجلسة + شاشة الملخص) */}
       {planDialog}
+
+      {/* ═ v1.14.0: نافذة اقتراح عيادة — للمختص فقط: فلترة الولاية/المدينة/
+          التخصصات/سنوات الخبرة ثم إرسال إشعار فوري للعميل بالتفاصيل */}
+      <ClinicSuggestDialog
+        open={suggestOpen}
+        onOpenChange={setSuggestOpen}
+        sessionId={session.id}
+        suggestedIds={clinicSugg.map((s) => s.clinicId)}
+        onSuggested={loadClinicSugg}
+      />
 
       {/* ═ v1.4.0: نافذة الدردشة الواسعة — مطابقة لنافذة التواصل بين الطرفين ═
           نفس مكوّن الدردشة الداخلي بمساحة كاملة (75vh) بلا ضغط الرأس والملخص */}

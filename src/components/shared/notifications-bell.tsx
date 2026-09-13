@@ -144,6 +144,16 @@ export function NotificationsBell() {
         const url = new URL(n.url, window.location.origin);
         const sessionId = url.searchParams.get("session");
         const dmId = url.searchParams.get("dm");
+        /* v1.14.0: إشعار اقتراح عيادة (وكل روابط ?clinic=) — الضغط يفتح
+           صفحة العيادة المقترحة مباشرة: تصفح + حجز حضوري + تقييم */
+        const clinicSlug = url.searchParams.get("clinic");
+        if (clinicSlug) {
+          useApp.getState().setActiveClinic(clinicSlug.slice(0, 120));
+          useApp.getState().setView("clinic-page");
+          setOpen(false);
+          markOne(n.id);
+          return;
+        }
         /* v2.13.0: رابط صفحة عامة (?view=community مثلًا) — إشعار المنشور
            الجديد من أخصائي يتابعه المستخدم يفتح المجتمع مباشرة */
         const viewParam = url.searchParams.get("view");

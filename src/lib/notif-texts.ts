@@ -35,6 +35,14 @@ export type NotifKey =
   | "contractSigned"
   | "reminder"
   | "challengeWon"
+  | /* v1.14.0: منظومة العيادات */ "clinicSuggested"
+  | "clinicBookingNew"
+  | "clinicBookingConfirmed"
+  | "clinicBookingCancelled"
+  | "clinicBookingCancelledByClient"
+  | "clinicVisitCompleted"
+  | "clinicAdApproved"
+  | "clinicAdRejected"
   | "test";
 
 export type NotifLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh";
@@ -264,6 +272,71 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     tr: { title: "👑 Yeni yarışma kazananı!", body: "Gizli yarışmanın ilk kazananı: {name} — ayrıntılar için yönetim paneline bakın" },
     ru: { title: "👑 Новый победитель испытания!", body: "Первый победитель секретного испытания: {name} — подробности в панели администрирования" },
     zh: { title: "👑 挑战新冠军诞生！", body: "秘密挑战的首位获胜者：{name} — 详情请查看管理面板" },
+  },
+  /* ═ v1.14.0: منظومة العيادات — اقتراح المختص، الحجز الحضوري، الإعلانات ═ */
+  clinicSuggested: {
+    ar: { title: "🧭 اقترح لك مختصك عيادة", body: "«{clinic}» في {wilaya} — التخصصات: {specs} — سنوات الخبرة: {years} — ملاحظة المختص: {note} — اضغط لعرض العيادة والحجز الحضوري" },
+    fr: { title: "🧭 Votre spécialiste vous suggère une clinique", body: "« {clinic} » à {wilaya} — spécialités : {specs} — années d'expérience : {years} — note : {note} — touchez pour voir la clinique et réserver" },
+    en: { title: "🧭 Your specialist suggests a clinic", body: "“{clinic}” in {wilaya} — specialties: {specs} — years of experience: {years} — note: {note} — tap to view the clinic and book" },
+    tr: { title: "🧭 Uzmanınız size bir klinik önerdi", body: "“{clinic}” — {wilaya} — uzmanlıklar: {specs} — deneyim: {years} yıl — not: {note} — kliniği görmek ve randevu almak için dokunun" },
+    ru: { title: "🧭 Ваш специалист предлагает клинику", body: "«{clinic}» в {wilaya} — специализации: {specs} — опыт: {years} лет — заметка: {note} — нажмите, чтобы открыть клинику и записаться" },
+    zh: { title: "🧭 您的专家为您推荐了一家诊所", body: "「{clinic}」位于{wilaya}——专长：{specs}——经验：{years} 年——备注：{note}——点击查看诊所并预约" },
+  },
+  clinicBookingNew: {
+    ar: { title: "📅 طلب حجز حضوري جديد", body: "العميل {name} يطلب موعداً حضورياً في «{clinic}» بتاريخ {when} — راجع لوحة عيادتك للتأكيد أو الإلغاء" },
+    fr: { title: "📅 Nouvelle demande de rendez-vous", body: "Le client {name} demande une consultation présentielle à « {clinic} » le {when} — confirmez ou annulez depuis votre tableau de bord" },
+    en: { title: "📅 New in-person booking request", body: "Client {name} requests an in-person visit at “{clinic}” on {when} — confirm or cancel from your dashboard" },
+    tr: { title: "📅 Yeni yüz yüze randevu talebi", body: "Müşteri {name}, «{clinic}» kliniğinde {when} tarihli yüz yüze randevu istiyor — panonuzdan onaylayın veya iptal edin" },
+    ru: { title: "📅 Новая заявка на очный приём", body: "Клиент {name} просит очный приём в «{clinic}» на {when} — подтвердите или отмените в вашей панели" },
+    zh: { title: "📅 新的线下预约请求", body: "客户{name}申请在「{clinic}」于{when}进行线下就诊——请在您的面板确认或取消" },
+  },
+  clinicBookingConfirmed: {
+    ar: { title: "✅ تأكيد حجزك الحضوري", body: "العيادة «{clinic}» أكدت موعدك الحضوري: {when} — العنوان: {address} — راجع صفحة العيادة لأي تواصل" },
+    fr: { title: "✅ Votre rendez-vous est confirmé", body: "La clinique « {clinic} » a confirmé votre visite : {when} — adresse : {address} — consultez la page de la clinique pour tout contact" },
+    en: { title: "✅ Your booking is confirmed", body: "“{clinic}” confirmed your in-person visit: {when} — address: {address} — see the clinic page for contact details" },
+    tr: { title: "✅ Randevunuz onaylandı", body: "“{clinic}” kliniği yüz yüze randevunuzu onayladı: {when} — adres: {address} — iletişim için kliniğin sayfasına bakın" },
+    ru: { title: "✅ Ваша запись подтверждена", body: "Клиника «{clinic}» подтвердила ваш очный приём: {when} — адрес: {address} — контактные данные на странице клиники" },
+    zh: { title: "✅ 您的预约已确认", body: "「{clinic}」已确认您的线下就诊：{when}——地址：{address}——联系方式请查看诊所页面" },
+  },
+  clinicBookingCancelled: {
+    ar: { title: "ℹ️ إلغاء حجز حضوري", body: "العيادة «{clinic}» ألغت موعدك: {when} — السبب: {reason} — يمكنك حجز موعد آخر من صفحة العيادة" },
+    fr: { title: "ℹ️ Rendez-vous annulé", body: "La clinique « {clinic} » a annulé votre rendez-vous du {when} — motif : {reason} — vous pouvez réserver un autre créneau depuis la page de la clinique" },
+    en: { title: "ℹ️ Booking cancelled", body: "“{clinic}” cancelled your appointment on {when} — reason: {reason} — you can book another slot from the clinic page" },
+    tr: { title: "ℹ️ Randevu iptal edildi", body: "“{clinic}” kliniği {when} tarihli randevunuzu iptal etti — gerekçe: {reason} — kliniğin sayfasından yeni bir saat seçebilirsiniz" },
+    ru: { title: "ℹ️ Приём отменён", body: "Клиника «{clinic}» отменила ваш приём {when} — причина: {reason} — выберите другое время на странице клиники" },
+    zh: { title: "ℹ️ 预约已取消", body: "「{clinic}」取消了您在{when}的预约——原因：{reason}——您可以在诊所页面重新预约" },
+  },
+  clinicBookingCancelledByClient: {
+    ar: { title: "ℹ️ العميل ألغى حجزه الحضوري", body: "العميل {name} ألغى موعد {when} في «{clinic}» — الوقت متاح الآن لعميل آخر" },
+    fr: { title: "ℹ️ Le client a annulé son rendez-vous", body: "Le client {name} a annulé le rendez-vous du {when} à « {clinic} » — le créneau est de nouveau disponible" },
+    en: { title: "ℹ️ Client cancelled the booking", body: "Client {name} cancelled the appointment on {when} at “{clinic}” — the slot is available again" },
+    tr: { title: "ℹ️ Müşteri randevusunu iptal etti", body: "Müşteri {name}, «{clinic}» kliniğindeki {when} randevusunu iptal etti — saat yeniden müsait" },
+    ru: { title: "ℹ️ Клиент отменил запись", body: "Клиент {name} отменил приём {when} в «{clinic}» — время снова свободно" },
+    zh: { title: "ℹ️ 客户取消了预约", body: "客户{name}取消了{when}在「{clinic}」的预约——该时段重新可用" },
+  },
+  clinicVisitCompleted: {
+    ar: { title: "🏁 اكتملت زيارتك الحضورية", body: "أنهت العيادة «{clinic}» موعدك — كيف كانت تجربتك؟ قيّم العيادة من صفحتها" },
+    fr: { title: "🏁 Votre visite est terminée", body: "La clinique « {clinic} » a clôturé votre rendez-vous — comment s'est passée votre expérience ? Évaluez la clinique depuis sa page" },
+    en: { title: "🏁 Your visit is completed", body: "“{clinic}” closed your appointment — how was your experience? Rate the clinic from its page" },
+    tr: { title: "🏁 Ziyaretiniz tamamlandı", body: "“{clinic}” kliniği randevunuzu tamamladı — deneyiminiz nasıldı? Kliniği kendi sayfasından değerlendirin" },
+    ru: { title: "🏁 Ваш визит завершён", body: "Клиника «{clinic}» закрыла ваш приём — как всё прошло? Оцените клинику на её странице" },
+    zh: { title: "🏁 您的就诊已完成", body: "「{clinic}」已完成您的预约——体验如何？请在诊所页面进行评价" },
+  },
+  clinicAdApproved: {
+    ar: { title: "✅ نُشر إعلان عيادتك", body: "«{title}» — أُكد نشر الإعلان بعد التأكد من السداد، وهو الآن ظاهر للجمهور في صفحة الإعلانات" },
+    fr: { title: "✅ Votre annonce est publiée", body: "« {title} » — publication confirmée après vérification du paiement ; l'annonce est visible par le public" },
+    en: { title: "✅ Your clinic ad is live", body: "“{title}” — publication confirmed after payment verification; the ad is now visible to the public" },
+    tr: { title: "✅ Klinik ilanınız yayınlandı", body: "“{title}” — ödeme doğrulandıktan sonra yayın onaylandı; ilan artık herkese görünür" },
+    ru: { title: "✅ Объявление клиники опубликовано", body: "«{title}» — публикация подтверждена после проверки оплаты; объявление теперь видно всем" },
+    zh: { title: "✅ 您的诊所广告已发布", body: "「{title}」——已确认付款并发布；广告现已向公众展示" },
+  },
+  clinicAdRejected: {
+    ar: { title: "ℹ️ بخصوص إعلان عيادتك", body: "«{title}» — لم تتم الموافقة على النشر حالياً — السبب: {reason} — راجع لوحة عيادتك لتعديل الإعلان" },
+    fr: { title: "ℹ️ Concernant votre annonce", body: "« {title} » — publication non approuvée pour le moment — motif : {reason} — modifiez l'annonce depuis votre tableau de bord" },
+    en: { title: "ℹ️ About your clinic ad", body: "“{title}” — the ad was not approved at this time — reason: {reason} — edit the ad from your dashboard" },
+    tr: { title: "ℹ️ Klinik ilanınız hakkında", body: "“{title}” — ilan şu anda onaylanmadı — gerekçe: {reason} — ilanı panonuzdan düzenleyin" },
+    ru: { title: "ℹ️ О вашем объявлении", body: "«{title}» — публикация пока не одобрена — причина: {reason} — отредактируйте объявление в вашей панели" },
+    zh: { title: "ℹ️ 关于您的诊所广告", body: "「{title}」——该广告暂未获批——原因：{reason}——请在您的面板中修改" },
   },
   test: {
     ar: { title: "مرحباً بك في طمأنينة 💜", body: "الإشعارات تعمل بنجاح — أنت في أيدٍ أمينة" },

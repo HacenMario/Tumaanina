@@ -20,6 +20,11 @@ export type ViewName =
   | "counselor-stats"
   | "admin-chat"
   | "counselors-directory"
+  | "clinics-directory"
+  | "clinic-page"
+  | "clinic-auth"
+  | "clinic-dashboard"
+  | "ads"
   | "community"
   | "admin-login"
   | "admin-panel"
@@ -38,9 +43,14 @@ export type ViewName =
 
 export interface AuthUser {
   id: string;
-  role: "VICTIM" | "COUNSELOR" | "ADMIN";
+  /* v1.14.0: CLINIC — حساب عيادة نفسية (دليل العيادات + الجلسات الحضورية + الإعلانات) */
+  role: "VICTIM" | "COUNSELOR" | "ADMIN" | "CLINIC";
   pseudonym?: string;
   fullName?: string;
+  /* v1.14.0: اسم العيادة ورابط صفحتها العامة — لحسابات CLINIC */
+  clinicName?: string;
+  clinicSlug?: string;
+  clinicId?: string;
   email?: string;
   language?: AppLang;
   wilaya?: string;
@@ -73,6 +83,10 @@ interface AppState {
   user: AuthUser | null;
   clientDraft: ClientDraft;
   activeSessionId: string | null;
+  /* v1.14.0: العيادة المفتوحة في صفحتها العامة — تُضبط من الدليل أو من
+     إشعار اقتراح المختص (?clinic={slug}) قبل فتح view=clinic-page */
+  activeClinicSlug: string | null;
+  setActiveClinic: (slug: string | null) => void;
   /* حجم خط عام قابل للتكبير/التصغير (نسبة %) — لإمكانية الوصول لكل الفئات */
   fontScale: number;
   setFontScale: (n: number) => void;
@@ -96,7 +110,9 @@ export const useApp = create<AppState>()(
       user: null,
       clientDraft: {},
       activeSessionId: null,
+      activeClinicSlug: null,
       fontScale: 100,
+      setActiveClinic: (slug) => set({ activeClinicSlug: slug }),
       setFontScale: (n) => set({ fontScale: Math.min(140, Math.max(85, n)) }),
       currency: "DZD",
       setCurrency: (c) => set({ currency: c }),
@@ -115,8 +131,8 @@ export const useApp = create<AppState>()(
       setDraft: (d) => set({ clientDraft: { ...get().clientDraft, ...d } }),
       setActiveSession: (id) => set({ activeSessionId: id }),
       /* تسجيل الخروج لكل الأدوار: ينظّف الجلسة النشطة ويُبقي مسودة العميل */
-      logout: () => set({ user: null, activeSessionId: null, view: "landing" }),
-      reset: () => set({ view: "landing", history: [], user: null, clientDraft: {}, activeSessionId: null }),
+      logout: () => set({ user: null, activeSessionId: null, activeClinicSlug: null, view: "landing" }),
+      reset: () => set({ view: "landing", history: [], user: null, clientDraft: {}, activeSessionId: null, activeClinicSlug: null }),
     }),
     {
       name: "tumaanina-state",

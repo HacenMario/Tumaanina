@@ -27,7 +27,8 @@ const UserSchema = new Schema(
     pseudonym: { type: String, default: null, trim: true },
     role: {
       type: String,
-      enum: ["VICTIM", "COUNSELOR", "ADMIN"],
+      /* v1.14.0: CLINIC — حساب عيادة نفسية (دليل العيادات + الجلسات الحضورية + الإعلانات) */
+      enum: ["VICTIM", "COUNSELOR", "ADMIN", "CLINIC"],
       required: true,
     },
     /* v1.3.0: كل لغات المنصة الست — كان التعداد الثلاثي يُفشل تسجيل/حفظ حساب
@@ -590,6 +591,140 @@ export const Exercise =
   (mongoose.models.Exercise as mongoose.Model<any>) ||
   mongoose.model("Exercise", ExerciseSchema);
 
+/* ═ v1.14.0: Clinic — عيادة نفسية مسجّلة في الدليل ═
+   حساب مستقل (دخول عيادة) يملؤه صاحب العيادة من لوحته: الاسم، سنة الإنشاء،
+   التخصصات، العنوان (ولاية/بلدية/تفصيلي)، الهواتف، التواصل الاجتماعي،
+   الموقع الإلكتروني، الشعار، ساعات العمل… وتظهر للعموم في /clinic/{slug}
+   مع حجز جلسات حضورية وتقييم العيادة. الحساب المعطّل (isActive=false)
+   يختفي من الدليل وصفحته العامة تصبح غير متاحة. */
+const ClinicSchema = new Schema(
+  {
+    ownerUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true, index: true },
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    /* رابط الصفحة العامة: /clinic/{slug} — يُولَّد من الاسم مرة واحدة ويُحدَّث عند تغييره */
+    slug: { type: String, default: null, index: true },
+    /* سنة إنشاء العيادة (1950..السنة الحالية) — سنوات الخبرة تُشتق منها */
+    foundedYear: { type: Number, default: null, min: 1950, max: 2100 },
+    specialties: { type: [String], default: [] },
+    customSpecialties: { type: [String], default: [] },
+    about: { type: String, default: null, maxlength: 4000 },
+    /* الموقع: ولاية (مفتاح WILAYAS) + بلدية/مدينة + عنوان تفصيلي */
+    wilaya: { type: String, default: null },
+    city: { type: String, default: null, trim: true, maxlength: 80 },
+    address: { type: String, default: null, trim: true, maxlength: 300 },
+    /* أرقام الهواتف للاتصال (رقم أو أكثر) — أرقام فقط بالصيغة الدولية 213XXXXXXXXX */
+    phones: { type: [String], default: [] },
+    /* واتساب العيادة — زر التواصل المباشر في صفحتها وفي اقتراح المختص */
+    whatsapp: { type: String, default: null, trim: true },
+    contactEmail: { type: String, default: null, trim: true, lowercase: true },
+    website: { type: String, default: null, trim: true, maxlength: 300 },
+    socials: {
+      facebook: { type: String, default: null, trim: true },
+      instagram: { type: String, default: null, trim: true },
+      tiktok: { type: String, default: null, trim: true },
+    },
+    /* شعار العيادة base64 (data URL) — يُقدَّم عبر /api/clinics/{id}/logo */
+    logo: { type: String, default: null },
+    /* ساعات العمل + ملاحظة الأسعار + مرجع ترخيص (تفاصيل مهمة لكل عيادة) */
+    workingHours: { type: String, default: null, trim: true, maxlength: 400 },
+    priceNote: { type: String, default: null, trim: true, maxlength: 400 },
+    licenseNumber: { type: String, default: null, trim: true, maxlength: 80 },
+    /* تعطيل من الإدارة — يخفي العيادة من الدليل ويعطّل صفحتها وحجزها */
+    isActive: { type: Boolean, default: true },
+    /* التقييم: متوسط النجوم + عدد المقيّمين + عدد الحجوزات المكتملة */
+    rating: { type: Number, default: 5.0 },
+    ratingsCount: { type: Number, default: 0 },
+    bookingsCount: { type: Number, default: 0 },
+  },
+  { timestamps: true, collection: "clinics" }
+);
+
+/* ═ v1.14.0: ClinicAd — إعلان عيادة (لا يُنشر قبل موافقة الإدارة) ═
+   العيادة تصيغ إعلانها من لوحتها، فيبقى «بانتظار المراجعة» حتى يؤكّد
+   الأدمين نشره بعد التواصل مع العيادة والتأكد من سداد مستحقات الإعلان —
+   عندها فقط يظهر في صفحة الإعلانات العمومية. الرفض يصل للعيادة بسببه. */
+const ClinicAdSchema = new Schema(
+  {
+    clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true, index: true },
+    title: { type: String, required: true, trim: true, maxlength: 120 },
+    body: { type: String, required: true, trim: true, maxlength: 1200 },
+    /* صورة الإعلان base64 (data URL) — اختيارية */
+    image: { type: String, default: null },
+    /* PENDING = بانتظار مراجعة الإدارة | APPROVED = منشور | REJECTED = مرفوض */
+    status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING", index: true },
+    /* مرجع سداد مستحقات الإعلان الذي أكده الأدمين عند الموافقة */
+    paymentNote: { type: String, default: null, trim: true, maxlength: 200 },
+    /* سبب الرفض / ملاحظة الإدارة — يصل لصاحب العيادة */
+    adminNote: { type: String, default: null, trim: true, maxlength: 400 },
+    reviewedBy: { type: String, default: null },
+    reviewedAt: { type: Date, default: null },
+  },
+  { timestamps: true, collection: "clinic_ads" }
+);
+ClinicAdSchema.index({ status: 1, reviewedAt: -1 });
+ClinicAdSchema.index({ clinicId: 1, createdAt: -1 });
+
+/* ═ v1.14.0: ClinicBooking — حجز جلسة حضورية في العيادة ═
+   العميل (بحساب VICTIM) يحجز موعداً حضورياً من صفحة العيادة: تاريخ + ساعة
+   + اسم + هاتف + سبب مختصر. العيادة تدير الحجوزات من لوحتها (تأكيد/إلغاء/
+   إتمام) ويصل العميل إشعار فوري عند كل تغيير حالة. موعد واحد لكل
+   (عيادة + تاريخ + ساعة) يمنع التصادم ذرياً بفهرس فريد جزئي. */
+const ClinicBookingSchema = new Schema(
+  {
+    clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true, index: true },
+    clientUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    /* نسخة اسم وهاتف العميل لحظة الحجز — تُعرض للعيادة حصراً */
+    clientName: { type: String, required: true, trim: true, maxlength: 120 },
+    clientPhone: { type: String, required: true, trim: true, maxlength: 20 },
+    date: { type: String, required: true }, /* YYYY-MM-DD */
+    slot: { type: String, required: true }, /* HH:MM من SLOT_TIMES */
+    reason: { type: String, default: null, trim: true, maxlength: 600 },
+    status: {
+      type: String,
+      enum: ["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"],
+      default: "PENDING",
+      index: true,
+    },
+    /* من ألغى: CLIENT | CLINIC — مع ملاحظة العيادة التي تصل للعميل */
+    cancelledBy: { type: String, default: null },
+    clinicNote: { type: String, default: null, trim: true, maxlength: 400 },
+  },
+  { timestamps: true, collection: "clinic_bookings" }
+);
+ClinicBookingSchema.index({ clinicId: 1, date: 1, slot: 1 });
+ClinicBookingSchema.index({ clientUserId: 1, createdAt: -1 });
+
+/* ═ v1.14.0: ClinicSuggestion — اقتراح عيادة من المختص للعميل في غرفة الجلسة ═
+   يُنشأ لحظة ضغط المختص «اقترح هذه العيادة» — يصل للعميل إشعار فوري بكامل
+   تفاصيل العيادة يوجهه لصفحتها، ويُعرض أيضاً في شريط «العيادات المقترحة»
+   داخل غرفة الجلسة. اقتراح واحد لكل (جلسة × عيادة) بلا تكرار. */
+const ClinicSuggestionSchema = new Schema(
+  {
+    sessionId: { type: Schema.Types.ObjectId, ref: "SupportSession", required: true, index: true },
+    clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true },
+    counselorUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    clientUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    /* ملاحظة المختص المرفقة بالاقتراح (لماذا تقترح هذه العيادة) */
+    note: { type: String, default: null, trim: true, maxlength: 400 },
+  },
+  { timestamps: true, collection: "clinic_suggestions" }
+);
+ClinicSuggestionSchema.index({ sessionId: 1, clinicId: 1 }, { unique: true });
+
+/* ═ v1.14.0: ClinicRating — تقييم العيادة من العميل (1–5 نجوم) ═
+   تقييم واحد لكل (عميل × عيادة) — إعادة الإرسال تُحدّث النجوم،
+   والمتوسط يُحدَّث لحظياً في ملف العيادة. */
+const ClinicRatingSchema = new Schema(
+  {
+    rateKey: { type: String, required: true, unique: true },
+    clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true, index: true },
+    clientUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    stars: { type: Number, required: true, min: 1, max: 5 },
+    comment: { type: String, default: null, trim: true, maxlength: 500 },
+  },
+  { timestamps: true, collection: "clinic_ratings" }
+);
+
 export const TherapyContract =
   (mongoose.models.TherapyContract as mongoose.Model<any>) ||
   mongoose.model("TherapyContract", TherapyContractSchema);
@@ -603,6 +738,25 @@ export const PlatformContract =
 export const ContractCounter =
   (mongoose.models.ContractCounter as mongoose.Model<any>) ||
   mongoose.model("ContractCounter", ContractCounterSchema);
+
+/* v1.14.0: منظومة العيادات النفسية */
+export const Clinic =
+  (mongoose.models.Clinic as mongoose.Model<any>) || mongoose.model("Clinic", ClinicSchema);
+
+export const ClinicAd =
+  (mongoose.models.ClinicAd as mongoose.Model<any>) || mongoose.model("ClinicAd", ClinicAdSchema);
+
+export const ClinicBooking =
+  (mongoose.models.ClinicBooking as mongoose.Model<any>) ||
+  mongoose.model("ClinicBooking", ClinicBookingSchema);
+
+export const ClinicRating =
+  (mongoose.models.ClinicRating as mongoose.Model<any>) ||
+  mongoose.model("ClinicRating", ClinicRatingSchema);
+
+export const ClinicSuggestion =
+  (mongoose.models.ClinicSuggestion as mongoose.Model<any>) ||
+  mongoose.model("ClinicSuggestion", ClinicSuggestionSchema);
 
 /* أنواع مساعدة خفيفة */
 export type UserDoc = mongoose.InferSchemaType<typeof UserSchema>;

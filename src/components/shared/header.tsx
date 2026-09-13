@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { useTheme } from "next-themes";
-import { Globe, Palette, Menu, LogOut, LogIn, UserRound, Stethoscope, TriangleAlert, House, CircleHelp, HeartHandshake, Stethoscope as StethoscopeIcon, Users, CalendarDays, LayoutDashboard, MessageSquare, Shield, Settings, Heart, Info, MessagesSquare, Lock, FileText, Mail, UsersRound, Sparkles, Waves, GraduationCap, Coins, Check, BarChart3 } from "lucide-react";
+import { Globe, Palette, Menu, LogOut, LogIn, UserRound, Stethoscope, TriangleAlert, House, CircleHelp, HeartHandshake, Stethoscope as StethoscopeIcon, Users, CalendarDays, LayoutDashboard, MessageSquare, Shield, Settings, Heart, Info, MessagesSquare, Lock, FileText, Mail, UsersRound, Sparkles, Waves, GraduationCap, Coins, Check, BarChart3, Building2, Megaphone } from "lucide-react";
 import { useState } from "react";
 import { useI18n, LANG_META } from "@/lib/i18n";
 import { useApp, type ViewName } from "@/lib/store";
@@ -33,6 +33,11 @@ const VIEW_ICONS: Partial<Record<ViewName, LucideIcon | "🤲">> = {
   how: CircleHelp,
   roles: HeartHandshake,
   "counselors-directory": StethoscopeIcon,
+  "clinics-directory": Building2,
+  "clinic-page": Building2,
+  "clinic-auth": Building2,
+  "clinic-dashboard": LayoutDashboard,
+  ads: Megaphone,
   community: Users,
   "client-sessions": CalendarDays,
   "counselor-dashboard": LayoutDashboard,
@@ -101,12 +106,15 @@ export function AppHeader() {
     { label: t.nav.how, view: "how", show: true, wide: true },
     { label: t.nav.findHelp, view: "roles", show: !role || role === "VICTIM" },
     { label: t.nav.counselors, view: "counselors-directory", show: true, wide: true },
+    { label: t.nav.clinics, view: "clinics-directory", show: true },
+    { label: t.nav.ads, view: "ads", show: true, wide: true },
     { label: t.nav.community, view: "community", show: true },
     { label: t.nav.exercises, view: "exercises", show: true, wide: true },
     { label: t.nav.sessions, view: "client-sessions", show: role === "VICTIM" },
     { label: t.nav.dashboard, view: "counselor-dashboard", show: role === "COUNSELOR" },
     { label: t.nav.myStats, view: "counselor-stats", show: role === "COUNSELOR" },
     { label: t.nav.adminChat, view: "admin-chat", show: role === "COUNSELOR" },
+    { label: t.nav.clinicDash, view: "clinic-dashboard", show: role === "CLINIC" },
     { label: t.nav.admin, view: "admin-panel", show: role === "ADMIN" },
     { label: t.nav.settings, view: "settings", show: true },
     { label: t.nav.thanks, view: "gratitude", show: true, wide: true },
@@ -122,6 +130,8 @@ export function AppHeader() {
       /* v2.13.0: صفحة كيف تعمل المنصة — في قائمة الهاتف دائماً */
       { label: t.nav.how, view: "how" as ViewName },
       { label: t.nav.counselors, view: "counselors-directory" as ViewName },
+      { label: t.nav.clinics, view: "clinics-directory" as ViewName },
+      { label: t.nav.ads, view: "ads" as ViewName },
       { label: t.nav.thanks, view: "gratitude" as ViewName },
       { label: t.nav.privacy, view: "privacy" as ViewName },
       { label: t.nav.terms, view: "terms" as ViewName },
@@ -321,6 +331,18 @@ export function AppHeader() {
                       <Stethoscope className="h-4 w-4" />
                       {t.nav.counselorLogin}
                     </Button>
+                    {/* v1.14.0: دخول العيادة من القائمة الجانبية مباشرة */}
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start font-black rounded-xl border-primary/40 text-primary"
+                      onClick={() => {
+                        setView("clinic-auth");
+                        setOpen(false);
+                      }}
+                    >
+                      <Building2 className="h-4 w-4" />
+                      {t.nav.clinicLogin}
+                    </Button>
                   </div>
                 )}
                 {navItems
@@ -405,7 +427,13 @@ export function AppHeader() {
                   <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
                     <UserRound className="h-4 w-4" />
                     <span className="truncate font-semibold">
-                      {user.role === "COUNSELOR" ? user.fullName || "—" : user.role === "VICTIM" ? user.pseudonym : t.roles.adminTitle}
+                      {user.role === "COUNSELOR"
+                        ? user.fullName || "—"
+                        : user.role === "CLINIC"
+                          ? user.clinicName || "—"
+                          : user.role === "VICTIM"
+                            ? user.pseudonym
+                            : t.roles.adminTitle}
                     </span>
                   </div>
                   <Button

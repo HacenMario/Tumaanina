@@ -386,7 +386,7 @@ async function main() {
   server.listen(PORT, () => {
     console.log("────────────────────────────────────────────────");
     console.log(`🟢 طمأنينة — الخادم الموحّد يعمل (${DEV ? "تطوير" : "إنتاج"})`);
-    console.log(`   الإصدار:     v1.13.1`);
+    console.log(`   الإصدار:     v1.14.0`);
     console.log(`   العنوان:     http://localhost:${PORT}`);
     console.log(`   فحص الصحة:   http://localhost:${PORT}/api/health`);
     console.log(`   قاعدة البيانات: ${safeUri}`);
