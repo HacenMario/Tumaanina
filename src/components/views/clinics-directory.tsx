@@ -6,6 +6,7 @@ import { Building2, SearchX, ChevronLeft, ChevronRight, MapPin, CalendarCheck2, 
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { WILAYA_LIST, SPECIALTIES, type SpecialtyKey } from "@/lib/constants";
+import { LogoMark } from "@/lib/logo";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
 import { waLink } from "@/lib/whatsapp";
 import { openClinicRatings } from "@/components/shared/clinic-ratings-dialog";
@@ -138,8 +139,9 @@ export function ClinicsDirectoryView() {
       <BackButton />
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 mb-6">
         <div className="flex items-center gap-3">
+          {/* v1.15.1: شعار المنصة (زهرة اللوتس) في رأس الدليل — كان غائباً */}
           <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Building2 className="h-5.5 w-5.5 text-primary" />
+            <LogoMark size={34} />
           </div>
           <h1 className="text-2xl md:text-3xl font-black">{t.clinics.dirTitle}</h1>
         </div>

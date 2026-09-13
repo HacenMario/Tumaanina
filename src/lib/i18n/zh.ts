@@ -69,7 +69,7 @@ export const zh = {
     heroTitle1: "你所经历的一切并不轻松……",
     heroTitle2: "你不必独自承受",
     /* v1.5.0: الاستشارة صوتية أو مرئية عبر واتساب — بلا نص كطريقة استشارة */
-    heroSubtitle: "连接持证心理咨询专家的平台——咨询通过 WhatsApp 语音或视频进行，安全房间内还有辅助聊天。价格透明，专业保密。",
+    heroSubtitle: "连接持证心理咨询专家与可信赖诊所的平台——咨询可通过 WhatsApp 语音或视频进行，也可到您附近的诊所面诊，安全房间内还有辅助聊天。价格透明，专业保密。",
     ctaPrimary: "开启康复之旅",
     ctaSecondary: "我是心理咨询师——加入我们",
     trustAnon: "身份受保护",
@@ -651,6 +651,7 @@ export const zh = {
     roleVICTIM: "来访者",
     roleCOUNSELOR: "专家",
     roleADMIN: "管理",
+    roleCLINIC: "诊所",
     createAccount: "创建新账户",
     createRole: "账户类型",
     createSubmit: "创建账户",
@@ -1622,6 +1623,7 @@ export const zh = {
     noComments: "暂无评论",
     adMedia: "广告媒体",
     adMediaHint: "最多 5 张图片和 1 个视频——在可左右滑动的窗口中显示",
+    adMediaHintMulti: "一次选择所有图片——最多 5 张图片和 1 个视频",
     addImage: "图片",
     addVideo: "视频",
     adMaxMedia: "最多 5 张图片和 1 个视频",
@@ -1643,7 +1645,7 @@ export const zh = {
 
   ads: {
     title: "诊所广告",
-    desc: "仅由平台管理端批准的广告——每条发布广告均核验过诊所与费用，助您安心对接可靠服务。",
+    desc: "仅由平台管理端批准的广告——每条发布广告均核验过其发布诊所，助您安心对接可靠服务。",
     empty: "暂无已发布广告——请稍后再来",
     visitClinic: "诊所页面",
     publishedOn: "发布于",
@@ -1653,6 +1655,10 @@ export const zh = {
     commentSent: "您的评论已发布",
     clinicReply: "诊所回复",
     commentPh: "写下评论…",
+    /* v1.15.1 */
+    showComments: "评论",
+    hideComments: "隐藏评论",
+    noCommentsYet: "暂无评论——来做第一个吧",
   },
 
   suggest: {
@@ -1739,5 +1745,6 @@ export const zh = {
     badge: "付费广告",
     openClinic: "打开诊所页面",
     video: "视频",
+    dontShowAgain: "不再显示",
   },
 };

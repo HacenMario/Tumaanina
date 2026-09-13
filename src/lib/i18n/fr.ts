@@ -71,7 +71,7 @@ export const fr: Dict = {
     heroTitle1: "Ce que vous traversez n'est pas facile…",
     heroTitle2: "Ne portez pas ce poids seul",
     /* v1.5.0: الاستشارة صوتية أو مرئية عبر واتساب — بلا نص كطريقة استشارة */
-    heroSubtitle: "Une plateforme de consultations psychologiques avec des professionnels agréés — votre séance en appel vocal ou vidéo via WhatsApp, avec un tchat d'appoint dans la salle sécurisée. Des tarifs clairs et une confidentialité totale.",
+    heroSubtitle: "Une plateforme de consultations psychologiques avec des professionnels agréés et des cliniques de confiance — votre séance en appel vocal ou vidéo via WhatsApp, ou en présentiel dans une clinique proche de vous, avec un tchat d'appoint dans la salle sécurisée. Des tarifs clairs et une confidentialité totale.",
     ctaPrimary: "Commencer le rétablissement",
     ctaSecondary: "Je suis psychologue — rejoignez-nous",
     trustAnon: "Identité protégée",
@@ -664,6 +664,7 @@ export const fr: Dict = {
     roleVICTIM: "Victime",
     roleCOUNSELOR: "Professionnel",
     roleADMIN: "Administration",
+    roleCLINIC: "Clinique",
     createAccount: "Créer un compte",
     createRole: "Type de compte",
     createSubmit: "Créer le compte",
@@ -1654,6 +1655,7 @@ export const fr: Dict = {
     noComments: "Aucun commentaire pour le moment",
     adMedia: "Médias de l'annonce",
     adMediaHint: "Jusqu'à 5 photos et 1 vidéo — fenêtre avec balayage gauche/droite",
+    adMediaHintMulti: "Sélectionnez toutes vos photos d'un coup — jusqu'à 5 photos et 1 vidéo",
     addImage: "Photo",
     addVideo: "Vidéo",
     adMaxMedia: "Maximum 5 photos et 1 vidéo",
@@ -1675,7 +1677,7 @@ export const fr: Dict = {
 
   ads: {
     title: "Publicités des cliniques",
-    desc: "Annonces approuvées exclusivement par l'administration — chaque publication a été vérifiée quant à sa clinique et à ses frais, pour naviguer en toute sécurité vers des services fiables.",
+    desc: "Annonces approuvées exclusivement par l'administration — chaque publication a été vérifiée quant à la clinique qui la publie, pour naviguer en toute sécurité vers des services fiables.",
     empty: "Aucune annonce publiée pour l'instant — revenez bientôt",
     visitClinic: "Page de la clinique",
     publishedOn: "Publié le",
@@ -1685,6 +1687,10 @@ export const fr: Dict = {
     commentSent: "Votre commentaire a été publié",
     clinicReply: "Réponse de la clinique",
     commentPh: "Écrivez un commentaire…",
+    /* v1.15.1 */
+    showComments: "Commentaires",
+    hideComments: "Masquer les commentaires",
+    noCommentsYet: "Aucun commentaire — soyez le premier",
   },
 
   suggest: {
@@ -1771,5 +1777,6 @@ export const fr: Dict = {
     badge: "Annonce payante",
     openClinic: "Ouvrir la page de la clinique",
     video: "Vidéo",
+    dontShowAgain: "Ne plus afficher",
   },
 };

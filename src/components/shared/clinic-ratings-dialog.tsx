@@ -31,9 +31,11 @@ interface ClinicRatingItem {
 interface ClinicRatingsData {
   avg: number;
   count: number;
-  distribution: { stars: number; count: number }[];
-  items: ClinicRatingItem[];
-  myRating: { stars: number; comment: string | null } | null;
+  distribution?: { stars: number; count: number }[];
+  /* v1.15.1: الاسم الفعلي للحقل في استجابة الـ API هو reviews (وليس items)
+     — كان الاختلاف يسبب انهياراً côté العميل (reading 'length' of undefined) */
+  reviews?: ClinicRatingItem[];
+  myRating?: { stars: number; comment: string | null } | null;
 }
 
 const STARS = [1, 2, 3, 4, 5];
@@ -218,11 +220,11 @@ export function ClinicRatingsDialog() {
               </div>
             )}
 
-            {/* قائمة التقييمات */}
-            {data && data.items.length > 0 && (
+            {/* قائمة التقييمات — v1.15.1: من حقل reviews المُعاد من الخادم مع حماية كاملة */}
+            {data && (data.reviews?.length ?? 0) > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-black text-muted-foreground">{t.clinicRatings.listTitle}</p>
-                {data.items.slice(0, 10).map((r) => (
+                {(data.reviews ?? []).slice(0, 10).map((r) => (
                   <div key={r.id} className="rounded-xl border border-border/70 bg-card px-3.5 py-3 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-black truncate">{r.clientName}</span>

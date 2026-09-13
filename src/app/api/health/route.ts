@@ -10,7 +10,7 @@ async function GET_impl() {
   return NextResponse.json({
     ok: true,
     service: "tumaanina",
-    version: "1.15.0",
+    version: "1.15.1",
     db: dbState === 1 ? "connected" : dbState === 2 ? "connecting" : "disconnected",
     time: new Date().toISOString(),
   });

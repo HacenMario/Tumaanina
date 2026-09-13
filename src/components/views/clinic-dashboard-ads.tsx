@@ -277,13 +277,14 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{a.body}</p>
                 {a.mediaUrls.length > 0 ? (
+                  /* v1.15.1: مربعات موحّدة 96px مع object-contain — الصورة كاملة بلا قصّ ولا فيض */
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                     {a.mediaUrls.map((u, i) =>
                       /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u) ? (
-                        <video key={i} src={u} className="rounded-lg h-24 w-auto shrink-0 border border-border/60" muted />
+                        <video key={i} src={u} className="rounded-lg h-24 w-24 shrink-0 border border-border/60 bg-muted/40 object-contain" muted />
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img key={i} src={u} alt={`${a.title} ${i + 1}`} loading="lazy" className="rounded-lg max-h-24 w-auto shrink-0 border border-border/60" />
+                        <img key={i} src={u} alt={`${a.title} ${i + 1}`} loading="lazy" className="rounded-lg h-24 w-24 shrink-0 border border-border/60 bg-muted/40 object-contain" />
                       )
                     )}
                   </div>
@@ -355,7 +356,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
             </div>
             <div className="space-y-1.5">
               <Label className="font-bold">{t.clinicDash.adMedia}</Label>
-              <p className="text-[10px] text-muted-foreground font-semibold">{t.clinicDash.adMediaHint}</p>
+              <p className="text-[10px] text-muted-foreground font-semibold">{t.clinicDash.adMediaHintMulti ?? t.clinicDash.adMediaHint}</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   type="button"
@@ -384,18 +385,32 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                 id="ad-img-input"
                 type="file"
                 accept="image/*"
+                /* v1.15.1: multiple — اختيار كل الصور دفعة واحدة (حتى 5) بدل صورة بعد صورة */
+                multiple
                 className="hidden"
                 onChange={async (e) => {
-                  const f = e.target.files?.[0];
+                  const files = Array.from(e.target.files || []);
                   e.currentTarget.value = "";
-                  if (!f) return;
-                  if (adMedia.length >= 6) return;
-                  try {
-                    const c = await compressImage(f, 1200, MAX_ADIMG_B64);
-                    setAdMedia((p) => [...p, c]);
-                  } catch {
-                    showAppToast(t.clinicDash.adMediaBig, "");
+                  if (!files.length) return;
+                  /* حتى 5 صور + فيديو واحد = 6 وسائط كحد أقصى */
+                  const room = 6 - adMedia.length;
+                  const imgRoom = 5 - adMedia.filter((m) => m.startsWith("data:image/")).length;
+                  const take = Math.min(files.length, room, imgRoom);
+                  if (take <= 0) {
+                    showAppToast(t.clinicDash.adMaxMedia, "");
+                    return;
                   }
+                  if (files.length > take) showAppToast(t.clinicDash.adMaxMedia, "");
+                  const picked = files.slice(0, take);
+                  const compressed: string[] = [];
+                  for (const f of picked) {
+                    try {
+                      compressed.push(await compressImage(f, 1200, MAX_ADIMG_B64));
+                    } catch {
+                      showAppToast(t.clinicDash.adMediaBig, "");
+                    }
+                  }
+                  if (compressed.length) setAdMedia((p) => [...p, ...compressed]);
                 }}
               />
               <input

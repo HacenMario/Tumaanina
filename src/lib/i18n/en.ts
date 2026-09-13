@@ -71,7 +71,7 @@ export const en: Dict = {
     heroTitle1: "What you're going through isn't easy…",
     heroTitle2: "You don't have to carry it alone",
     /* v1.5.0: الاستشارة صوتية أو مرئية عبر واتساب — بلا نص كطريقة استشارة */
-    heroSubtitle: "A psychological consultation platform connecting you with licensed specialists — your session is a voice or video call via WhatsApp, with a supportive chat in the secure room. Clear prices and full professional confidentiality.",
+    heroSubtitle: "A psychological consultation platform connecting you with licensed specialists and trusted clinics — your session is a voice or video call via WhatsApp, or in person at a clinic near you, with a supportive chat in the secure room. Clear prices and full professional confidentiality.",
     ctaPrimary: "Start your healing journey",
     ctaSecondary: "I'm a psychologist — join us",
     trustAnon: "Protected identity",
@@ -664,6 +664,7 @@ export const en: Dict = {
     roleVICTIM: "Client",
     roleCOUNSELOR: "Counselor",
     roleADMIN: "Admin",
+    roleCLINIC: "Clinic",
     createAccount: "Create account",
     createRole: "Account type",
     createSubmit: "Create account",
@@ -1654,6 +1655,7 @@ export const en: Dict = {
     noComments: "No comments yet",
     adMedia: "Ad media",
     adMediaHint: "Up to 5 photos and 1 video — shown in a swipeable window",
+    adMediaHintMulti: "Select all your photos at once — up to 5 photos and 1 video",
     addImage: "Photo",
     addVideo: "Video",
     adMaxMedia: "Max 5 photos and 1 video",
@@ -1675,7 +1677,7 @@ export const en: Dict = {
 
   ads: {
     title: "Clinic Ads",
-    desc: "Ads approved exclusively by the platform administration — every published ad was verified for its clinic and fees, so you navigate safely to trusted services.",
+    desc: "Ads approved exclusively by the platform administration — every published ad was verified for its publishing clinic, so you navigate safely to trusted services.",
     empty: "No published ads right now — check back soon",
     visitClinic: "Clinic page",
     publishedOn: "Published on",
@@ -1685,6 +1687,10 @@ export const en: Dict = {
     commentSent: "Your comment was posted",
     clinicReply: "Clinic reply",
     commentPh: "Write a comment…",
+    /* v1.15.1 */
+    showComments: "Comments",
+    hideComments: "Hide comments",
+    noCommentsYet: "No comments yet — be the first",
   },
 
   suggest: {
@@ -1771,5 +1777,6 @@ export const en: Dict = {
     badge: "Paid ad",
     openClinic: "Open clinic page",
     video: "Video",
+    dontShowAgain: "Don't show again",
   },
 };

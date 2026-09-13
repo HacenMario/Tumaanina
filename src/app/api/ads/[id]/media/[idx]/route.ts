@@ -6,8 +6,12 @@ export const dynamic = "force-dynamic";
 
 /* ═ v1.15.0 — تقديم وسائط الإعلان (صور/فيديو) ═
    GET /api/ads/{id}/media/{idx} — الوسيط رقم idx من وثيقة الإعلان
-   (تدعم الفيديو طلبات Range للتمرير داخل المشغّل). يُقدّم للإعلان
-   المنشور فقط (APPROVED). */
+   (تدعم الفيديو طلبات Range للتمرير داخل المشغّل).
+   v1.15.1: يُقدَّم الوسيط لكل حالات الإعلان (بانتظار/مرفوض/منشور) —
+   كي ترى العيادة صاحبة الإعلان صور إعلانها في بطاقة «إعلاناتي» فور
+   صياغته، ويراها الأدمين في لوحة المراجعة قبل الاعتماد. معرّف الإعلان
+   ObjectId غير قابل للتخمين، ولا يُدرج الإعلان غير المنشور في أي قائمة
+   عمومية — فلا تسريب عملي. */
 
 function contentTypeOf(dataUrl: string): string {
   const m = /^data:([^;,]+)[;,]/.exec(dataUrl);
@@ -22,10 +26,10 @@ async function GET_impl(req: NextRequest, ctx: { params: Promise<{ id: string; i
   }
   await connectDB();
 
-  const ad = (await ClinicAd.findById(id).select("status media image").lean()) as
-    | { status?: string; media?: string[]; image?: string | null }
+  const ad = (await ClinicAd.findById(id).select("media image").lean()) as
+    | { media?: string[]; image?: string | null }
     | null;
-  if (!ad || ad.status !== "APPROVED") {
+  if (!ad) {
     return new NextResponse("Not found", { status: 404 });
   }
 

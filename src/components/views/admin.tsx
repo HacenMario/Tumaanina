@@ -105,7 +105,7 @@ interface PendingProfile {
 
 interface AdminUserRow {
   id: string;
-  role: "VICTIM" | "COUNSELOR" | "ADMIN";
+  role: "VICTIM" | "COUNSELOR" | "ADMIN" | "CLINIC";
   pseudonym: string | null;
   email: string | null;
   wilaya: string | null;
@@ -1206,14 +1206,23 @@ export function AdminPanelView() {
   }
 
   const asList = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]) : []);
+  /* v1.15.1: شارة مستقلة لحسابات العيادات — كانت تسقط في الفرع الافتراضي فتظهر بشارة الإدارة */
   const roleBadge = (role: string) =>
     role === "VICTIM"
       ? "bg-primary/15 text-primary border-0"
       : role === "COUNSELOR"
         ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0"
-        : "bg-destructive/15 text-destructive border-0";
+        : role === "CLINIC"
+          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0"
+          : "bg-destructive/15 text-destructive border-0";
   const roleLabel = (role: string) =>
-    role === "VICTIM" ? t.admin.roleVICTIM : role === "COUNSELOR" ? t.admin.roleCOUNSELOR : t.admin.roleADMIN;
+    role === "VICTIM"
+      ? t.admin.roleVICTIM
+      : role === "COUNSELOR"
+        ? t.admin.roleCOUNSELOR
+        : role === "CLINIC"
+          ? t.admin.roleCLINIC
+          : t.admin.roleADMIN;
 
   return (
     <div className="max-w-5xl w-full mx-auto px-4 py-10 md:py-12 min-w-0">
@@ -1526,6 +1535,7 @@ export function AdminPanelView() {
                     <SelectItem value="ALL">{t.admin.roleAll}</SelectItem>
                     <SelectItem value="VICTIM">{t.admin.roleVICTIM}</SelectItem>
                     <SelectItem value="COUNSELOR">{t.admin.roleCOUNSELOR}</SelectItem>
+                    <SelectItem value="CLINIC">{t.admin.roleCLINIC}</SelectItem>
                     <SelectItem value="ADMIN">{t.admin.roleADMIN}</SelectItem>
                   </SelectContent>
                 </Select>

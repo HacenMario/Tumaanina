@@ -69,7 +69,7 @@ export const tr = {
     heroTitle1: "Yaşadıklarınız kolay değil…",
     heroTitle2: "Bu yükü tek başına taşmayın",
     /* v1.5.0: الاستشارة صوتية أو مرئية عبر واتساب — بلا نص كطريقة استشارة */
-    heroSubtitle: "Ruhsatlı uzmanlarla bir araya gelen bir psikolojik danışmanlık platformu — seansınız WhatsApp üzerinden sesli veya görüntülü, güvenli odada yardımcı bir sohbet de var. Net ücretler ve tam gizlilik.",
+    heroSubtitle: "Ruhsatlı uzmanları ve güvenilir klinikleri bir araya getiren bir psikolojik danışmanlık platformu — seansınız WhatsApp üzerinden sesli veya görüntülü, ya da yakınınızdaki bir klinikte yüz yüze; güvenli odada yardımcı bir sohbet de var. Net ücretler ve tam gizlilik.",
     ctaPrimary: "İyileşme yolculuğunu başlat",
     ctaSecondary: "Ben psikologum — bize katılın",
     trustAnon: "Kimlik korumalı",
@@ -659,6 +659,7 @@ export const tr = {
     roleVICTIM: "Mağdur",
     roleCOUNSELOR: "Uzman",
     roleADMIN: "Yönetim",
+    roleCLINIC: "Klinik",
     createAccount: "Yeni hesap oluştur",
     createRole: "Hesap türü",
     createSubmit: "Hesabı oluştur",
@@ -1631,6 +1632,7 @@ export const tr = {
     noComments: "Henüz yorum yok",
     adMedia: "İlan medyaları",
     adMediaHint: "En fazla 5 fotoğraf ve 1 video — kaydırmalı pencere",
+    adMediaHintMulti: "Tüm fotoğrafları tek seferde seçin — en fazla 5 fotoğraf ve 1 video",
     addImage: "Fotoğraf",
     addVideo: "Video",
     adMaxMedia: "En fazla 5 fotoğraf ve 1 video",
@@ -1652,7 +1654,7 @@ export const tr = {
 
   ads: {
     title: "Klinik İlanları",
-    desc: "Yalnızca platform yönetimi tarafından onaylanan ilanlar — yayımlanan her ilanın kliniği ve ücreti doğrulandı, güvenilir hizmetlere güvenle yönelin.",
+    desc: "Yalnızca platform yönetimi tarafından onaylanan ilanlar — yayımlanan her ilanı yayınlayan kliniği doğrulandı, güvenilir hizmetlere güvenle yönelin.",
     empty: "Şu anda yayımlanmış ilan yok — yakında tekrar bakın",
     visitClinic: "Klinik sayfası",
     publishedOn: "Yayın tarihi",
@@ -1662,6 +1664,10 @@ export const tr = {
     commentSent: "Yorumunuz yayınlandı",
     clinicReply: "Klinik yanıtı",
     commentPh: "Bir yorum yazın…",
+    /* v1.15.1 */
+    showComments: "Yorumlar",
+    hideComments: "Yorumları gizle",
+    noCommentsYet: "Henüz yorum yok — ilk yorumu siz yazın",
   },
 
   suggest: {
@@ -1748,5 +1754,6 @@ export const tr = {
     badge: "Ücretli reklam",
     openClinic: "Klinik sayfasını aç",
     video: "Video",
+    dontShowAgain: "Bir daha gösterme",
   },
 };

@@ -226,48 +226,56 @@ export function AdsView() {
                       <Heart className={cn("h-3.5 w-3.5", a.likedByMe && "fill-rose-500")} />
                       {a.likesCount}
                     </button>
+                    {/* v1.15.1: زر التعليقات يعرض العدد فقط — القائمة تُفتح بالنقر عليه */}
                     <button
                       type="button"
                       onClick={() => { setCommentOpen(commentOpen === a.id ? null : a.id); setCommentText(""); }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-card text-muted-foreground hover:border-primary/40 hover:text-primary px-3 py-1.5 text-xs font-black transition-all"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-black transition-all",
+                        commentOpen === a.id
+                          ? "border-primary/50 bg-primary/10 text-primary"
+                          : "border-border/70 bg-card text-muted-foreground hover:border-primary/40 hover:text-primary"
+                      )}
                     >
                       <MessageCircle className="h-3.5 w-3.5" />
-                      {a.commentsCount}
+                      {t.ads.showComments}
+                      <span className="rounded-full bg-muted px-1.5 font-mono text-[10px]">{a.commentsCount}</span>
                     </button>
                   </div>
 
-                  {/* التعليقات الظاهرة (غير المحجوبة) + ردود العيادة */}
-                  {a.comments.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {a.comments.slice(0, 3).map((c, ci) => (
-                        <div key={ci} className="rounded-xl bg-muted/40 px-3 py-2 space-y-1">
-                          <p className="text-[11px] font-black">{c.name}</p>
-                          <p className="text-xs text-muted-foreground leading-relaxed">{c.text}</p>
-                          {c.reply?.text ? (
-                            <div className="rounded-lg bg-primary/5 border border-primary/20 px-2.5 py-1.5">
-                              <p className="text-[10px] font-black text-primary">{t.ads.clinicReply}</p>
-                              <p className="text-xs font-semibold leading-relaxed">{c.reply.text}</p>
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                      {a.commentsCount > a.comments.slice(0, 3).length ? (
-                        <p className="text-[10px] font-bold text-muted-foreground px-1">+{a.commentsCount - 3} …</p>
-                      ) : null}
-                    </div>
-                  ) : null}
+                  {/* v1.15.1: التعليقات لا تظهر إلا بعد الضغط على الزر — تفادي طول الصفحة */}
                   {commentOpen === a.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <Input
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        className="rounded-xl bg-card h-10 text-sm"
-                        maxLength={300}
-                        placeholder={t.ads.commentPh}
-                      />
-                      <Button size="sm" className="gradient-primary text-white font-black rounded-xl h-10 shrink-0" disabled={!commentText.trim() || busy === a.id} onClick={() => void submitComment(a.id)}>
-                        {busy === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      </Button>
+                    <div className="space-y-2">
+                      {a.comments.length > 0 ? (
+                        <div className="max-h-72 overflow-y-auto space-y-1.5 rounded-xl border border-border/60 bg-muted/20 p-2">
+                          {a.comments.map((c, ci) => (
+                            <div key={ci} className="rounded-xl bg-muted/40 px-3 py-2 space-y-1">
+                              <p className="text-[11px] font-black">{c.name}</p>
+                              <p className="text-xs text-muted-foreground leading-relaxed" dir="auto">{c.text}</p>
+                              {c.reply?.text ? (
+                                <div className="rounded-lg bg-primary/5 border border-primary/20 px-2.5 py-1.5">
+                                  <p className="text-[10px] font-black text-primary">{t.ads.clinicReply}</p>
+                                  <p className="text-xs font-semibold leading-relaxed" dir="auto">{c.reply.text}</p>
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] font-bold text-muted-foreground px-1">{t.ads.noCommentsYet}</p>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          className="rounded-xl bg-card h-10 text-sm"
+                          maxLength={300}
+                          placeholder={t.ads.commentPh}
+                        />
+                        <Button size="sm" className="gradient-primary text-white font-black rounded-xl h-10 shrink-0" disabled={!commentText.trim() || busy === a.id} onClick={() => void submitComment(a.id)}>
+                          {busy === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </div>
                   ) : null}
 
@@ -366,10 +374,11 @@ function AdMediaCarousel({ urls, title }: { urls: string[]; title: string }) {
       }}
     >
       {isVideo(urls[safe]) ? (
-        <video key={urls[safe]} src={urls[safe]} className="h-full w-full object-cover" controls playsInline muted />
+        <video key={urls[safe]} src={urls[safe]} className="h-full w-full object-contain" controls playsInline muted />
       ) : (
         /* eslint-disable-next-line @next/next/no-img-element */
-        <img src={urls[safe]} alt={title} loading="lazy" className="h-full w-full object-cover" draggable={false} />
+        /* v1.15.1: object-contain — الصورة كاملة داخل إطارها بلا قصّ، بأي أبعاد كانت */
+        <img src={urls[safe]} alt={title} loading="lazy" className="h-full w-full object-contain" draggable={false} />
       )}
       {urls.length > 1 ? (
         <>
