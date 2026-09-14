@@ -26,24 +26,7 @@ export function fmtCommission(amount: number, cur: CurrencyCode = "DZD", lang?: 
   return fmtMoney(Math.round(Number(amount) * PLATFORM_COMMISSION_RATE * 100) / 100, cur, lang);
 }
 
-/* ═ v1.17.0 — أسعار العيادات بالدينار أساساً + عملات عرض اختيارية ═
-   العيادة تحدد أسعارها (الجلسة والباقات) بالدينار الجزائري فقط —
-   ومن يتصفح يمكنه رؤية تقدير تقريبي بعملته المختارة (EUR/USD) بجانب
-   السعر الأصلي. التحويل تقريبي بأسعار صرف ثابتة معلنة، والعلامة «≈»
-   تُنصّ صراحةً أن المبلغ التقريبي لا يلغي السعر الرسمي بالدينار. */
-const DZD_PER_EUR = 145;
-const DZD_PER_USD = 135;
-
-export function convertFromDzd(amountDzd: number, cur: CurrencyCode): number | null {
-  const v = Math.max(0, Number(amountDzd) || 0);
-  if (cur === "EUR") return Math.round((v / DZD_PER_EUR) * 10) / 10;
-  if (cur === "USD") return Math.round((v / DZD_PER_USD) * 10) / 10;
-  return null; /* DZD — لا تحويل */
-}
-
-/** تقدير تقريبي بعملة العرض لمبلغ أصله بالدينار — null إن كانت العملة DZD */
-export function fmtApproxFromDzd(amountDzd: number, cur: CurrencyCode, lang?: string): string | null {
-  const c = convertFromDzd(amountDzd, cur);
-  if (c === null) return null;
-  return `≈ ${fmtMoney(c, cur, lang)}`;
-}
+/* ═ v1.18.0 — نُزعت خاصية تحويل الدينار إلى EUR/USD نهائياً ═
+   أسعار العيادات بالدينار هي الرسمية الوحيدة، ومن أراد عرض سعر بالأورو
+   أو الدولار حدّده بنفسه من إعداداته (priceEur/priceUsd اختياريان) —
+   لا يوجد أي تحويل عملات في كل المنصة. */

@@ -663,8 +663,13 @@ const ClinicSchema = new Schema(
 
     /* ══ v1.16.0 ══ */
     /* سعر الجلسة الحضورية بالدينار (DZD) — يحدده صاحب العيادة ويظهر في
-       بطاقة الدليل وصفحة العيادة ونافذة الحجز؛ null = لم يحدّد سعراً بعد */
+       بطاقة الدليل وصفحة العيادة ونافذة الحجز؛ null = لم يحدّد سعراً بعد
+       v1.18.0: EUR/USD صارا سعرين مستقلين تحددهما العيادة نفسها (اختياري)
+       — لا يوجد أي تحويل عملات في المنصة، ومن لم يحدّد سعر عملة لا يُعرض
+       له الزائر بعملته شيئاً ويكفيه السعر الرسمي بالدينار */
     sessionPrice: { type: Number, default: null, min: 0, max: 10000000 },
+    priceEur: { type: Number, default: null, min: 0, max: 100000 },
+    priceUsd: { type: Number, default: null, min: 0, max: 100000 },
     /* باقات الجلسات الحضورية (Packs) — يصوغها صاحب العيادة بحرية:
        اسم الباقة + عدد الجلسات + سعرها + ملاحظة اختيارية */
     packs: {
@@ -683,6 +688,12 @@ const ClinicSchema = new Schema(
         message: "MAX_12_PACKS",
       },
     },
+    /* ═ v1.18.0: فيديوهات المعرض — مراجع GridFS بلا حد للحجم ═
+       كل عنصر «/api/media/{fileId}» — يُرفع عبر /api/media بتقطيع chunks
+       ثم يُجمَّع في GridFS (bucket «media»). الفيديوهات القديمة (data URLs
+       في مجموعة clinic_gallery_media) تُرحَّل تلقائياً إلى GridFS عند أول
+       حفظ للفيديوهات من لوحة العيادة. فيديو أو اثنان لكل عيادة. */
+    galleryVideoRefs: { type: [String], default: [] },
   },
   { timestamps: true, collection: "clinics" }
 );
@@ -804,11 +815,43 @@ const ClinicBookingSchema = new Schema(
 ClinicBookingSchema.index({ clinicId: 1, date: 1, slot: 1 });
 ClinicBookingSchema.index({ clientUserId: 1, createdAt: -1 });
 
+/* ═ v1.18.0: MediaUpload + MediaChunk — رفع الفيديوهات الكبيرة بتقطيع ═
+   الفيديو بلا حد للحجم لا يمكن أن يمرّ طلباً واحداً (حدود الجسم والذاكرة)،
+   لذا يُرفع على دفعات ~3.5MB: جلسة رفع في media_uploads وكل دفعة وثيقة
+   في media_chunks، وعند الاكتمال تُجمَّع الدفعات في GridFS (bucket «media»)
+   وتُحذف الجلسة ودفعاتها. الجلسات المهجورة تنتهي تلقائياً بعد 24 ساعة. */
+const MediaUploadSchema = new Schema(
+  {
+    clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    mime: { type: String, default: "video/mp4" },
+    name: { type: String, default: "", maxlength: 200 },
+    size: { type: Number, default: 0, min: 0 },
+    chunkSize: { type: Number, default: 3_500_000 },
+    received: { type: Number, default: 0 },
+    createdAt: { type: Date, default: Date.now, expires: "24h" },
+  },
+  { collection: "media_uploads" }
+);
+
+const MediaChunkSchema = new Schema(
+  {
+    uploadId: { type: Schema.Types.ObjectId, required: true, index: true },
+    idx: { type: Number, required: true, min: 0 },
+    data: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now, expires: "24h" },
+  },
+  { collection: "media_chunks" }
+);
+MediaChunkSchema.index({ uploadId: 1, idx: 1 }, { unique: true });
+
 /* ═ v1.17.0: ClinicGalleryMedia — فيديوهات معرض العيادة ═
    الفيديو كبير الحجم على حد BSON، لذا يُخزَّن في مجموعة مستقلة عن وثيقة
    العيادة (فيديو أو اثنان لكل عيادة) — يُقدَّم عبر المسار
    /api/clinics/{id}/gallery/media/{idx} بدعم Range لتمرير المشغّل،
-   ويُستبدل دفعة واحدة حين تعدّل العيادة فيديوهات معرضها من لوحتها. */
+   ويُستبدل دفعة واحدة حين تعدّل العيادة فيديوهات معرضها من لوحتها.
+   v1.18.0: صارت مرجعاً قديماً — الجديد يُخزَّن في GridFS عبر /api/media،
+   والمجموعة تبقى لقراءة فيديوهات ما قبل الترحيل حتى أول حفظ جديد. */
 const ClinicGalleryMediaSchema = new Schema(
   {
     clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true, index: true },
@@ -887,6 +930,15 @@ export const ClinicSuggestion =
 export const ClinicGalleryMedia =
   (mongoose.models.ClinicGalleryMedia as mongoose.Model<any>) ||
   mongoose.model("ClinicGalleryMedia", ClinicGalleryMediaSchema);
+
+/* v1.18.0: جلسات ودفعات رفع الفيديو الكبير */
+export const MediaUpload =
+  (mongoose.models.MediaUpload as mongoose.Model<any>) ||
+  mongoose.model("MediaUpload", MediaUploadSchema);
+
+export const MediaChunk =
+  (mongoose.models.MediaChunk as mongoose.Model<any>) ||
+  mongoose.model("MediaChunk", MediaChunkSchema);
 
 /* أنواع مساعدة خفيفة */
 export type UserDoc = mongoose.InferSchemaType<typeof UserSchema>;

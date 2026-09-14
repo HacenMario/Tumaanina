@@ -31,6 +31,7 @@ import {
   Clock3,
   PenLine,
   Lock,
+  Building2,
 } from "lucide-react";
 import { useI18n, LANG_META } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -252,6 +253,9 @@ export function SettingsView() {
 
   /* ─── v2.9.0: روابط التواصل الاجتماعي + جنس العميلين المقبول (أخصائي فقط) ─── */
   const [socials, setSocials] = useState({ facebook: "", instagram: "", tiktok: "" });
+  /* v1.18.0: الانتماء للعيادة قابل للتعديل — مستقل افتراضياً */
+  const [myClinicId, setMyClinicId] = useState("none");
+  const [clinicsList, setClinicsList] = useState<{ id: string; name: string }[]>([]);
   const [acceptedGenders, setAcceptedGenders] = useState<string[]>(["male", "female"]);
   /* v1.3.0 (طمأنينة): سعر الجلسة لكل عملة على حدة — الأخصائي يحدد
      سعر الدينار/اليورو/الدولار بنفسه، والعميل يرى سعر عملته فقط */
@@ -396,6 +400,8 @@ export function SettingsView() {
           const so = me.socials || {};
           setSocials({ facebook: so.facebook || "", instagram: so.instagram || "", tiktok: so.tiktok || "" });
           setAcceptedGenders(Array.isArray(me.acceptedGenders) && me.acceptedGenders.length ? me.acceptedGenders : ["male", "female"]);
+          /* v1.18.0: الانتماء الحالي للعيادة */
+          setMyClinicId(me.clinicId || "none");
           /* v1.3.0: أسعار الجلسة الثلاثة (السجلات القديمة تُرحَّل تلقائياً) */
           const sp = me.sessionPrices || {};
           setSessionPrices({
@@ -414,6 +420,13 @@ export function SettingsView() {
       })
       .catch(() => {});
     /* v1.9.0: قالب العقد العلاجي + قائمة العقود الممضاة — مسار مستقل خفيف */
+    /* v1.18.0: قائمة العيادات النشطة لاختيار الانتماء */
+    fetch("/api/clinics?pageSize=200")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.clinics)) setClinicsList(d.clinics.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+      })
+      .catch(() => {});
     fetch(`/api/contract?view=template&userId=${user.id}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -566,6 +579,8 @@ export function SettingsView() {
             acceptedGenders,
             /* v1.9.0: سنوات الخبرة — قابلة للتعديل من الإعدادات */
             yearsExperience: Math.max(0, Math.min(70, Math.round(Number(yearsExp) || 0))),
+            /* v1.18.0: الانتماء للعيادة أو الاستقلال */
+            clinicId: myClinicId === "none" ? null : myClinicId,
             /* v1.3.0: أسعار الجلسة الثلاثة المستقلة */
             sessionPrices: {
               DZD: Math.round(Number(sessionPrices.DZD) || 0),
@@ -609,6 +624,7 @@ export function SettingsView() {
           userId: user.id,
           socials,
           acceptedGenders,
+          clinicId: myClinicId === "none" ? null : myClinicId,
           sessionPrices: {
             DZD: Math.round(Number(sessionPrices.DZD) || 0),
             EUR: Number(sessionPrices.EUR) || 0,
@@ -1371,6 +1387,26 @@ export function SettingsView() {
                 })}
               </div>
               <p className="text-[10px] font-bold text-muted-foreground">{t.admin.genderAllLabel}: {acceptedGenders.length === 2 ? "✓" : "—"}</p>
+            </div>
+
+            {/* v1.18.0: الانتماء للعيادة — قابل للتعديل من الإعدادات */}
+            <div className="space-y-2 pt-1 border-t border-border/60">
+              <h3 className="font-bold text-xs pt-3 flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5 text-primary" />
+                {t.counselor.clinicAffil}
+              </h3>
+              <p className="text-[11px] text-muted-foreground font-semibold">{t.counselor.clinicAffilHint}</p>
+              <Select value={myClinicId} onValueChange={setMyClinicId}>
+                <SelectTrigger className="rounded-xl bg-card font-semibold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="none">{t.counselor.clinicAffilNone}</SelectItem>
+                  {clinicsList.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* ═ v1.3.0: زر حفظ صريح لهذه البطاقة — بنتيجة نجاح/فشل واضحة ═

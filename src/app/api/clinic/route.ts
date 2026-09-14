@@ -6,6 +6,7 @@ import { hashSecret, verifySecret } from "@/lib/server/auth";
 import { apiHandler } from "@/lib/server/api";
 import { slugifyName, fallbackSlug } from "@/lib/server/slug";
 import { SPECIALTIES, WILAYAS } from "@/lib/constants";
+import { deleteOrphanMedia, gridfsPutBuffer, isVideoItem, loadClinicGalleryVideos } from "@/lib/server/media";
 
 export const dynamic = "force-dynamic";
 
@@ -93,10 +94,16 @@ interface UpdateProfileBody {
   slots?: string[];
   gallery?: string[] | null;
   location?: { lat: number | null; lng: number | null } | null;
-  /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
+  /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs)
+     v1.18.0: سعرا EUR/USD مستقلان تحددهما العيادة نفسها (اختياريان — بلا تحويل) */
   sessionPrice?: number | null;
+  priceEur?: number | null;
+  priceUsd?: number | null;
   packs?: { name: string; sessions: number; price: number; note?: string | null }[] | null;
-  /* v1.17.0: فيديوهات المعرض — استبدال كامل (مصفوفة data URLs)؛ [] = حذف الكل */
+  /* v1.18.0: فيديوهات المعرض — استبدال كامل بمراجع GridFS بلا حد للحجم؛
+     [] = حذف الكل. يُقبل: مرجع /api/media حديث، رابط معرض قديم
+     /api/clinics/{id}/gallery/media/{i} (يُرحَّل تلقائياً إلى GridFS)،
+     أو data:video قديم صغير (يُرحَّل هو أيضاً) */
   galleryVideos?: string[] | null;
 }
 
@@ -377,7 +384,10 @@ async function POST_impl(req: NextRequest) {
     if (body.priceNote !== undefined) set.priceNote = body.priceNote ? String(body.priceNote).trim().slice(0, 400) : null;
     if (body.licenseNumber !== undefined) set.licenseNumber = body.licenseNumber ? String(body.licenseNumber).trim().slice(0, 80) : null;
 
-    /* ══ v1.16.0: سعر الجلسة الحضورية + الباقات ══ */
+    /* ══ v1.16.0: سعر الجلسة الحضورية + الباقات ══
+       ══ v1.18.0: EUR/USD سعران اختياريان يحددهما صاحب العيادة نفسه —
+       نُزعت خاصية التحويل نهائياً: من لم يحدّد سعر عملة لا يُعرض له
+       الزائر بعملته شيء، والدينار يبقى السعر الرسمي الظاهر دائماً ══ */
     if (body.sessionPrice !== undefined) {
       if (body.sessionPrice === null || body.sessionPrice === "") {
         set.sessionPrice = null;
@@ -388,6 +398,22 @@ async function POST_impl(req: NextRequest) {
         }
         set.sessionPrice = sp;
       }
+    }
+    const optPrice = (v: unknown, max: number): number | null | "INVALID" => {
+      if (v === null || v === "" || v === undefined) return null;
+      const n = Math.round(Number(v) * 100) / 100;
+      if (!Number.isFinite(n) || n < 0 || n > max) return "INVALID";
+      return n;
+    };
+    if (body.priceEur !== undefined) {
+      const v = optPrice(body.priceEur, 100000);
+      if (v === "INVALID") return NextResponse.json({ error: "INVALID_PRICE" }, { status: 400 });
+      set.priceEur = v;
+    }
+    if (body.priceUsd !== undefined) {
+      const v = optPrice(body.priceUsd, 100000);
+      if (v === "INVALID") return NextResponse.json({ error: "INVALID_PRICE" }, { status: 400 });
+      set.priceUsd = v;
     }
     /* الباقات: مصفوفة { name, sessions, price, note? } حتى 12 باقة؛ null أو [] = حذف الكل */
     if (body.packs !== undefined) {
@@ -413,29 +439,64 @@ async function POST_impl(req: NextRequest) {
     /* اسم العيادة يُزامن مع اسم الحساب (يظهر في الهيدر) */
     if (set.name) await User.updateOne({ _id: userId }, { $set: { pseudonym: String(set.name) } });
 
-    /* ══ v1.17.0: فيديوهات المعرض — استبدال كامل لمستندات المجموعة المستقلة ══
-       الفيديو كبير على BSON لذا يُخزن خارج وثيقة العيادة (فيديو أو اثنان،
-       كل واحد حتى ~4MB ثنائية بصيغة mp4/webm) — يُقدَّم عبر مسار المعرض */
+    /* ══ v1.18.0: فيديوهات المعرض — GridFS بلا حد للحجم ══
+       الاستبدال الكامل: العناصر القديمة (روابط المعرض/data URLs) تُرحَّل
+       تلقائياً إلى GridFS عند أول حفظ، والجديدة تأتي مراجع /api/media
+       جاهزة. مراجع GridFS المُزالة تُحذف من التخزين (لا ملفات يتيمة). */
     if (body.galleryVideos !== undefined) {
       if (body.galleryVideos === null || (Array.isArray(body.galleryVideos) && body.galleryVideos.length === 0)) {
+        const oldRefs = ((clinic.galleryVideoRefs as string[]) || []).slice();
         await ClinicGalleryMedia.deleteMany({ clinicId: clinic._id });
+        await Clinic.updateOne({ _id: clinic._id }, { $set: { galleryVideoRefs: [] } });
+        await deleteOrphanMedia(oldRefs, []);
       } else if (Array.isArray(body.galleryVideos)) {
         if (body.galleryVideos.length > MAX_GALLERY_VIDEOS) {
           return NextResponse.json({ error: "MAX_2_VIDEOS" }, { status: 400 });
         }
-        const clean: { mime: string; data: string }[] = [];
+        const newRefs: string[] = [];
         for (const v of body.galleryVideos) {
-          if (typeof v !== "string" || !/^data:video\/(mp4|webm|quicktime|x-m4v)[;,]/i.test(v)) {
+          if (typeof v !== "string" || !v) {
             return NextResponse.json({ error: "INVALID_VIDEO" }, { status: 400 });
           }
-          if (v.length > MAX_GALLERY_VIDEO_B64) {
-            return NextResponse.json({ error: "VIDEO_TOO_BIG" }, { status: 400 });
+          /* 1) مرجع GridFS جاهز — يجب أن يكون ملكاً لهذه العيادة */
+          const refM = /^\/api\/media\/([a-f0-9]{24})$/i.exec(v.trim());
+          if (refM) {
+            newRefs.push(`/api/media/${refM[1]}`);
+            continue;
           }
-          const mime = /^data:([^;,]+)/.exec(v)?.[1] || "video/mp4";
-          clean.push({ mime, data: v.slice(v.indexOf(",") + 1) });
+          /* 2) رابط معرض قديم — يُرحَّل من clinic_gallery_media إلى GridFS */
+          const legacyM = new RegExp(`^/api/clinics/${String(clinic._id)}/gallery/media/(\\d+)$`).exec(v.trim());
+          if (legacyM) {
+            const idx = Number(legacyM[1]);
+            const legacyDocs = await ClinicGalleryMedia.find({ clinicId: clinic._id }).sort({ createdAt: 1, _id: 1 }).lean();
+            const doc = legacyDocs[idx] as { mime?: string; data?: string } | undefined;
+            if (!doc?.data) return NextResponse.json({ error: "INVALID_VIDEO" }, { status: 400 });
+            const fileId = await gridfsPutBuffer(Buffer.from(doc.data, "base64"), {
+              contentType: String(doc.mime || "video/mp4"),
+              metadata: { clinicId: String(clinic._id), kind: "video", name: "gallery-migrated" },
+            });
+            newRefs.push(`/api/media/${fileId}`);
+            continue;
+          }
+          /* 3) data:video قديم صغير — يُرحَّل هو أيضاً إلى GridFS */
+          if (isVideoItem(v) && v.startsWith("data:")) {
+            if (v.length > MAX_GALLERY_VIDEO_B64) {
+              return NextResponse.json({ error: "VIDEO_TOO_BIG" }, { status: 400 });
+            }
+            const mime = /^data:([^;,]+)/.exec(v)?.[1] || "video/mp4";
+            const fileId = await gridfsPutBuffer(Buffer.from(v.slice(v.indexOf(",") + 1), "base64"), {
+              contentType: mime,
+              metadata: { clinicId: String(clinic._id), kind: "video", name: "gallery-inline" },
+            });
+            newRefs.push(`/api/media/${fileId}`);
+            continue;
+          }
+          return NextResponse.json({ error: "INVALID_VIDEO" }, { status: 400 });
         }
+        const oldRefs = ((clinic.galleryVideoRefs as string[]) || []).slice();
         await ClinicGalleryMedia.deleteMany({ clinicId: clinic._id });
-        if (clean.length) await ClinicGalleryMedia.insertMany(clean.map((c) => ({ clinicId: clinic._id, mime: c.mime, data: c.data })));
+        await Clinic.updateOne({ _id: clinic._id }, { $set: { galleryVideoRefs: newRefs } });
+        await deleteOrphanMedia(oldRefs, newRefs);
       } else {
         return NextResponse.json({ error: "INVALID_VIDEO" }, { status: 400 });
       }
@@ -497,16 +558,13 @@ async function GET_impl(req: NextRequest) {
       gallery: (c.gallery as string[]) || [],
       galleryCount: ((c.gallery as string[]) || []).length,
       location: (c.location as { lat: number | null; lng: number | null }) ?? { lat: null, lng: null },
-      /* v1.16.0: سعر الجلسة الحضورية والباقات */
+      /* v1.16.0: سعر الجلسة الحضورية والباقات — v1.18.0: EUR/USD من العيادة نفسها */
       sessionPrice: (c.sessionPrice as number | null) ?? null,
+      priceEur: (c.priceEur as number | null) ?? null,
+      priceUsd: (c.priceUsd as number | null) ?? null,
       packs: (c.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
-      /* v1.17.0: فيديوهات المعرض — روابط تقديم آمنة (بلا base64 داخل JSON) */
-      galleryVideos: (
-        await ClinicGalleryMedia.find({ clinicId: c._id }).sort({ createdAt: 1, _id: 1 }).select("mime").lean()
-      ).map((v: Record<string, unknown>, i: number) => ({
-        url: `/api/clinics/${String(c._id)}/gallery/media/${i}`,
-        mime: String(v.mime || "video/mp4"),
-      })),
+      /* v1.18.0: فيديوهات المعرض — القائمة الموحّدة (قديم + GridFS بلا حد حجم) */
+      galleryVideos: await loadClinicGalleryVideos(ClinicGalleryMedia, String(c._id), c.galleryVideoRefs as string[]),
     },
   });
 }

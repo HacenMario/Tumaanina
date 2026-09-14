@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BackButton } from "@/components/shared/back-button";
 import { formatDateTime } from "@/lib/utils";
-import { fmtApproxFromDzd } from "@/lib/money";
+import { fmtMoney } from "@/lib/money";
 import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from "@/components/shared/social-glyphs";
 import { showAppToast } from "@/components/shared/app-toast";
 import { openClinicPage } from "./clinics-directory";
@@ -80,6 +80,9 @@ interface ClinicProfile {
   location: { lat: number | null; lng: number | null };
   /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
   sessionPrice: number | null;
+  /* v1.18.0: EUR/USD اختياريان تحددهما العيادة نفسها — لا تحويل عملات */
+  priceEur: number | null;
+  priceUsd: number | null;
   packs: { name: string; sessions: number; price: number; note: string | null }[];
   /* v1.17.0: فيديوهات المعرض + الأخصائيون التابعون */
   galleryVideoUrls: { url: string; mime: string }[];
@@ -112,6 +115,15 @@ function Stars({ n, size = "h-4 w-4" }: { n: number; size?: string }) {
 export function ClinicPageView() {
   const { t, lang } = useI18n();
   const { user, activeClinicSlug, setView, currency } = useApp();
+
+  /* v1.18.0: سعر العملة الأجنبية كما حددته العيادة نفسها — من لم تحدد
+     سعراً بعملتها لا يُعرض للزائر شيء بالعملة، والدينار هو الرسمي دائماً */
+  const clinicForeignPrice = (cur: string): string | null => {
+    if (!clinic) return null;
+    if (cur === "EUR" && clinic.priceEur != null && clinic.priceEur > 0) return fmtMoney(clinic.priceEur, "EUR", lang);
+    if (cur === "USD" && clinic.priceUsd != null && clinic.priceUsd > 0) return fmtMoney(clinic.priceUsd, "USD", lang);
+    return null;
+  };
   const [clinic, setClinic] = useState<ClinicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
@@ -443,8 +455,8 @@ export function ClinicPageView() {
                     <Wallet className="h-4 w-4 text-primary" />
                     <span className="text-base font-black text-primary">{clinic.sessionPrice.toLocaleString("en-US")} DZD</span>
                     <span className="text-[11px] font-bold text-muted-foreground">/ {t.clinics.sessionShort}</span>
-                    {currency !== "DZD" ? (
-                      <span className="text-[11px] font-bold text-muted-foreground" dir="ltr">{fmtApproxFromDzd(clinic.sessionPrice, currency, lang)}</span>
+                    {currency !== "DZD" && clinicForeignPrice(currency) ? (
+                      <span className="text-[11px] font-bold text-muted-foreground" dir="ltr">{clinicForeignPrice(currency)}</span>
                     ) : null}
                   </div>
                 ) : null}
@@ -872,10 +884,10 @@ export function ClinicPageView() {
                   <span className="text-xs font-bold text-muted-foreground">{t.clinics.sessionShort}</span>
                   <span className="text-sm font-black text-primary">{clinic.sessionPrice.toLocaleString("en-US")} DZD</span>
                 </div>
-                {currency !== "DZD" ? (
+                {currency !== "DZD" && clinicForeignPrice(currency) ? (
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold text-muted-foreground/80" dir="ltr">≈</span>
-                    <span className="text-xs font-black text-primary/80" dir="ltr">{fmtApproxFromDzd(clinic.sessionPrice, currency, lang)}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground/80">{currency}</span>
+                    <span className="text-xs font-black text-primary/80" dir="ltr">{clinicForeignPrice(currency)}</span>
                   </div>
                 ) : null}
               </div>

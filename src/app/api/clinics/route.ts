@@ -121,6 +121,9 @@ async function GET_impl(req: NextRequest) {
         hasLogo: rec.hasLogo === true,
         /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
         sessionPrice: (rec.sessionPrice as number | null) ?? null,
+        /* v1.18.0: سعرا EUR/USD كما حددتهما العيادة (بلا تحويل) */
+        priceEur: (rec.priceEur as number | null) ?? null,
+        priceUsd: (rec.priceUsd as number | null) ?? null,
         packs: (rec.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
         createdAt: rec.createdAt,
       };

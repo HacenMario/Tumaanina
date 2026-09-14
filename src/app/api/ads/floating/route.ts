@@ -60,6 +60,8 @@ async function GET_impl(req: NextRequest) {
         title: rec.title,
         body: rec.body,
         mediaUrls: media.map((_, i) => `/api/ads/${String(rec._id)}/media/${i}`),
+        /* v1.18.0: نوع كل وسيط — الفيديو (data:video قديم أو مرجع GridFS) يُعرض بمشغّله */
+        mediaKinds: media.map((m) => (String(m).startsWith("data:video/") || String(m).startsWith("/api/media/") ? "video" : "image")),
         expiresAt: rec.expiresAt ?? null,
         likesCount: (rec.likes || []).length,
         clinic: {

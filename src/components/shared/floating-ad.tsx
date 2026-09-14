@@ -28,6 +28,8 @@ interface FloatingAd {
   title: string;
   body: string;
   mediaUrls: string[];
+  /* v1.18.0: نوع كل وسيط — الفيديو مرجع GridFS بلا امتداد */
+  mediaKinds: string[];
   expiresAt: string | null;
   likesCount: number;
   clinic: { id: string; name: string; slug: string | null; hasLogo: boolean; logoUrl: string };
@@ -43,7 +45,8 @@ function disabledKey(userId: string) {
 }
 
 function isVideo(url: string) {
-  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
+  /* v1.18.0: مراجع GridFS بلا امتداد + الروابط المباشرة القديمة */
+  return url.startsWith("/api/media/") || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
 }
 
 export function FloatingAdPopup() {
@@ -227,7 +230,7 @@ export function FloatingAdPopup() {
                 onTouchStart={onTouchStart}
                 onTouchEnd={onTouchEnd}
               >
-                {isVideo(ad.mediaUrls[slide]) ? (
+                {(ad.mediaKinds || [])[slide] === "video" || isVideo(ad.mediaUrls[slide]) ? (
                   <video
                     key={ad.mediaUrls[slide]}
                     src={ad.mediaUrls[slide]}
@@ -256,7 +259,7 @@ export function FloatingAdPopup() {
                     </div>
                   </>
                 ) : null}
-                {isVideo(ad.mediaUrls[slide]) ? (
+                {(ad.mediaKinds || [])[slide] === "video" || isVideo(ad.mediaUrls[slide]) ? (
                   <span className="absolute top-2 start-2 inline-flex items-center gap-1 rounded-full bg-black/50 text-white text-[10px] font-black px-2 py-0.5">
                     <Volume2 className="h-3 w-3" />
                     {t.floatingAd.video}

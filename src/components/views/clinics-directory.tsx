@@ -9,7 +9,7 @@ import { WILAYA_LIST, SPECIALTIES, type SpecialtyKey } from "@/lib/constants";
 import { LogoMark } from "@/lib/logo";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
 import { waLink } from "@/lib/whatsapp";
-import { fmtApproxFromDzd } from "@/lib/money";
+import { fmtMoney } from "@/lib/money";
 import { openClinicRatings } from "@/components/shared/clinic-ratings-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +52,8 @@ export interface ClinicCard {
   hasLogo: boolean;
   /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
   sessionPrice: number | null;
+  priceEur: number | null;
+  priceUsd: number | null;
   packs: { name: string; sessions: number; price: number; note: string | null }[];
 }
 
@@ -269,9 +271,11 @@ export function ClinicsDirectoryView() {
                           <div className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/25 px-2 py-0.5 text-[11px] font-black text-primary w-fit" dir="ltr">
                             {c.sessionPrice.toLocaleString("en-US")} DZD
                             <span className="text-[10px] font-bold text-muted-foreground">/ {t.clinics.sessionShort}</span>
-                            {/* v1.17.0: تقدير تقريبي بعملة العرض إن لم تكن الدينار */}
-                            {currency !== "DZD" ? (
-                              <span className="text-[10px] font-bold text-muted-foreground">{fmtApproxFromDzd(c.sessionPrice, currency, lang)}</span>
+                            {/* v1.18.0: سعر العملة كما حددته العيادة نفسها — بلا أي تحويل */}
+                            {currency !== "DZD" && c.priceEur != null && currency === "EUR" ? (
+                              <span className="text-[10px] font-bold text-muted-foreground">{fmtMoney(c.priceEur, "EUR", lang)}</span>
+                            ) : currency !== "DZD" && c.priceUsd != null && currency === "USD" ? (
+                              <span className="text-[10px] font-bold text-muted-foreground">{fmtMoney(c.priceUsd, "USD", lang)}</span>
                             ) : null}
                           </div>
                         ) : null}

@@ -36,6 +36,8 @@ interface AdItem {
   title: string;
   body: string;
   mediaUrls: string[];
+  /* v1.18.0: نوع كل وسيط — الفيديو مرجع GridFS بلا امتداد في الرابط */
+  mediaKinds: string[];
   imageUrl: string | null;
   publishedAt: string;
   likesCount: number;
@@ -58,7 +60,9 @@ interface AdItem {
 }
 
 function isVideo(url: string) {
-  return /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
+  /* v1.18.0: روابط وسائط الإعلان بلا امتدادات (مسارات تقديم) — النوع يأتي
+     من mediaKinds؛ هذا الفحص يبقى احتياطاً للروابط المباشرة القديمة فقط */
+  return url.startsWith("/api/media/") || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
 }
 
 export function AdsView() {
@@ -215,7 +219,7 @@ export function AdsView() {
 
                   {/* سلايدر الوسائط — حتى 5 صور + فيديو، بالسحب يمين/يسار */}
                   {a.mediaUrls.length > 0 ? (
-                    <AdMediaCarousel urls={a.mediaUrls} title={a.title} />
+                    <AdMediaCarousel urls={a.mediaUrls} kinds={a.mediaKinds || []} title={a.title} />
                   ) : null}
 
                   <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{a.body}</p>
@@ -360,7 +364,7 @@ export function AdsView() {
 }
 
 /* سلايدر وسائط الإعلان — سحب يمين/يسار + أسهم */
-function AdMediaCarousel({ urls, title }: { urls: string[]; title: string }) {
+function AdMediaCarousel({ urls, kinds, title }: { urls: string[]; kinds: string[]; title: string }) {
   const [slide, setSlide] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const safe = Math.min(slide, urls.length - 1);
@@ -387,8 +391,10 @@ function AdMediaCarousel({ urls, title }: { urls: string[]; title: string }) {
         touchStartX.current = null;
       }}
     >
-      {isVideo(urls[safe]) ? (
-        <video key={urls[safe]} src={urls[safe]} className="h-full w-full object-contain" controls playsInline muted />
+      {(kinds || [])[safe] === "video" || isVideo(urls[safe]) ? (
+        /* v1.18.0: الفيديو بمشغّل المتصفح المدمج — Range من GridFS يتيح التمرير،
+           وغير مكتوم ليقرر الزائر تشغيله بصوته */
+        <video key={urls[safe]} src={urls[safe]} className="h-full w-full object-contain bg-black" controls playsInline preload="metadata" />
       ) : (
         /* eslint-disable-next-line @next/next/no-img-element */
         /* v1.15.1: object-contain — الصورة كاملة داخل إطارها بلا قصّ، بأي أبعاد كانت */

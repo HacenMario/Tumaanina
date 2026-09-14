@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { Clinic, ClinicGalleryMedia, CounselorProfile, User } from "@/lib/models";
+import { loadClinicGalleryVideos } from "@/lib/server/media";
 import { apiHandler } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
@@ -95,16 +96,18 @@ async function GET_impl(_req: NextRequest, ctx: { params: Promise<{ id: string }
       slots: (clinic.slots as string[]) || [],
       galleryCount: ((clinic.gallery as string[]) || []).length,
       location: (clinic.location as { lat: number | null; lng: number | null }) ?? { lat: null, lng: null },
-      /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
+      /* v1.16.0: سعر الجلسة الحضورية + الباقات — v1.18.0: EUR/USD اختياري
+         من العيادة نفسها (لا تحويل عملات في المنصة إطلاقاً) */
       sessionPrice: (clinic.sessionPrice as number | null) ?? null,
+      priceEur: (clinic.priceEur as number | null) ?? null,
+      priceUsd: (clinic.priceUsd as number | null) ?? null,
       packs: (clinic.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
-      /* v1.17.0: فيديوهات المعرض + الأخصائيون التابعون للعيادة */
-      galleryVideoUrls: (
-        await ClinicGalleryMedia.find({ clinicId: String(clinic._id) }).sort({ createdAt: 1, _id: 1 }).select("mime").lean()
-      ).map((v: Record<string, unknown>, i: number) => ({
-        url: `/api/clinics/${String(clinic._id)}/gallery/media/${i}`,
-        mime: String(v.mime || "video/mp4"),
-      })),
+      /* v1.18.0: فيديوهات المعرض — القائمة الموحّدة (قديم + GridFS بلا حد حجم) */
+      galleryVideoUrls: await loadClinicGalleryVideos(
+        ClinicGalleryMedia,
+        String(clinic._id),
+        clinic.galleryVideoRefs as string[] | undefined
+      ),
       specialists: await loadClinicSpecialists(String(clinic._id)),
       createdAt: clinic.createdAt,
     },

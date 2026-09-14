@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { Clinic, ClinicGalleryMedia } from "@/lib/models";
+import { loadClinicGalleryVideos } from "@/lib/server/media";
 import { apiHandler } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
@@ -18,21 +19,16 @@ async function GET_impl(_req: NextRequest, ctx: { params: Promise<{ id: string }
   if (!key) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const isObjectId = /^[a-f0-9]{24}$/i.test(key);
-  const clinic = (await Clinic.findOne(isObjectId ? { _id: key } : { slug: key }).select("_id gallery isActive").lean()) as
-    | { _id?: unknown; gallery?: string[]; isActive?: boolean }
+  const clinic = (await Clinic.findOne(isObjectId ? { _id: key } : { slug: key }).select("_id gallery galleryVideoRefs isActive").lean()) as
+    | { _id?: unknown; gallery?: string[]; galleryVideoRefs?: string[]; isActive?: boolean }
     | null;
   if (!clinic || clinic.isActive === false) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  /* v1.17.0: فيديوهات المعرض — روابط بمسار التقديم مع نوع الملف */
+  /* v1.18.0: فيديوهات المعرض — القائمة الموحّدة (قديم + GridFS بلا حد حجم) */
   const cid = String(clinic._id);
-  const videos = (
-    await ClinicGalleryMedia.find({ clinicId: cid }).sort({ createdAt: 1, _id: 1 }).select("mime").lean()
-  ).map((v: Record<string, unknown>, i: number) => ({
-    url: `/api/clinics/${cid}/gallery/media/${i}`,
-    mime: String(v.mime || "video/mp4"),
-  }));
+  const videos = await loadClinicGalleryVideos(ClinicGalleryMedia, cid, clinic.galleryVideoRefs);
 
   return NextResponse.json({ images: clinic.gallery || [], videos });
 }

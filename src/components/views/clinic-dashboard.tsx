@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
+import { uploadVideoToMedia } from "@/lib/media-upload";
 import { WILAYA_LIST, SPECIALTIES, SLOT_TIMES, type SpecialtyKey } from "@/lib/constants";
 import { ClinicAdsTab, ClinicDuesTab } from "./clinic-dashboard-ads";
 import { Button } from "@/components/ui/button";
@@ -102,8 +103,11 @@ interface ClinicProfile {
   slots: string[];
   gallery: string[];
   location: { lat: number | null; lng: number | null };
-  /* v1.16.0: سعر الجلسة الحضورية + الباقات */
+  /* v1.16.0: سعر الجلسة الحضورية + الباقات
+     v1.18.0: EUR/USD سعران اختياريان يحددهما صاحب العيادة بنفسه — بلا تحويل */
   sessionPrice: number | null;
+  priceEur: number | null;
+  priceUsd: number | null;
   packs: { name: string; sessions: number; price: number; note: string | null }[];
   /* v1.17.0: فيديوهات المعرض — روابط تقديم آمنة */
   galleryVideos: { url: string; mime: string }[];
@@ -160,6 +164,8 @@ export function ClinicDashboardView() {
 
   /* ══ v1.16.0: سعر الجلسة الحضورية + الباقات ══ */
   const [fSessionPrice, setFSessionPrice] = useState("");
+  const [fPriceEur, setFPriceEur] = useState("");
+  const [fPriceUsd, setFPriceUsd] = useState("");
   const [fPacks, setFPacks] = useState<{ name: string; sessions: number; price: number; note: string | null }[]>([]);
   const [packsDirty, setPacksDirty] = useState(false);
 
@@ -184,8 +190,8 @@ export function ClinicDashboardView() {
   const [bookLoading, setBookLoading] = useState(false);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [cancelNote, setCancelNote] = useState("");
-  /* v1.15.0: نافذة «إظهار الباقي» — تظهر 5 فقط والباقي بنافذة منبثقة */
-  const [showAllBookings, setShowAllBookings] = useState(false);
+  /* v1.18.0: فلترة الحجوزات حسب الحالة — أزرار بعدّاد لكل حالة */
+  const [bkFilter, setBkFilter] = useState<"all" | "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED">("all");
 
   const loadClinic = useCallback(async () => {
     if (!user?.id) return;
@@ -226,8 +232,10 @@ export function ClinicDashboardView() {
         setFLat(c.location?.lat ?? null);
         setFLng(c.location?.lng ?? null);
         setLocDirty(false);
-        /* v1.16.0: السعر والباقات */
+        /* v1.16.0: السعر والباقات — v1.18.0: EUR/USD الاختياريان من العيادة */
         setFSessionPrice(c.sessionPrice != null ? String(c.sessionPrice) : "");
+        setFPriceEur(c.priceEur != null ? String(c.priceEur) : "");
+        setFPriceUsd(c.priceUsd != null ? String(c.priceUsd) : "");
         setFPacks((c.packs || []).map((p) => ({ ...p })));
         setPacksDirty(false);
       }
@@ -279,8 +287,10 @@ export function ClinicDashboardView() {
         workingHours: fHours.trim() || null,
         priceNote: fPriceNote.trim() || null,
         licenseNumber: fLicense.trim() || null,
-        /* v1.16.0: سعر الجلسة الحضورية + الباقات */
+        /* v1.16.0: سعر الجلسة الحضورية + الباقات — v1.18.0: EUR/USD اختياريان بلا تحويل */
         sessionPrice: fSessionPrice.trim() === "" ? null : Number(fSessionPrice),
+        priceEur: fPriceEur.trim() === "" ? null : Number(fPriceEur),
+        priceUsd: fPriceUsd.trim() === "" ? null : Number(fPriceUsd),
         packs: packsDirty ? fPacks : undefined,
       };
       if (logoDirty) payload.logo = fLogo;
@@ -354,63 +364,31 @@ export function ClinicDashboardView() {
     }
   };
 
-  /* ══ v1.17.0: فيديوهات المعرض ══
-     أول تعديل: جلب الفيديوهات الحالية من مساراتها وتحويلها data URLs
-     كي يُرسل الاستبدال الكامل بلا فقدان لما هو موجود */
-  const materializeVideos = async (): Promise<string[]> => {
-    const out: string[] = [];
-    for (const v of fVideos) {
-      if (v.startsWith("data:")) {
-        out.push(v);
-        continue;
-      }
-      try {
-        const blob = await fetch(v).then((r) => r.blob());
-        const d = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        out.push(d);
-      } catch {
-        /* تجاهل ما تعذّر جلبه */
-      }
-    }
-    return out;
-  };
-
+  /* ══ v1.18.0: فيديوهات المعرض — GridFS بلا حد للحجم ══
+     الفيديو يُرفع على دفعات عبر /api/media فيصبح مرجعاً «/api/media/{id}»،
+     والمراجع القديمة (روابط المعرض) يغادرها الخادم يرحّلها تلقائياً عند الحفظ
+     — لا حاجة لجلب الفيديوهات الحالية ولا لأي حد حجم */
   const pickVideos = async (files: FileList | null) => {
-    if (!files?.length) return;
+    if (!files?.length || !user?.id) return;
+    const room = 2 - fVideos.length;
+    const list = Array.from(files).slice(0, Math.max(0, room));
+    if (list.length === 0) {
+      showAppToast(t.clinicDash.videoFull, "");
+      return;
+    }
     setVideosBusy(true);
     try {
-      const base = await materializeVideos();
-      const room = 2 - base.length;
-      const list = Array.from(files).slice(0, Math.max(0, room));
-      if (list.length === 0) {
-        showAppToast(t.clinicDash.videoFull, "");
-        return;
-      }
       const added: string[] = [];
       for (const f of list) {
-        if (f.size > 3_900_000) {
-          showAppToast(t.clinicDash.videoBig, "");
-          continue;
+        try {
+          const r = await uploadVideoToMedia(f, user.id);
+          added.push(r.url);
+        } catch {
+          showAppToast(t.clinicDash.videoUploadFail, "");
         }
-        const d = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = reject;
-          reader.readAsDataURL(f);
-        });
-        if (d.length > 5_400_000 || !d.startsWith("data:video/")) {
-          showAppToast(t.clinicDash.videoBig, "");
-          continue;
-        }
-        added.push(d);
       }
       if (added.length) {
-        setFVideos([...base, ...added]);
+        setFVideos((p) => [...p, ...added]);
         setVideosDirty(true);
       }
     } finally {
@@ -418,9 +396,8 @@ export function ClinicDashboardView() {
     }
   };
 
-  const removeVideo = async (idx: number) => {
-    const base = await materializeVideos();
-    setFVideos(base.filter((_, j) => j !== idx));
+  const removeVideo = (idx: number) => {
+    setFVideos((p) => p.filter((_, j) => j !== idx));
     setVideosDirty(true);
   };
 
@@ -758,6 +735,40 @@ export function ClinicDashboardView() {
                     </div>
                     <p className="text-[10px] text-muted-foreground font-semibold">{t.clinicDash.sessionPriceHint}</p>
                   </div>
+                  {/* v1.18.0: سعرا EUR/USD اختياريان تحددهما العيادة نفسها — بلا أي تحويل */}
+                  <div className="space-y-1.5">
+                    <Label className="font-bold">{t.clinicDash.priceEurLabel}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.5"
+                        dir="ltr"
+                        value={fPriceEur}
+                        onChange={(e) => setFPriceEur(e.target.value)}
+                        className="rounded-xl bg-card"
+                        placeholder="—"
+                      />
+                      <span className="text-xs font-black text-muted-foreground shrink-0">EUR</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-bold">{t.clinicDash.priceUsdLabel}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.5"
+                        dir="ltr"
+                        value={fPriceUsd}
+                        onChange={(e) => setFPriceUsd(e.target.value)}
+                        className="rounded-xl bg-card"
+                        placeholder="—"
+                      />
+                      <span className="text-xs font-black text-muted-foreground shrink-0">USD</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-semibold">{t.clinicDash.priceOptHint}</p>
+                  </div>
                 </div>
 
                 {/* ══ v1.16.0: باقات الجلسات الحضورية (Packs) ══ */}
@@ -940,7 +951,7 @@ export function ClinicDashboardView() {
                           <button
                             type="button"
                             className="absolute top-1 end-1 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center"
-                            onClick={() => { void removeVideo(i); }}
+                            onClick={() => removeVideo(i)}
                             aria-label="remove video"
                           >
                             <X className="h-3 w-3" />
@@ -959,7 +970,7 @@ export function ClinicDashboardView() {
                       {videosBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <VideoIcon className="h-3.5 w-3.5" />}
                       {t.clinicDash.galleryAddVideo} ({fVideos.length}/2)
                     </Button>
-                    <input id="clinic-videos-input" type="file" accept="video/mp4,video/webm,video/quicktime" multiple className="hidden" onChange={(e) => { void pickVideos(e.target.files); e.currentTarget.value = ""; }} />
+                    <input id="clinic-videos-input" type="file" accept="video/*" multiple className="hidden" onChange={(e) => { void pickVideos(e.target.files); e.currentTarget.value = ""; }} />
                   </div>
                 </div>
 
@@ -1038,66 +1049,98 @@ export function ClinicDashboardView() {
             </Card>
           ) : (
             <>
-              {/* v1.15.0: أول 5 حجوزات فقط — بانتظار التأكيد أولاً (الترتيب من الخادم) */}
-              {bookings.slice(0, 5).map((b) => (
-              <Card key={b.id} className="border-border/70">
-                <CardContent className="p-4 space-y-2.5">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <div className="min-w-0">
-                      <p className="font-black text-sm">{b.clientName}</p>
-                      {b.clientPhone ? (
-                        <a href={`tel:${b.clientPhone}`} className="text-xs font-bold text-primary hover:underline" dir="ltr">{b.clientPhone}</a>
-                      ) : null}
-                      {/* v1.17.0: الباقة المختارة عند الحجز */}
-                      {b.packName ? (
-                        <p className="text-[11px] font-bold text-primary flex items-center gap-1 mt-0.5 flex-wrap">
-                          <Wallet className="h-3 w-3 shrink-0" />
-                          {b.packName}
-                          {" · "}
-                          {t.clinics.packsSessions.replace("{n}", String(b.packSessions ?? 1))}
-                          {b.packPrice ? ` · ${b.packPrice.toLocaleString("en-US")} DZD` : ""}
-                        </p>
-                      ) : null}
+              {/* v1.18.0: أزرار الحالات مع العدد — الضغط يفتح القائمة الكاملة لتلك الحالة */}
+              {(() => {
+                const counts: Record<string, number> = { all: bookings.length, PENDING: 0, CONFIRMED: 0, COMPLETED: 0, CANCELLED: 0 };
+                for (const b of bookings) {
+                  if (counts[b.status] !== undefined) counts[b.status] += 1;
+                }
+                const chips: { key: typeof bkFilter; label: string; cls: string }[] = [
+                  { key: "all", label: t.clinicDash.bkAll, cls: "border-primary/50 bg-primary/10 text-primary" },
+                  { key: "PENDING", label: t.clinicDash.bkPending, cls: "border-amber-400/50 bg-amber-400/10 text-amber-600 dark:text-amber-400" },
+                  { key: "CONFIRMED", label: t.clinicDash.bkConfirmed, cls: "border-primary/40 bg-primary/5 text-primary" },
+                  { key: "COMPLETED", label: t.clinicDash.bkCompleted, cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+                  { key: "CANCELLED", label: t.clinicDash.bkCancelled, cls: "border-destructive/40 bg-destructive/10 text-destructive" },
+                ];
+                const visible = bkFilter === "all" ? bookings : bookings.filter((b) => b.status === bkFilter);
+                return (
+                  <>
+                    <div className="flex items-center gap-1.5 flex-wrap pb-1">
+                      {chips.map((c) => (
+                        <button
+                          key={c.key}
+                          type="button"
+                          onClick={() => setBkFilter(c.key)}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-black transition-all ${bkFilter === c.key ? c.cls + " shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-primary/30"}`}
+                        >
+                          {c.label}
+                          <span className="rounded-full bg-muted px-1.5 font-mono text-[10px]" dir="ltr">{counts[c.key]}</span>
+                        </button>
+                      ))}
                     </div>
-                    {bookingBadge(b.status)}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground flex-wrap">
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date.replaceAll("-", "/")} — {b.slot}</span>
-                  </div>
-                  {b.reason ? <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 rounded-lg px-3 py-2">{b.reason}</p> : null}
-                  {b.status === "CANCELLED" && b.clinicNote ? (
-                    <p className="text-xs text-destructive font-semibold">{t.clinicDash.cancelNoteLabel}: {b.clinicNote}</p>
-                  ) : null}
-                  {b.status === "PENDING" || b.status === "CONFIRMED" ? (
-                    <div className="flex items-center gap-2 flex-wrap pt-1">
-                      {b.status === "PENDING" ? (
-                        <Button size="sm" className="gradient-primary text-white font-black rounded-lg" onClick={() => bookingAction(b.id, "confirm")}>
-                          <Check className="h-3.5 w-3.5" />
-                          {t.clinicDash.confirm}
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" className="rounded-lg font-black border-emerald-500/40 text-emerald-600 dark:text-emerald-400" onClick={() => bookingAction(b.id, "complete")}>
-                          <Check className="h-3.5 w-3.5" />
-                          {t.clinicDash.complete}
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" className="rounded-lg font-black text-destructive border-destructive/40" onClick={() => { setCancelId(b.id); setCancelNote(""); }}>
-                        <Ban className="h-3.5 w-3.5" />
-                        {t.clinicDash.cancel}
-                      </Button>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ))
-            }
-              {/* v1.15.0: زر «إظهار الباقي» — البقية بنافذة منبثقة */}
-              {bookings.length > 5 ? (
-                <Button variant="outline" className="w-full rounded-xl font-black gap-1.5" onClick={() => setShowAllBookings(true)}>
-                  <List className="h-4 w-4" />
-                  {t.clinicDash.showRest.replace("{n}", String(bookings.length - 5))}
-                </Button>
-              ) : null}
+                    {visible.length === 0 ? (
+                      <Card className="border-dashed">
+                        <CardContent className="p-8 text-center space-y-2 text-muted-foreground">
+                          <CalendarClock className="h-8 w-8 mx-auto opacity-40" />
+                          <p className="text-sm font-semibold">{t.clinicDash.bkEmptyFiltered}</p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      visible.map((b) => (
+                        <Card key={b.id} className="border-border/70 overflow-hidden max-w-full">
+                          <CardContent className="p-4 space-y-2.5 min-w-0">
+                            <div className="flex items-start justify-between gap-2 flex-wrap">
+                              <div className="min-w-0">
+                                <p className="font-black text-sm break-words">{b.clientName}</p>
+                                {b.clientPhone ? (
+                                  <a href={`tel:${b.clientPhone}`} className="text-xs font-bold text-primary hover:underline" dir="ltr">{b.clientPhone}</a>
+                                ) : null}
+                                {/* v1.17.0: الباقة المختارة عند الحجز */}
+                                {b.packName ? (
+                                  <p className="text-[11px] font-bold text-primary flex items-center gap-1 mt-0.5 flex-wrap">
+                                    <Wallet className="h-3 w-3 shrink-0" />
+                                    {b.packName}
+                                    {" · "}
+                                    {t.clinics.packsSessions.replace("{n}", String(b.packSessions ?? 1))}
+                                    {b.packPrice ? ` · ${b.packPrice.toLocaleString("en-US")} DZD` : ""}
+                                  </p>
+                                ) : null}
+                              </div>
+                              {bookingBadge(b.status)}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground flex-wrap">
+                              <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date.replaceAll("-", "/")} — {b.slot}</span>
+                            </div>
+                            {b.reason ? <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 rounded-lg px-3 py-2 break-words">{b.reason}</p> : null}
+                            {b.status === "CANCELLED" && b.clinicNote ? (
+                              <p className="text-xs text-destructive font-semibold">{t.clinicDash.cancelNoteLabel}: {b.clinicNote}</p>
+                            ) : null}
+                            {b.status === "PENDING" || b.status === "CONFIRMED" ? (
+                              <div className="flex items-center gap-2 flex-wrap pt-1">
+                                {b.status === "PENDING" ? (
+                                  <Button size="sm" className="gradient-primary text-white font-black rounded-lg" onClick={() => bookingAction(b.id, "confirm")}>
+                                    <Check className="h-3.5 w-3.5" />
+                                    {t.clinicDash.confirm}
+                                  </Button>
+                                ) : (
+                                  <Button size="sm" variant="outline" className="rounded-lg font-black border-emerald-500/40 text-emerald-600 dark:text-emerald-400" onClick={() => bookingAction(b.id, "complete")}>
+                                    <Check className="h-3.5 w-3.5" />
+                                    {t.clinicDash.complete}
+                                  </Button>
+                                )}
+                                <Button size="sm" variant="outline" className="rounded-lg font-black text-destructive border-destructive/40" onClick={() => { setCancelId(b.id); setCancelNote(""); }}>
+                                  <Ban className="h-3.5 w-3.5" />
+                                  {t.clinicDash.cancel}
+                                </Button>
+                              </div>
+                            ) : null}
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </>
+                );
+              })()}
             </>
           )}
           {!bookLoading && bookings.length > 0 ? (
@@ -1132,56 +1175,6 @@ export function ClinicDashboardView() {
         </DialogContent>
       </Dialog>
 
-      {/* v1.15.0: نافذة «إظهار الباقي» — كل الحجوزات المتبقية */}
-      <Dialog open={showAllBookings} onOpenChange={setShowAllBookings}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-start text-base flex items-center gap-2">
-              <CalendarClock className="h-4.5 w-4.5 text-primary" />
-              {t.clinicDash.allBookingsTitle}
-            </DialogTitle>
-            <DialogDescription className="text-start text-xs leading-relaxed">{t.clinicDash.allBookingsDesc}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2.5">
-            {bookings.map((b) => (
-              <Card key={b.id} className="border-border/60">
-                <CardContent className="p-3.5 space-y-2">
-                  <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <div className="min-w-0">
-                      <p className="font-black text-sm">{b.clientName}</p>
-                      {b.clientPhone ? (
-                        <a href={`tel:${b.clientPhone}`} className="text-xs font-bold text-primary hover:underline" dir="ltr">{b.clientPhone}</a>
-                      ) : null}
-                    </div>
-                    {bookingBadge(b.status)}
-                  </div>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1 text-xs font-bold" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date.replaceAll("-", "/")} — {b.slot}</span>
-                  {b.reason ? <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 rounded-lg px-3 py-2">{b.reason}</p> : null}
-                  {b.status === "PENDING" || b.status === "CONFIRMED" ? (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {b.status === "PENDING" ? (
-                        <Button size="sm" className="gradient-primary text-white font-black rounded-lg" onClick={() => bookingAction(b.id, "confirm")}>
-                          <Check className="h-3.5 w-3.5" />
-                          {t.clinicDash.confirm}
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" className="rounded-lg font-black border-emerald-500/40 text-emerald-600 dark:text-emerald-400" onClick={() => bookingAction(b.id, "complete")}>
-                          <Check className="h-3.5 w-3.5" />
-                          {t.clinicDash.complete}
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" className="rounded-lg font-black text-destructive border-destructive/40" onClick={() => { setCancelId(b.id); setCancelNote(""); }}>
-                        <Ban className="h-3.5 w-3.5" />
-                        {t.clinicDash.cancel}
-                      </Button>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

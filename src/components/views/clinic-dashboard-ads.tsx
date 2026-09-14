@@ -14,9 +14,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Megaphone, Loader2, Plus, Trash2, X, Upload, Check, Ban, Flag,
-  Eye, Heart, MessageCircle, Wallet, CalendarRange, CornerUpLeft, EyeOff, Pencil,
+  Eye, Heart, MessageCircle, Wallet, CalendarRange, CornerUpLeft, EyeOff, Pencil, Play,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { uploadVideoToMedia } from "@/lib/media-upload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,6 @@ import { showAppToast } from "@/components/shared/app-toast";
 import { formatDateTime } from "@/lib/utils";
 
 const MAX_ADIMG_B64 = 1_200_000;
-const MAX_ADVID_B64 = 5_400_000;
 const PAGE = 8;
 
 async function compressImage(file: File, maxSide = 1200, limit = MAX_ADIMG_B64): Promise<string> {
@@ -85,6 +85,8 @@ export interface AdRow {
   title: string;
   body: string;
   mediaUrls: string[];
+  /* v1.18.0: نوع كل وسيط — image/video (الفيديو مرجع GridFS بلا حد حجم) */
+  mediaKinds: string[];
   hasImage: boolean;
   imageUrl: string | null;
   status: string;
@@ -131,12 +133,15 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  /* نافذة صياغة الإعلان — v1.17.0: تُستعمل للإنشاء وللتعديل معاً */
+  /* نافذة صياغة الإعلان — v1.17.0: تُستعمل للإنشاء وللتعديل معاً
+     v1.18.0: الوسائط بkindها — الصور data URLs والفيديو مرجع GridFS */
   const [adOpen, setAdOpen] = useState(false);
   const [adTitle, setAdTitle] = useState("");
   const [adBody, setAdBody] = useState("");
-  const [adMedia, setAdMedia] = useState<string[]>([]);
+  const [adMedia, setAdMedia] = useState<{ src: string; kind: "image" | "video" }[]>([]);
   const [adBusy, setAdBusy] = useState(false);
+  const [vidUploading, setVidUploading] = useState(false);
+  const [vidPct, setVidPct] = useState(0);
   const [adError, setAdError] = useState("");
   /* v1.17.0: الإعلان قيد التعديل (null = إنشاء جديد) */
   const [editingAd, setEditingAd] = useState<AdRow | null>(null);
@@ -189,31 +194,6 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
     load();
   }, [load]);
 
-  /* v1.17.0: جلب وسائط الإعلان من مساراتها كـ data URLs — الاستبدال الكامل
-     عند حفظ التعديل يحتاج البيانات نفسها لا روابطها */
-  const materializeMedia = async (urls: string[]): Promise<string[]> => {
-    const out: string[] = [];
-    for (const u of urls) {
-      if (u.startsWith("data:")) {
-        out.push(u);
-        continue;
-      }
-      try {
-        const blob = await fetch(u).then((r) => r.blob());
-        const d = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        out.push(d);
-      } catch {
-        /* تجاهل ما تعذّر جلبه */
-      }
-    }
-    return out;
-  };
-
   const openEditAd = async (a: AdRow) => {
     setEditingAd(a);
     setAdTitle(a.title);
@@ -221,8 +201,34 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
     setAdMedia([]);
     setAdOpen(true);
     try {
-      const media = await materializeMedia(a.mediaUrls);
-      setAdMedia(media);
+      /* v1.18.0: الصور فقط تُجلَب كـ data URLs — الفيديو يبقى بمرجعه
+         كما هو (بلا إعادة رفع ولا أي حد حجم) بفضل mediaKinds */
+      const kinds = a.mediaKinds || [];
+      const out: { src: string; kind: "image" | "video" }[] = [];
+      for (let i = 0; i < a.mediaUrls.length; i++) {
+        const u = a.mediaUrls[i];
+        if (kinds[i] === "video" || u.startsWith("/api/media/")) {
+          out.push({ src: u, kind: "video" });
+          continue;
+        }
+        if (u.startsWith("data:")) {
+          out.push({ src: u, kind: "image" });
+          continue;
+        }
+        try {
+          const blob = await fetch(u).then((r) => r.blob());
+          const d = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          out.push({ src: d, kind: "image" });
+        } catch {
+          /* تجاهل ما تعذّر جلبه */
+        }
+      }
+      setAdMedia(out);
     } catch {
       /* تُترك الوسائط فارغة إن تعذّر جلبها — النص يُحفظ دائماً */
     }
@@ -242,8 +248,8 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editing
-          ? { action: "update", userId, id: editingAd!.id, title: adTitle.trim(), body: adBody.trim(), media: adMedia }
-          : { action: "create", userId, title: adTitle.trim(), body: adBody.trim(), media: adMedia }),
+          ? { action: "update", userId, id: editingAd!.id, title: adTitle.trim(), body: adBody.trim(), media: adMedia.map((m) => m.src) }
+          : { action: "create", userId, title: adTitle.trim(), body: adBody.trim(), media: adMedia.map((m) => m.src) }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -337,8 +343,8 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
       ) : (
         <>
           {ads.map((a) => (
-            <Card key={a.id} className="border-border/70">
-              <CardContent className="p-4 space-y-2.5">
+            <Card key={a.id} className="border-border/70 overflow-hidden max-w-full">
+              <CardContent className="p-4 space-y-2.5 min-w-0">
                 <div className="flex items-start justify-between gap-2 flex-wrap">
                   <p className="font-black text-sm min-w-0">{a.title}</p>
                   <div className="flex items-center gap-1.5">
@@ -346,16 +352,25 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                     {statusBadge(a.status)}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{a.body}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line break-words min-w-0">{a.body}</p>
                 {a.mediaUrls.length > 0 ? (
-                  /* v1.15.1: مربعات موحّدة 96px مع object-contain — الصورة كاملة بلا قصّ ولا فيض */
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  /* v1.18.0: شبكة مُغلِفة تلتف بلا أي فيض أفقي — كان الصف
+                     الأفقي الممتد يبرّج إطار البطاقة على الهاتف مع كثرة الصور.
+                     الفيديو بمرجعه من GridFS يظهر بإطاره الأول + زر تشغيل */
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 max-w-full overflow-hidden">
                     {a.mediaUrls.map((u, i) =>
-                      /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u) ? (
-                        <video key={i} src={u} className="rounded-lg h-24 w-24 shrink-0 border border-border/60 bg-muted/40 object-contain" muted />
+                      (a.mediaKinds || [])[i] === "video" || u.startsWith("/api/media/") ? (
+                        <div key={i} className="relative rounded-lg h-24 w-full border border-border/60 bg-black/80 overflow-hidden">
+                          <video src={u} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center">
+                              <Play className="h-3.5 w-3.5 fill-white" />
+                            </span>
+                          </span>
+                        </div>
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img key={i} src={u} alt={`${a.title} ${i + 1}`} loading="lazy" className="rounded-lg h-24 w-24 shrink-0 border border-border/60 bg-muted/40 object-contain" />
+                        <img key={i} src={u} alt={`${a.title} ${i + 1}`} loading="lazy" className="rounded-lg h-24 w-full border border-border/60 bg-muted/40 object-contain" />
                       )
                     )}
                   </div>
@@ -454,22 +469,23 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                   variant="outline"
                   size="sm"
                   className="rounded-lg font-bold gap-1.5"
-                  disabled={adMedia.filter((m) => m.startsWith("data:image/")).length >= 5}
+                  disabled={vidUploading || adMedia.filter((m) => m.kind === "image").length >= 5}
                   onClick={() => document.getElementById("ad-img-input")?.click()}
                 >
                   <Upload className="h-3.5 w-3.5" />
-                  {t.clinicDash.addImage} ({adMedia.filter((m) => m.startsWith("data:image/")).length}/5)
+                  {t.clinicDash.addImage} ({adMedia.filter((m) => m.kind === "image").length}/5)
                 </Button>
+                {/* v1.18.0: الفيديو بلا حد للحجم — يُرفع على دفعات ويُخزّن في GridFS */}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="rounded-lg font-bold gap-1.5"
-                  disabled={adMedia.some((m) => m.startsWith("data:video/"))}
+                  disabled={vidUploading || adMedia.some((m) => m.kind === "video")}
                   onClick={() => document.getElementById("ad-vid-input")?.click()}
                 >
-                  <Upload className="h-3.5 w-3.5" />
-                  {t.clinicDash.addVideo}
+                  {vidUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                  {vidUploading ? `${t.clinicDash.videoUploading} ${vidPct}%` : t.clinicDash.addVideo}
                 </Button>
               </div>
               <input
@@ -485,7 +501,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                   if (!files.length) return;
                   /* حتى 5 صور + فيديو واحد = 6 وسائط كحد أقصى */
                   const room = 6 - adMedia.length;
-                  const imgRoom = 5 - adMedia.filter((m) => m.startsWith("data:image/")).length;
+                  const imgRoom = 5 - adMedia.filter((m) => m.kind === "image").length;
                   const take = Math.min(files.length, room, imgRoom);
                   if (take <= 0) {
                     showAppToast(t.clinicDash.adMaxMedia, "");
@@ -501,43 +517,49 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                       showAppToast(t.clinicDash.adMediaBig, "");
                     }
                   }
-                  if (compressed.length) setAdMedia((p) => [...p, ...compressed]);
+                  if (compressed.length) setAdMedia((p) => [...p, ...compressed.map((src) => ({ src, kind: "image" as const }))]);
                 }}
               />
               <input
                 id="ad-vid-input"
                 type="file"
-                accept="video/mp4,video/webm,video/quicktime"
+                accept="video/*"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const f = e.target.files?.[0];
                   e.currentTarget.value = "";
-                  if (!f) return;
-                  if (f.size > 3_900_000) {
-                    showAppToast(t.clinicDash.adVideoBig, "");
-                    return;
+                  if (!f || vidUploading) return;
+                  setVidUploading(true);
+                  setVidPct(0);
+                  try {
+                    /* v1.18.0: رفع على دفعات — بلا حد لحجم الفيديو */
+                    const r = await uploadVideoToMedia(f, userId, setVidPct);
+                    setAdMedia((p) => [...p, { src: r.url, kind: "video" as const }]);
+                  } catch {
+                    showAppToast(t.clinicDash.videoUploadFail, "");
+                  } finally {
+                    setVidUploading(false);
+                    setVidPct(0);
                   }
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const d = String(reader.result);
-                    if (d.length > MAX_ADVID_B64) {
-                      showAppToast(t.clinicDash.adVideoBig, "");
-                      return;
-                    }
-                    setAdMedia((p) => [...p, d]);
-                  };
-                  reader.readAsDataURL(f);
                 }}
               />
               {adMedia.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2">
                   {adMedia.map((m, i) => (
                     <div key={i} className="relative rounded-lg overflow-hidden border border-border/60 aspect-video bg-muted/40">
-                      {m.startsWith("data:video/") ? (
-                        <video src={m} className="h-full w-full object-cover" muted />
+                      {m.kind === "video" ? (
+                        /* v1.18.0: معاينة الفيديو بإطارها الأول + زر تشغيل */
+                        <span className="absolute inset-0">
+                          <video src={m.src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center">
+                              <Play className="h-3.5 w-3.5 fill-white" />
+                            </span>
+                          </span>
+                        </span>
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={m} alt={`media ${i + 1}`} className="h-full w-full object-cover" />
+                        <img src={m.src} alt={`media ${i + 1}`} className="h-full w-full object-cover" />
                       )}
                       <button
                         type="button"
@@ -553,9 +575,10 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
               ) : null}
             </div>
             {adError ? <div className="rounded-xl bg-destructive/10 text-destructive text-sm font-bold px-4 py-3">{adError}</div> : null}
-            <Button className="w-full gradient-primary text-white font-black rounded-xl h-12" disabled={adBusy} onClick={submitAd}>
+            <Button className="w-full gradient-primary text-white font-black rounded-xl h-12" disabled={adBusy || vidUploading} onClick={submitAd}>
               {adBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
-              {editingAd ? t.clinicDash.saveBtn ?? t.clinicDash.adSubmit : t.clinicDash.adSubmit}
+              {/* v1.18.0: زر نافذة الإعلان يقول «حفظ الإعلان» لا «حفظ معلومات العيادة» */}
+              {editingAd ? t.clinicDash.saveAd : t.clinicDash.adSubmit}
             </Button>
           </div>
         </DialogContent>

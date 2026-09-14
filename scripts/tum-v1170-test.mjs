@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * غرفة اختبار طمأنينة v1.17.0 — خادم إنتاجي حقيقي + MongoDB ذاكرة (منفذ 27077)
+ * غرفة اختبار طمأنينة v1.18.0 — خادم إنتاجي حقيقي + MongoDB ذاكرة (منفذ 27077)
  * تثبت بنود المستخدم الجديدة:
  *  1) اختيار الباقة (Pack) في الحجز + ظهورها للعيادة + رفض فهرس خاطئ
  *  2) تعديل الإعلان المنشور من العيادة → يصل للمستخدمين تلقائياً
@@ -11,7 +11,7 @@
  *  5) فيديوهات المعرض: رفع/عرض/تقديم بدعم Range + حدود الحجم والعدد
  *  6) انتماء الأخصائي للعيادة + قائمة الأخصائيين في صفحة العيادة (بعد التوثيق)
  *  7) رفض الإعلانات يحجب البانر أيضاً (user-ads-status)
- *  8) الصحة 1.17.0 + استقرار
+ *  8) الصحة 1.18.0 + استقرار
  */
 import { spawn } from "child_process";
 import { MongoMemoryServer } from "mongodb-memory-server";
@@ -49,10 +49,10 @@ function tinyMp4() {
 }
 
 const run = async () => {
-  console.log("═══ طمأنينة v1.17.0 — غرفة اختبار بنود الجولة الجديدة ═══\n");
+  console.log("═══ طمأنينة v1.18.0 — غرفة اختبار بنود الجولة الجديدة ═══\n");
   const mongod = await MongoMemoryServer.create({ instance: { port: 27077 } });
   const server = spawn("node", ["server.js"], {
-    env: { ...process.env, PORT, MONGODB_URI: mongod.getUri("tumaanina-v17"), ADMIN_PASSCODE: "tum-pass-17", NODE_ENV: "production" },
+    env: { ...process.env, PORT, MONGODB_URI: mongod.getUri("tumaanina-v17-reg"), ADMIN_PASSCODE: "tum-pass-17", NODE_ENV: "production" },
     stdio: ["ignore", "ignore", "pipe"],
   });
   server.stderr.on("data", () => {});
@@ -61,10 +61,10 @@ const run = async () => {
     await wait(500);
     try {
       const h = await req("GET", "/api/health");
-      if (h.json?.version === "1.17.0" && h.json?.ok) { ready = true; break; }
+      if (h.json?.version === "1.18.0" && h.json?.ok) { ready = true; break; }
     } catch {}
   }
-  check("الخادم جاهز ويقول 1.17.0", ready);
+  check("الخادم جاهز ويقول 1.18.0", ready);
   if (!ready) { server.kill(); await mongod.stop(); process.exit(1); }
 
   const admin = await req("POST", "/api/admin", { action: "login", passcode: "tum-pass-17" });

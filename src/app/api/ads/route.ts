@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { Clinic, ClinicAd, User } from "@/lib/models";
 import { apiHandler } from "@/lib/server/api";
+import { deleteOrphanMedia, gridfsFileInfo, isVideoItem } from "@/lib/server/media";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +37,48 @@ function mediaUrls(id: string, rec: Record<string, unknown>): string[] {
   return all.map((_, i) => `/api/ads/${id}/media/${i}`);
 }
 
+/* v1.18.0: نوع كل وسيط — الفيديو data:video قديم أو مرجع GridFS جديد،
+   والبقية صور. يُرسل للواجهات كي تعرض الفيديو بمشغّله لا بصورة مكسورة */
+function mediaKindsOf(rec: Record<string, unknown>): string[] {
+  const media = (rec.media as string[]) || [];
+  const legacy = rec.image ? [rec.image as string] : [];
+  const all = media.length ? media : legacy;
+  return all.map((m) => (isVideoItem(String(m)) ? "video" : "image"));
+}
+
+/* أول وسيط صورة (للبانر والعارض الصغير) — الفيديو لا يصلح صورة مصغّرة */
+function firstImageUrl(id: string, rec: Record<string, unknown>): string | null {
+  const urls = mediaUrls(id, rec);
+  const kinds = mediaKindsOf(rec);
+  const i = kinds.findIndex((k) => k === "image");
+  return i >= 0 ? urls[i] : null;
+}
+
 function mediaCount(rec: Record<string, unknown>): number {
   const media = (rec.media as string[]) || [];
   return media.length || (rec.image ? 1 : 0);
+}
+
+/* ═ v1.18.0: مدقّق وسائط موحّد — صور data URL + فيديو بلا حد للحجم ═
+   الفيديو إمّا data:video قديم (≤ الحد الباقي للتوافق) أو مرجع GridFS
+   «/api/media/{fileId}» مملوك لهذه العيادة — بلا أي حد حجم يُحتسب
+   في جسم الطلب. الصور تبقى data URLs مضغوطة من العميل. */
+async function validateMediaList(media: string[], clinicId: string): Promise<string | null> {
+  const images = media.filter((m) => m.startsWith("data:image/"));
+  const videos = media.filter((m) => isVideoItem(m));
+  if (images.length + videos.length !== media.length) return "INVALID_MEDIA";
+  if (images.length > 5 || videos.length > 1) return "MAX_6_MEDIA";
+  const dataItems = media.filter((m) => m.startsWith("data:"));
+  if (dataItems.some((m) => m.length > MAX_MEDIA_ITEM)) return "MEDIA_TOO_BIG";
+  if (dataItems.reduce((s, m) => s + m.length, 0) > MAX_MEDIA_TOTAL) return "MEDIA_TOO_BIG";
+  for (const m of media) {
+    const mm = /^\/api\/media\/([a-f0-9]{24})$/i.exec(m.trim());
+    if (mm) {
+      const info = await gridfsFileInfo(mm[1]);
+      if (!info || String(info.metadata?.clinicId || "") !== String(clinicId)) return "INVALID_MEDIA";
+    }
+  }
+  return null;
 }
 
 async function GET_impl(req: NextRequest) {
@@ -74,8 +114,10 @@ async function GET_impl(req: NextRequest) {
           title: (rec.title as string) || "",
           body: (rec.body as string) || "",
           mediaUrls: mediaUrls(String(rec._id), rec),
+          /* v1.18.0: نوع كل وسيط — image/video */
+          mediaKinds: mediaKindsOf(rec),
           hasImage: mediaCount(rec) > 0,
-          imageUrl: mediaUrls(String(rec._id), rec)[0] || null,
+          imageUrl: firstImageUrl(String(rec._id), rec),
           status: rec.status,
           adminNote: (rec.adminNote as string) || null,
           paymentNote: (rec.paymentNote as string) || null,
@@ -142,7 +184,9 @@ async function GET_impl(req: NextRequest) {
           title: (rec.title as string) || "",
           body: (rec.body as string) || "",
           mediaUrls: mediaUrls(String(rec._id), rec),
-          imageUrl: mediaUrls(String(rec._id), rec)[0] || null,
+          /* v1.18.0: نوع كل وسيط — image/video */
+          mediaKinds: mediaKindsOf(rec),
+          imageUrl: firstImageUrl(String(rec._id), rec),
           publishedAt: (rec.reviewedAt as string) || (rec.createdAt as string),
           likesCount: likes.length,
           likedByMe: viewerOid ? likes.some((l) => String(l) === viewerOid) : false,
@@ -247,16 +291,12 @@ async function POST_impl(req: NextRequest) {
       const title = String(body.title || "").trim().slice(0, 120);
       const adBody = String(body.body || "").trim().slice(0, 1200);
       if (!title || !adBody) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
-      /* الوسائط: حتى 5 صور + فيديو واحد (data URLs) */
+      /* الوسائط: حتى 5 صور + فيديو واحد (data URL أو مرجع GridFS بلا حد حجم) */
       let media: string[] = Array.isArray(body.media) ? body.media.filter((m: unknown) => typeof m === "string") : [];
       if (!media.length && typeof body.image === "string" && body.image) media = [body.image];
       if (media.length > 6) return NextResponse.json({ error: "MAX_6_MEDIA" }, { status: 400 });
-      const images = media.filter((m) => m.startsWith("data:image/"));
-      const videos = media.filter((m) => m.startsWith("data:video/"));
-      if (images.length + videos.length !== media.length) return NextResponse.json({ error: "INVALID_MEDIA" }, { status: 400 });
-      if (images.length > 5 || videos.length > 1) return NextResponse.json({ error: "MAX_6_MEDIA" }, { status: 400 });
-      if (media.some((m) => m.length > MAX_MEDIA_ITEM)) return NextResponse.json({ error: "MEDIA_TOO_BIG" }, { status: 400 });
-      if (media.reduce((s, m) => s + m.length, 0) > MAX_MEDIA_TOTAL) return NextResponse.json({ error: "MEDIA_TOO_BIG" }, { status: 400 });
+      const mediaErr = await validateMediaList(media, String(clinic._id));
+      if (mediaErr) return NextResponse.json({ error: mediaErr }, { status: 400 });
       const count = await ClinicAd.countDocuments({ clinicId: clinic._id });
       if (count >= MAX_ADS_PER_CLINIC) return NextResponse.json({ error: "ADS_LIMIT" }, { status: 409 });
       await ClinicAd.create({ clinicId: clinic._id, title, body: adBody, media, status: "PENDING" });
@@ -264,7 +304,7 @@ async function POST_impl(req: NextRequest) {
     }
 
     /* الأفعال المتبقية تشترط ملكية الإعلان */
-    const ad = (await ClinicAd.findById(body.id).select("clinicId status").lean()) as Record<string, unknown> | null;
+    const ad = (await ClinicAd.findById(body.id).select("clinicId status media image").lean()) as Record<string, unknown> | null;
     if (!ad || String(ad.clinicId as { toString(): string }) !== String(clinic._id)) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     }
@@ -282,18 +322,20 @@ async function POST_impl(req: NextRequest) {
       let media: string[] = Array.isArray(body.media) ? body.media.filter((m: unknown) => typeof m === "string") : [];
       if (!media.length && typeof body.image === "string" && body.image) media = [body.image];
       if (media.length > 6) return NextResponse.json({ error: "MAX_6_MEDIA" }, { status: 400 });
-      const images = media.filter((m) => m.startsWith("data:image/"));
-      const videos = media.filter((m) => m.startsWith("data:video/"));
-      if (images.length + videos.length !== media.length) return NextResponse.json({ error: "INVALID_MEDIA" }, { status: 400 });
-      if (images.length > 5 || videos.length > 1) return NextResponse.json({ error: "MAX_6_MEDIA" }, { status: 400 });
-      if (media.some((m) => m.length > MAX_MEDIA_ITEM)) return NextResponse.json({ error: "MEDIA_TOO_BIG" }, { status: 400 });
-      if (media.reduce((s, m) => s + m.length, 0) > MAX_MEDIA_TOTAL) return NextResponse.json({ error: "MEDIA_TOO_BIG" }, { status: 400 });
+      const mediaErr = await validateMediaList(media, String(clinic._id));
+      if (mediaErr) return NextResponse.json({ error: mediaErr }, { status: 400 });
       await ClinicAd.updateOne({ _id: body.id }, { $set: { title, body: adBody, media } });
+      /* v1.18.0: تنظيف فيديوهات GridFS التي أزالتها العيادة من إعلانها */
+      const oldMedia = ((ad.media as string[]) || (ad.image ? [ad.image as string] : []));
+      await deleteOrphanMedia(oldMedia, media);
       return NextResponse.json({ ok: true, updated: true });
     }
 
     if (action === "delete") {
       await ClinicAd.deleteOne({ _id: body.id });
+      /* v1.18.0: حذف فيديوهات GridFS المرتبطة بالإعلان المحذوف */
+      const oldMedia = ((ad.media as string[]) || (ad.image ? [ad.image as string] : []));
+      await deleteOrphanMedia(oldMedia, []);
       return NextResponse.json({ ok: true });
     }
     if (action === "comment-hide") {

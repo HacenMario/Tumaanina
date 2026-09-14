@@ -80,6 +80,9 @@ interface UpdateProfileBody {
   customSpecialties?: string[];
   /* الصورة الشخصية: data URL للتعيين/التغيير، null للحذف، غائبة = دون تغيير */
   photo?: string | null;
+  /* v1.18.0: الانتماء للعيادة قابل للتعديل من الإعدادات —
+     null/"none" = مستقل، ومعرّف صالح = الانتساب لعيادة نشطة */
+  clinicId?: string | null;
 }
 async function POST_impl(req: NextRequest) {
   const body = await req.json();
@@ -360,6 +363,24 @@ async function POST_impl(req: NextRequest) {
       }
       set.yearsExperience = y;
     }
+    /* ═ v1.18.0: الانتماء للعيادة من الإعدادات — مستقل افتراضياً ═
+       "none"/null = الانسحاب من أي عيادة (مستقل)، ومعرّف عيادة صحيح
+       نشط = الانتساب لها فتظهر تفاصيل الأخصائي في قائمة أخصائييها.
+       عيادة غير موجودة أو موقوفة → INVALID_CLINIC (نتيجة صريحة من الإعدادات). */
+    if (body.clinicId !== undefined) {
+      const raw = body.clinicId === null ? "none" : String(body.clinicId || "none");
+      if (raw === "none" || raw === "") {
+        await User.updateOne({ _id: userId }, { $set: { clinicId: null } });
+      } else if (/^[a-f0-9]{24}$/i.test(raw)) {
+        const cl = (await Clinic.findById(raw).select("isActive").lean()) as { isActive?: boolean } | null;
+        if (!cl || cl.isActive === false) {
+          return NextResponse.json({ error: "INVALID_CLINIC" }, { status: 400 });
+        }
+        await User.updateOne({ _id: userId }, { $set: { clinicId: raw } });
+      } else {
+        return NextResponse.json({ error: "INVALID_CLINIC" }, { status: 400 });
+      }
+    }
     if (Object.keys(set).length) await CounselorProfile.updateOne({ userId }, { $set: set });
     if (set.fullName) {
       await User.updateOne({ _id: userId }, { $set: { pseudonym: String(set.fullName) } });
@@ -399,9 +420,15 @@ async function GET_impl(req: NextRequest) {
   const winner = await getChallengeWinner();
   const challengeWinner = !!winner && winner.userId === String(p.userId);
 
-  /* v2.9.0: تفضيل الجنس + روابط التواصل الاجتماعي */
-  const me = (await User.findById(p.userId).select("acceptedGenders").lean()) as { acceptedGenders?: string[] } | null;
+  /* v2.9.0: تفضيل الجنس + روابط التواصل الاجتماعي — v1.18.0: + الانتماء للعيادة */
+  const me = (await User.findById(p.userId).select("acceptedGenders clinicId").lean()) as { acceptedGenders?: string[]; clinicId?: unknown } | null;
   const socials = (p as { socials?: { facebook?: string | null; instagram?: string | null; tiktok?: string | null } }).socials ?? {};
+
+  /* v1.18.0: اسم العيادة الحالية لعرضه في الإعدادات */
+  const myClinicId = me?.clinicId ? String(me.clinicId) : null;
+  const myClinic = myClinicId
+    ? ((await Clinic.findById(myClinicId).select("name isActive").lean()) as { name?: string; isActive?: boolean } | null)
+    : null;
 
   return NextResponse.json({
     profile: {
@@ -425,6 +452,10 @@ async function GET_impl(req: NextRequest) {
       lateCount: Number(p.lateCount) || 0,
       /* v2.9.0: جنس العميلين المقبولين + روابط التواصل الاجتماعي */
       acceptedGenders: me?.acceptedGenders?.length ? me.acceptedGenders : ["male", "female"],
+      /* v1.18.0: الانتماء الحالي للعيادة (لعرضه وتعديله في الإعدادات) */
+      clinicId: myClinicId,
+      clinicName: myClinic?.name ?? null,
+      clinicActive: myClinic ? myClinic.isActive !== false : false,
       /* v1.1.0 (طمأنينة): سعر الجلسة بالدينار الجزائري + v1.3.0 الأسعار الثلاثة (ترحيل تلقائي) */
       sessionPrice: Math.max(200, Math.round(Number(p.sessionPrice) || DEFAULT_SESSION_PRICE)),
       sessionPrices: buildSessionPrices((p as { sessionPrices?: unknown }).sessionPrices as never, p.sessionPrice),

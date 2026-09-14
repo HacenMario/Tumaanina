@@ -4,37 +4,65 @@
    تماماً (450,300) ودائرة داخلية r=120 مركزها نحو جهة الطيران — فيكون
    الهلال ممتلئاً سميكاً بقرون قصيرة (بدل القرون الطويلة سابقاً)،
    والنجمة الخماسية داخل فتحته بالمسارات الرسمية نفسها.
-   يُستخدم بجانب اسم المنصة «طمأنينة» في كل مكان داخل المنصة. */
+   يُستخدم بجانب اسم المنصة «طمأنينة» في كل مكان داخل المنصة.
+
+   ═ v1.18.0 — أنيميشن القلب الشفاف ═
+   كل 10 ثوانٍ يظهر قلب أحمر شفاف فوق حدود العلم، يكبر قليلاً ثم
+   يصغر متلاشياً حتى الاختفاء، وتعاد الدورة تلقائياً (CSS خالص —
+   وتُعطَّل احتراماً لتقليل الحركة عند تفعيل prefers-reduced-motion). */
 
 export function AlgeriaFlag({
   className = "",
   size = 20,
   rounded = true,
+  heart = true,
 }: {
   className?: string;
   /** العرض بالبكسل — الارتفاع يُحسب تلقائياً بنسبة 2:3 */
   size?: number;
   rounded?: boolean;
+  /** v1.18.0: القلب الشفاف النابض فوق العلم كل 10 ثوانٍ */
+  heart?: boolean;
 }) {
+  const heartPx = Math.max(10, Math.round(size * 0.6));
   return (
-    <svg
-      width={size}
-      height={Math.round(size * (2 / 3))}
-      viewBox="0 0 900 600"
-      className={`${rounded ? "rounded-[2px] shadow-sm ring-1 ring-black/10" : ""} ${className}`}
-      role="img"
-      aria-label="العلم الجزائري"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      {/* النصف الأيمن أبيض + النصف الأيسر أخضر (جهة السارية) */}
-      <path fill="#FFFFFF" d="M0 0h900v600H0z" />
-      <path fill="#006233" d="M0 0h450v600H0z" />
+    <span className={`relative inline-block align-middle leading-none ${className}`}>
+      <svg
+        width={size}
+        height={Math.round(size * (2 / 3))}
+        viewBox="0 0 900 600"
+        className={`${rounded ? "rounded-[2px] shadow-sm ring-1 ring-black/10" : ""} block`}
+        role="img"
+        aria-label="العلم الجزائري"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {/* النصف الأيمن أبيض + النصف الأيسر أخضر (جهة السارية) */}
+        <path fill="#FFFFFF" d="M0 0h900v600H0z" />
+        <path fill="#006233" d="M0 0h450v600H0z" />
 
-      {/* الهلال الحمر — المسار الرسمي: قوس خارجي r=150 ثم قوس داخلي r=120 */}
-      <path fill="#D21034" d="M579.903811 225a150 150 0 1 0 0 150 120 120 0 1 1 0-150" />
+        {/* الهلال الحمر — المسار الرسمي: قوس خارجي r=150 ثم قوس داخلي r=120 */}
+        <path fill="#D21034" d="M579.903811 225a150 150 0 1 0 0 150 120 120 0 1 1 0-150" />
 
-      {/* النجمة الخماسية الحمراء داخل فتحة الهلال — المسار الرسمي */}
-      <path fill="#D21034" d="M585.676275 300 450 255.916106 533.852549 371.329239v-142.658277L450 344.083894z" />
-    </svg>
+        {/* النجمة الخماسية الحمراء داخل فتحة الهلال — المسار الرسمي */}
+        <path fill="#D21034" d="M585.676275 300 450 255.916106 533.852549 371.329239v-142.658277L450 344.083894z" />
+      </svg>
+
+      {/* القلب الأحمر الشفاف — يظهر فوق حدود العلم كل 10 ثوانٍ ثم يتلاشى */}
+      {heart ? (
+        <svg
+          className="flag-heart pointer-events-none absolute left-1/2 top-0 z-10"
+          width={heartPx}
+          height={heartPx}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            fill="#D21034"
+            opacity="0.75"
+            d="M12 21.35 10.55 20.03C5.4 15.36 2 12.27 2 8.5 2 5.41 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.08C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.41 22 8.5c0 3.77-3.4 6.86-8.55 11.53L12 21.35Z"
+          />
+        </svg>
+      ) : null}
+    </span>
   );
 }

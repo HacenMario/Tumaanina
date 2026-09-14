@@ -35,7 +35,16 @@ async function GET_impl(req: NextRequest, ctx: { params: Promise<{ id: string; i
 
   const media = (ad.media && ad.media.length ? ad.media : ad.image ? [ad.image] : []) as string[];
   const item = media[i];
-  if (!item || !item.startsWith("data:")) {
+  if (!item) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  /* v1.18.0: الفيديو الكبير مرجع GridFS «/api/media/{fileId}» —
+     يُحوَّل إليه الطلب (307) فيُعاد بطلبه من مسار GridFS بدعم Range */
+  if (item.startsWith("/api/media/")) {
+    return NextResponse.redirect(new URL(item, req.url), 307);
+  }
+  if (!item.startsWith("data:")) {
     return new NextResponse("Not found", { status: 404 });
   }
 
