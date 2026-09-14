@@ -514,6 +514,16 @@
     overscroll-behavior: contain;
     scrollbar-width: thin;
   }
+
+  /* v1.19.0: مسار وسائط بلا شريط تمرير مرئي — السحب باللمس هو المتحكم
+     (يخفي الشريط دون تعطيل التمرير نفسه على الهاتف والحاسوب) */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 * {

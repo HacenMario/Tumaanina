@@ -1,13 +1,19 @@
-/* ═ v1.18.0 — رفع الفيديو إلى GridFS عبر /api/media (بلا حد للحجم) ═
+/* ═ v1.19.0 — رفع الفيديو إلى GridFS عبر /api/media (بلا حد للحجم) ═
    يقطّع الملف دفعة دفعة (~3.5MB) كي يتجاوز حدود أجسام الطلبات على أي
    مضيف، ثم يجمّعها الخادم في ملف GridFS واحد يعيد رابطه «/api/media/{id}».
-   onProgress تُبلّغ بالنسبة المئوية 0-100 لعرضها أثناء الرفع. */
+
+   v1.19.0: تسريع الرفع — ثلاث دفعات في الطيران معاً بدل دفعة واحدة،
+   مع إعادة محاولة واحدة لكل دفعة تعالج تقلبات الاتصال الضعيف تلقائياً،
+   وonProgress تُبلّغ بالنسبة المئوية 0-100 أثناء الرفع. */
 
 export interface UploadVideoResult {
   url: string;
   fileId: string;
   bytes: number;
 }
+
+/* عدد الدفعات المتزامنة — ثلاثة يضاعف السرعة عادةً دون إرهاق اتصال ضعيف */
+const PARALLEL = 3;
 
 export async function uploadVideoToMedia(
   file: File,
@@ -26,34 +32,54 @@ export async function uploadVideoToMedia(
   }
   const uploadId = String(startData.uploadId);
   const chunkSize = Math.max(1024 * 512, Number(startData.chunkSize) || 3_500_000);
+  const chunksCount = Math.max(1, Math.ceil(file.size / chunkSize));
 
-  const report = (done: number) => {
+  let sentBytes = 0;
+  const report = () => {
     try {
-      onProgress?.(Math.min(99, Math.round((done / Math.max(1, file.size)) * 100)));
+      onProgress?.(Math.min(99, Math.round((sentBytes / Math.max(1, file.size)) * 100)));
     } catch {
       /* تجاهل */
     }
   };
 
-  try {
-    /* 2) الدفعات — بالترتيب، دفعة واحدة في الطيران لثبات الاتصال الضعيف */
-    let sent = 0;
-    let idx = 0;
-    while (sent < file.size) {
-      const blob = file.slice(sent, Math.min(sent + chunkSize, file.size));
-      const res = await fetch(`/api/media?op=chunk&uid=${encodeURIComponent(uploadId)}&idx=${idx}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: blob,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "UPLOAD_CHUNK_FAILED");
+  /* 2) دفعة واحدة — مع محاولة ثانية عند الإخفاق (انقطاع شبكة أو خطأ خادم عابر) */
+  const sendChunk = async (idx: number): Promise<void> => {
+    const from = idx * chunkSize;
+    const blob = file.slice(from, Math.min(from + chunkSize, file.size));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch(`/api/media?op=chunk&uid=${encodeURIComponent(uploadId)}&idx=${idx}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: blob,
+        });
+        if (res.ok) {
+          sentBytes += blob.size;
+          report();
+          return;
+        }
+        /* خطأ طلب دائم (4xx) لا تنفع فيه إعادة المحاولة */
+        if (res.status < 500) break;
+      } catch {
+        /* شبكة — تُعاد المحاولة */
       }
-      sent += blob.size;
-      idx += 1;
-      report(sent);
     }
+    throw new Error("UPLOAD_CHUNK_FAILED");
+  };
+
+  try {
+    /* 2) الدفعات — ثلاثة في الطيران بالترتيب المؤشر لكل عامل */
+    let next = 0;
+    const worker = async () => {
+      for (;;) {
+        const idx = next;
+        next += 1;
+        if (idx >= chunksCount) return;
+        await sendChunk(idx);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PARALLEL, chunksCount) }, () => worker()));
 
     /* 3) الإنهاء والتجميع في GridFS */
     const commitRes = await fetch("/api/media", {

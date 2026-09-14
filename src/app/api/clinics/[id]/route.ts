@@ -32,7 +32,10 @@ async function loadClinicSpecialists(clinicId: string) {
       yearsExperience: Number(p.yearsExperience) || 0,
       rating: Math.round((Number(p.rating) || 5) * 10) / 10,
       sessionsCount: Number(p.sessionsCount) || 0,
-      photoUrl: p.photo ? `/api/counselors/${uid}/photo` : null,
+      /* v1.19.0: الصورة كانت تُطلب بمعرّف المستخدم بينما المسار يبحث في
+         CounselorProfile بالمعرّف الخاص به — فتُرجع 404 ويظهر الحرف الأول.
+         صارت تُطلب بمعرّف الملف نفسه + وسم إصدار يكسر الذاكرة المؤقتة */
+      photoUrl: p.photo ? `/api/counselors/${String(p._id)}/photo?v=${p.updatedAt ? new Date(p.updatedAt as string).getTime() : 0}` : null,
     };
   });
 }

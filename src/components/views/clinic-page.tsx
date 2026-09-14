@@ -83,7 +83,8 @@ interface ClinicProfile {
   /* v1.18.0: EUR/USD اختياريان تحددهما العيادة نفسها — لا تحويل عملات */
   priceEur: number | null;
   priceUsd: number | null;
-  packs: { name: string; sessions: number; price: number; note: string | null }[];
+  /* v1.19.0: الباقات تحمل سعرين اختياريين بالأورو/الدولار يحددهما صاحب العيادة */
+  packs: { name: string; sessions: number; price: number; note: string | null; priceEur: number | null; priceUsd: number | null }[];
   /* v1.17.0: فيديوهات المعرض + الأخصائيون التابعون */
   galleryVideoUrls: { url: string; mime: string }[];
   specialists: ClinicSpecialist[];
@@ -158,8 +159,19 @@ export function ClinicPageView() {
   const [lightbox, setLightbox] = useState<number | null>(null);
   /* v1.17.0: فيديوهات المعرض — تُجلب مع الصور عند فتح النافذة */
   const [galleryVideos, setGalleryVideos] = useState<{ url: string; mime: string }[]>([]);
-  /* مرجع لمسة السحب داخل العارض (يمين/يسار) */
-  const lbTouch = useRef<number | null>(null);
+  /* v1.19.0: عارض الوسائط بمسار تمرير أفقي أصلي (scroll-snap) — السحب باللمس
+     يتبع الإصبع بسلاسة على الهاتف بلا أزرار، والأسهم للحاسوب فقط */
+  const lbTrack = useRef<HTMLDivElement | null>(null);
+  const lbInitial = useRef(0);
+
+  /* مزامنة المؤشر مع المسار — أسهم لوحة المفاتيح تحرّك التمرير فعلياً */
+  useEffect(() => {
+    if (lightbox === null) return;
+    const el = lbTrack.current;
+    if (!el || !el.clientWidth) return;
+    const target = lightbox * el.clientWidth;
+    if (Math.abs(el.scrollLeft - target) > 4) el.scrollTo({ left: target });
+  }, [lightbox]);
 
   const loadClinic = useCallback(async () => {
     if (!activeClinicSlug) {
@@ -493,6 +505,14 @@ export function ClinicPageView() {
                         {t.clinics.packsSessions.replace("{n}", String(p.sessions))}
                         {p.note ? ` · ${p.note}` : ""}
                       </p>
+                      {/* v1.19.0: أسعار اختيارية حددتها العيادة نفسها — تظهر كما هي بلا أي تحويل */}
+                      {p.priceEur != null || p.priceUsd != null ? (
+                        <p className="text-[11px] font-bold text-muted-foreground/80" dir="ltr">
+                          {p.priceEur != null ? fmtMoney(p.priceEur, "EUR", lang) : ""}
+                          {p.priceEur != null && p.priceUsd != null ? " · " : ""}
+                          {p.priceUsd != null ? fmtMoney(p.priceUsd, "USD", lang) : ""}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -769,7 +789,7 @@ export function ClinicPageView() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {galleryImages.map((src, i) => (
-                <button key={i} type="button" className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square" onClick={() => setLightbox(i)}>
+                <button key={i} type="button" className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square" onClick={() => { lbInitial.current = i; setLightbox(i); }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt={`${clinic.name} ${i + 1}`} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                 </button>
@@ -780,7 +800,7 @@ export function ClinicPageView() {
                   key={`v-${i}`}
                   type="button"
                   className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square bg-black/80"
-                  onClick={() => setLightbox(galleryImages.length + i)}
+                  onClick={() => { lbInitial.current = galleryImages.length + i; setLightbox(galleryImages.length + i); }}
                 >
                   <video src={v.url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
                   <span className="absolute inset-0 flex items-center justify-center">
@@ -796,74 +816,95 @@ export function ClinicPageView() {
       </Dialog>
 
       {/* v1.15.0: عارض الصورة الكاملة (Lightbox) */}
-      {/* v1.17.0: عارض الوسائط الكامل — صور وفيديوهات:
-          سحب يمين/يسار باللمس + أسهم بمواضع صحيحة تعمل بالضغط + إغلاق واحد
-          يعود مباشرة لصفحة العيادة + أسهم لوحة المفاتيح + مشغّل المتصفح للفيديو */}
+      {/* v1.19.0: عارض الوسائط بمسار تمرير أفقي أصلي (scroll-snap):
+          السحب باللمس على الهاتف يتبع الإصبع بسلاسة بلا أزرار (الأسهم
+          للحاسوب فقط)، النقر على الخلفية/المحيط يغلق ويعود لصفحة العيادة،
+          وأسهم لوحة المفاتيح تعمل على الحاسوب، والفيديو بمشغّل المتصفح */}
       {lightbox !== null && (galleryImages[lightbox] || galleryVideos[lightbox - galleryImages.length]) ? (
-        (() => {
-          const vid = lightbox >= galleryImages.length ? galleryVideos[lightbox - galleryImages.length] : null;
-          const total = galleryImages.length + galleryVideos.length;
-          return (
-            <div
-              className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4"
-              onClick={() => { setLightbox(null); setGalleryOpen(false); }}
-              onTouchStart={(e) => { lbTouch.current = e.touches[0]?.clientX ?? null; }}
-              onTouchEnd={(e) => {
-                if (lbTouch.current === null) return;
-                const dx = (e.changedTouches[0]?.clientX ?? 0) - lbTouch.current;
-                lbTouch.current = null;
-                if (Math.abs(dx) < 45) return;
-                setLightbox((cur) => {
-                  if (cur === null) return cur;
-                  return dx < 0 ? Math.min(cur + 1, total - 1) : Math.max(0, cur - 1);
-                });
-              }}
-            >
-              <button
-                type="button"
-                className="absolute top-4 end-4 z-10 h-11 w-11 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center"
-                onClick={(e) => { e.stopPropagation(); setLightbox(null); setGalleryOpen(false); }}
-                aria-label={t.common.close}
+        <div
+          className="fixed inset-0 z-[80] bg-black/95"
+          onClick={() => { setLightbox(null); setGalleryOpen(false); }}
+        >
+          <button
+            type="button"
+            className="absolute top-4 end-4 z-20 h-11 w-11 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center"
+            onClick={(e) => { e.stopPropagation(); setLightbox(null); setGalleryOpen(false); }}
+            aria-label={t.common.close}
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          {/* مسار الشرائح — dir=ltr لتوحيد حساب scrollLeft في الاتجاهين */}
+          <div
+            ref={lbTrack}
+            dir="ltr"
+            className="touch-scroll no-scrollbar h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
+            onScroll={() => {
+              const el = lbTrack.current;
+              if (!el || !el.clientWidth) return;
+              const total = galleryImages.length + galleryVideos.length;
+              const idx = Math.max(0, Math.min(total - 1, Math.round(el.scrollLeft / el.clientWidth)));
+              setLightbox((cur) => (cur === idx ? cur : idx));
+            }}
+          >
+            {galleryImages.map((src, i) => (
+              <div
+                key={`i-${i}`}
+                className="flex h-full w-full shrink-0 snap-center items-center justify-center p-3 sm:p-10"
+                onClick={() => { setLightbox(null); setGalleryOpen(false); }}
               >
-                <X className="h-5 w-5" />
-              </button>
-              {lightbox > 0 ? (
-                <button
-                  type="button"
-                  className="absolute start-2 sm:start-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center"
-                  onClick={(e) => { e.stopPropagation(); setLightbox(lightbox - 1); }}
-                  aria-label="prev"
-                >
-                  <ChevronLeft className="h-6 w-6 rtl:rotate-180" />
-                </button>
-              ) : null}
-              {lightbox < total - 1 ? (
-                <button
-                  type="button"
-                  className="absolute end-2 sm:end-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center"
-                  onClick={(e) => { e.stopPropagation(); setLightbox(lightbox + 1); }}
-                  aria-label="next"
-                >
-                  <ChevronRight className="h-6 w-6 rtl:rotate-180" />
-                </button>
-              ) : null}
-              {vid ? (
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`${clinic.name} ${i + 1}`} draggable={false} className="max-h-full max-w-full object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
+              </div>
+            ))}
+            {galleryVideos.map((v, i) => (
+              <div
+                key={`v-${i}`}
+                className="flex h-full w-full shrink-0 snap-center items-center justify-center p-3 sm:p-10"
+                onClick={() => { setLightbox(null); setGalleryOpen(false); }}
+              >
                 <video
-                  key={vid.url}
-                  src={vid.url}
+                  src={v.url}
                   controls
-                  autoPlay
                   playsInline
-                  className="max-h-[85vh] max-w-full rounded-xl bg-black"
+                  preload="metadata"
+                  autoPlay={galleryImages.length + i === lbInitial.current}
+                  className="max-h-full max-w-full rounded-xl bg-black"
                   onClick={(e) => e.stopPropagation()}
                 />
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={galleryImages[lightbox]} alt={`${clinic.name} ${lightbox + 1}`} className="max-h-[85vh] max-w-full object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
-              )}
-            </div>
-          );
-        })()
+              </div>
+            ))}
+          </div>
+
+          {/* أسهم الحاسوب فقط — على الهاتف التمرير باللمس دون أزرار */}
+          {lightbox > 0 ? (
+            <button
+              type="button"
+              className="hidden md:flex absolute start-3 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white items-center justify-center"
+              onClick={(e) => { e.stopPropagation(); setLightbox((c) => (c === null ? c : Math.max(0, c - 1))); }}
+              aria-label="prev"
+            >
+              <ChevronLeft className="h-6 w-6 rtl:rotate-180" />
+            </button>
+          ) : null}
+          {lightbox < galleryImages.length + galleryVideos.length - 1 ? (
+            <button
+              type="button"
+              className="hidden md:flex absolute end-3 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white items-center justify-center"
+              onClick={(e) => { e.stopPropagation(); setLightbox((c) => (c === null ? c : Math.min(galleryImages.length + galleryVideos.length - 1, c + 1))); }}
+              aria-label="next"
+            >
+              <ChevronRight className="h-6 w-6 rtl:rotate-180" />
+            </button>
+          ) : null}
+
+          {/* نقاط المؤشر — موضع الشريحة الحالية */}
+          <div className="absolute bottom-3 inset-x-0 z-20 flex items-center justify-center gap-1.5 pointer-events-none">
+            {Array.from({ length: galleryImages.length + galleryVideos.length }).map((_, i) => (
+              <span key={i} className={`h-1.5 rounded-full transition-all ${i === lightbox ? "w-4 bg-white" : "w-1.5 bg-white/50"}`} />
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {/* نافذة الحجز الحضوري */}
@@ -923,6 +964,13 @@ export function ClinicPageView() {
                         {t.clinics.packsSessions.replace("{n}", String(p.sessions))}
                         {p.note ? ` · ${p.note}` : ""}
                       </span>
+                      {p.priceEur != null || p.priceUsd != null ? (
+                        <span className={`block text-[10px] font-bold ${bPackIdx === i ? "text-white/80" : "text-muted-foreground/80"}`} dir="ltr">
+                          {p.priceEur != null ? fmtMoney(p.priceEur, "EUR", lang) : ""}
+                          {p.priceEur != null && p.priceUsd != null ? " · " : ""}
+                          {p.priceUsd != null ? fmtMoney(p.priceUsd, "USD", lang) : ""}
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>

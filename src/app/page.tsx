@@ -29,6 +29,7 @@ import { ClinicAuthView } from "@/components/views/clinic-auth";
 import { ClinicDashboardView } from "@/components/views/clinic-dashboard";
 import { AdsView } from "@/components/views/ads";
 import { CommunityView } from "@/components/views/community";
+import { CoursesView } from "@/components/views/courses";
 import { CounselorDashboardView } from "@/components/views/counselor-dashboard";
 import { CounselorStats } from "@/components/views/counselor-stats";
 import { AdminLoginView, AdminPanelView } from "@/components/views/admin";
@@ -73,6 +74,7 @@ const VIEWS: Record<string, React.ComponentType> = {
   "clinic-dashboard": ClinicDashboardView,
   ads: AdsView,
   community: CommunityView,
+  courses: CoursesView,
   "admin-login": AdminLoginView,
   "admin-panel": AdminPanelView,
   settings: SettingsView,

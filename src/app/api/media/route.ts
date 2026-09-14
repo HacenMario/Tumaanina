@@ -68,7 +68,8 @@ async function POST_impl(req: NextRequest) {
       { $set: { data: b64, createdAt: new Date() } },
       { upsert: true }
     );
-    await MediaUpload.updateOne({ _id: uid }, { $set: { received: idx + 1 } });
+    /* v1.19.0: الدفعات تصلكم متوازية الآن — $max آمن مع التزامن */
+    await MediaUpload.updateOne({ _id: uid }, { $max: { received: idx + 1 } });
     return NextResponse.json({ ok: true, received: ab.byteLength });
   }
 

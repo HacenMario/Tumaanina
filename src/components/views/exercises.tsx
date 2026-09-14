@@ -435,12 +435,15 @@ export function ExercisesView() {
                 </div>
               )}
               {images.length < MAX_IMAGES && (
-                <Button type="button" variant="outline" className="w-full rounded-xl font-bold border-dashed" onClick={() => fileRef.current?.click()}>
-                  <ImagePlus className="h-4 w-4" />
-                  {ex.fAddImage}
-                </Button>
+                /* v1.19.0: المدخل شفاف فوق الزر مباشرة — يفتح منتقي الملفات على كل الهواتف */
+                <div className="relative">
+                  <Button type="button" variant="outline" className="w-full rounded-xl font-bold border-dashed">
+                    <ImagePlus className="h-4 w-4" />
+                    {ex.fAddImage}
+                  </Button>
+                  <input ref={fileRef} type="file" accept="image/*" multiple className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(e) => { void pickImages(e.target.files); e.currentTarget.value = ""; }} />
+                </div>
               )}
-              <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void pickImages(e.target.files)} />
               <p className="text-[10px] font-bold text-muted-foreground">{ex.fImagesHint}</p>
             </div>
             {err && <p className="text-xs font-bold text-destructive">{err}</p>}

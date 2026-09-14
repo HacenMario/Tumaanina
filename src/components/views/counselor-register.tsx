@@ -474,15 +474,6 @@ export function CounselorRegisterView({ embedded = false }: { embedded?: boolean
             {/* الصورة الشخصية — اختيارية: تظهر للعميل في دليل الأخصائيين */}
             <div className="space-y-2">
               <Label className="font-bold">{t.counselor.photoLabel}</Label>
-              <input
-                ref={photoRef}
-                type="file"
-                accept="image/*,.heic,.heif"
-                className="hidden"
-                onChange={(e) => {
-                  void pickPhoto(e.target.files?.[0] || null);
-                }}
-              />
               <div className="flex items-center gap-4">
                 {photo ? (
                   <div className="relative shrink-0">
@@ -506,10 +497,23 @@ export function CounselorRegisterView({ embedded = false }: { embedded?: boolean
                   </div>
                 )}
                 <div className="space-y-1.5 min-w-0">
-                  <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold" onClick={() => photoRef.current?.click()}>
-                    <ImagePlus className="h-4 w-4" />
-                    {photo ? t.settings.photoChange : t.counselor.photoUploadBtn}
-                  </Button>
+                  {/* v1.19.0: المدخل شفاف فوق الزر مباشرة — يفتح منتقي الملفات على كل الهواتف */}
+                  <div className="relative w-fit">
+                    <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold">
+                      <ImagePlus className="h-4 w-4" />
+                      {photo ? t.settings.photoChange : t.counselor.photoUploadBtn}
+                    </Button>
+                    <input
+                      ref={photoRef}
+                      type="file"
+                      accept="image/*,.heic,.heif"
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      onChange={(e) => {
+                        void pickPhoto(e.target.files?.[0] || null);
+                        if (photoRef.current) photoRef.current.value = "";
+                      }}
+                    />
+                  </div>
                   <p className="text-[11px] text-muted-foreground font-semibold leading-relaxed">{t.counselor.photoHint}</p>
                 </div>
               </div>
@@ -518,15 +522,7 @@ export function CounselorRegisterView({ embedded = false }: { embedded?: boolean
             {/* صورة الشهادة — تتحقق منها الإدارة بصرياً */}
             <div className="space-y-2">
               <Label className="font-bold">{t.counselor.diplomaImageLabel} *</Label>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*,.heic,.heif"
-                className="hidden"
-                onChange={(e) => {
-                  void pickDiploma(e.target.files?.[0] || null);
-                }}
-              />
+
               {diplomaImage ? (
                 <div className="rounded-xl border border-border overflow-hidden space-y-2">
                   <img src={diplomaImage} alt={t.counselor.diplomaImageLabel} className="w-full max-h-52 object-contain bg-muted/40" />
@@ -544,15 +540,27 @@ export function CounselorRegisterView({ embedded = false }: { embedded?: boolean
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 p-6 flex flex-col items-center gap-2 text-muted-foreground hover:text-primary transition-all"
-                >
-                  <ImagePlus className="h-7 w-7" />
-                  <span className="text-sm font-bold">{t.counselor.diplomaUploadBtn}</span>
-                  <span className="text-[11px] font-semibold">{t.counselor.diplomaUploadHint}</span>
-                </button>
+                /* v1.19.0: المدخل شفاف فوق منطقة الرفع مباشرة — يعمل على كل الهواتف */
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 p-6 flex flex-col items-center gap-2 text-muted-foreground hover:text-primary transition-all"
+                  >
+                    <ImagePlus className="h-7 w-7" />
+                    <span className="text-sm font-bold">{t.counselor.diplomaUploadBtn}</span>
+                    <span className="text-[11px] font-semibold">{t.counselor.diplomaUploadHint}</span>
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*,.heic,.heif"
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    onChange={(e) => {
+                      void pickDiploma(e.target.files?.[0] || null);
+                      if (fileRef.current) fileRef.current.value = "";
+                    }}
+                  />
+                </div>
               )}
             </div>
 

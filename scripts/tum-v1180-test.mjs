@@ -73,7 +73,7 @@ const run = async () => {
     await wait(500);
     try {
       const h = await req("GET", "/api/health");
-      if (h.json?.version === "1.18.0" && h.json?.ok) { ready = true; break; }
+      if (h.json?.version === "1.19.0" && h.json?.ok) { ready = true; break; }
     } catch {}
   }
   check("الخادم جاهز ويقول 1.18.0", ready);

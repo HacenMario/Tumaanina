@@ -807,17 +807,20 @@ function Composer({ onPublished }: { onPublished: () => void }) {
         )}
         {error && <div className="rounded-xl bg-destructive/10 text-destructive text-xs font-bold px-3.5 py-2.5">{error}</div>}
         <div className="flex items-center justify-between gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => pickImage(e.target.files?.[0] || null)}
-          />
-          <Button variant="outline" className="rounded-xl font-bold" onClick={() => fileRef.current?.click()}>
-            <ImagePlus className="h-4 w-4" />
-            {t.community.addImage}
-          </Button>
+          {/* v1.19.0: المدخل شفاف فوق الزر مباشرة — يفتح منتقي الملفات على كل الهواتف */}
+          <div className="relative">
+            <Button variant="outline" className="rounded-xl font-bold">
+              <ImagePlus className="h-4 w-4" />
+              {t.community.addImage}
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              onChange={(e) => { pickImage(e.target.files?.[0] || null); e.currentTarget.value = ""; }}
+            />
+          </div>
           <Button
             className="gradient-primary text-white font-black rounded-xl px-6"
             disabled={busy || (!text.trim() && !image)}

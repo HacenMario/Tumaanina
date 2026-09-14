@@ -108,7 +108,7 @@ interface ClinicProfile {
   sessionPrice: number | null;
   priceEur: number | null;
   priceUsd: number | null;
-  packs: { name: string; sessions: number; price: number; note: string | null }[];
+  packs: { name: string; sessions: number; price: number; note: string | null; priceEur: number | null; priceUsd: number | null }[];
   /* v1.17.0: فيديوهات المعرض — روابط تقديم آمنة */
   galleryVideos: { url: string; mime: string }[];
 }
@@ -166,7 +166,7 @@ export function ClinicDashboardView() {
   const [fSessionPrice, setFSessionPrice] = useState("");
   const [fPriceEur, setFPriceEur] = useState("");
   const [fPriceUsd, setFPriceUsd] = useState("");
-  const [fPacks, setFPacks] = useState<{ name: string; sessions: number; price: number; note: string | null }[]>([]);
+  const [fPacks, setFPacks] = useState<{ name: string; sessions: number; price: number; note: string | null; priceEur: number | null; priceUsd: number | null }[]>([]);
   const [packsDirty, setPacksDirty] = useState(false);
 
   /* ══ v1.15.0: مواعيد الحجز + معرض الصور + الموقع ══ */
@@ -550,10 +550,15 @@ export function ClinicDashboardView() {
                   <div className="space-y-2">
                     <Label className="block text-xs font-black text-muted-foreground">{t.clinicDash.logoLabel}</Label>
                     <div className="flex items-center gap-2">
-                      <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" onClick={() => document.getElementById("clinic-logo-input")?.click()}>
-                        <Upload className="h-3.5 w-3.5" />
-                        {t.clinicDash.logoPick}
-                      </Button>
+                      {/* v1.19.0: ملف شفاف فوق الزر مباشرة — النقر يفتح منتقي الملفات في كل المتصفحات بما فيها iOS
+                          (النقر البرمجي على input مخفي بـ display:none لا يفتح المنتقي على بعض هواتف iOS/Android) */}
+                      <div className="relative">
+                        <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5">
+                          <Upload className="h-3.5 w-3.5" />
+                          {t.clinicDash.logoPick}
+                        </Button>
+                        <input type="file" accept="image/*" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" onChange={(e) => { pickLogo(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
+                      </div>
                       {logoDirty ? (
                         <Button type="button" variant="ghost" size="sm" className="rounded-lg font-bold text-destructive gap-1" onClick={() => { setFLogo(null); setLogoDirty(true); }}>
                           <X className="h-3.5 w-3.5" />
@@ -561,7 +566,6 @@ export function ClinicDashboardView() {
                         </Button>
                       ) : null}
                     </div>
-                    <input id="clinic-logo-input" type="file" accept="image/*" className="hidden" onChange={(e) => { pickLogo(e.target.files?.[0] || null); e.currentTarget.value = ""; }} />
                   </div>
                 </div>
 
@@ -786,7 +790,7 @@ export function ClinicDashboardView() {
                       className="rounded-lg font-black gap-1.5 border-primary/40 text-primary"
                       disabled={fPacks.length >= 12}
                       onClick={() => {
-                        setFPacks((p) => [...p, { name: "", sessions: 4, price: 0, note: null }]);
+                        setFPacks((p) => [...p, { name: "", sessions: 4, price: 0, note: null, priceEur: null, priceUsd: null }]);
                         setPacksDirty(true);
                       }}
                     >
@@ -855,6 +859,43 @@ export function ClinicDashboardView() {
                                   setPacksDirty(true);
                                 }}
                                 className="rounded-lg bg-card h-9 text-sm"
+                              />
+                            </div>
+                          </div>
+                          {/* v1.19.0: سعران اختياريان بالأورو/الدولار يحددهما صاحب العيادة */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-black text-muted-foreground">{t.clinicDash.priceEurLabel} · {t.clinicDash.packOpt}</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                dir="ltr"
+                                value={p.priceEur == null ? "" : String(p.priceEur)}
+                                onChange={(e) => {
+                                  const v = e.target.value.trim();
+                                  setFPacks((arr) => arr.map((x, j) => (j === i ? { ...x, priceEur: v === "" ? null : Math.max(0, Math.round(Number(v) * 100) / 100) } : x)));
+                                  setPacksDirty(true);
+                                }}
+                                className="rounded-lg bg-card h-9 text-sm"
+                                placeholder="€"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-black text-muted-foreground">{t.clinicDash.priceUsdLabel} · {t.clinicDash.packOpt}</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                dir="ltr"
+                                value={p.priceUsd == null ? "" : String(p.priceUsd)}
+                                onChange={(e) => {
+                                  const v = e.target.value.trim();
+                                  setFPacks((arr) => arr.map((x, j) => (j === i ? { ...x, priceUsd: v === "" ? null : Math.max(0, Math.round(Number(v) * 100) / 100) } : x)));
+                                  setPacksDirty(true);
+                                }}
+                                className="rounded-lg bg-card h-9 text-sm"
+                                placeholder="US$"
                               />
                             </div>
                           </div>
@@ -961,16 +1002,36 @@ export function ClinicDashboardView() {
                     </div>
                   ) : null}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={fGallery.length >= 8} onClick={() => document.getElementById("clinic-gallery-input")?.click()}>
-                      <Upload className="h-3.5 w-3.5" />
-                      {t.clinicDash.galleryAdd}
-                    </Button>
+                    {/* v1.19.0: أعيد المدخل المفقود لمعرض الصور — كان زر «إضافة صور»
+                        يستدعي getElementById لمدخل غير موجود فلا يفتح شيئاً.
+                        والمدخلان الآن شفافان فوق الزرين مباشرة (يعمل على كل الهواتف) */}
+                    <div className="relative">
+                      <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={fGallery.length >= 8}>
+                        <Upload className="h-3.5 w-3.5" />
+                        {t.clinicDash.galleryAdd}
+                      </Button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${fGallery.length >= 8 ? "pointer-events-none" : ""}`}
+                        onChange={(e) => { void pickGallery(e.target.files); e.currentTarget.value = ""; }}
+                      />
+                    </div>
                     {/* v1.17.0: رفع فيديو (أو اثنين) — يُشغَّل بمشغّل المتصفح المدمج */}
-                    <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={videosBusy || fVideos.length >= 2} onClick={() => document.getElementById("clinic-videos-input")?.click()}>
-                      {videosBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <VideoIcon className="h-3.5 w-3.5" />}
-                      {t.clinicDash.galleryAddVideo} ({fVideos.length}/2)
-                    </Button>
-                    <input id="clinic-videos-input" type="file" accept="video/*" multiple className="hidden" onChange={(e) => { void pickVideos(e.target.files); e.currentTarget.value = ""; }} />
+                    <div className="relative">
+                      <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={videosBusy || fVideos.length >= 2}>
+                        {videosBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <VideoIcon className="h-3.5 w-3.5" />}
+                        {t.clinicDash.galleryAddVideo} ({fVideos.length}/2)
+                      </Button>
+                      <input
+                        type="file"
+                        accept="video/*"
+                        multiple
+                        className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${videosBusy || fVideos.length >= 2 ? "pointer-events-none" : ""}`}
+                        onChange={(e) => { void pickVideos(e.target.files); e.currentTarget.value = ""; }}
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -26,6 +26,7 @@ export type ViewName =
   | "clinic-dashboard"
   | "ads"
   | "community"
+  | "courses"
   | "admin-login"
   | "admin-panel"
   | "settings"

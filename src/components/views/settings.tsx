@@ -1046,16 +1046,6 @@ export function SettingsView() {
                   {/* الصورة الشخصية — اختيارية: تغيير أو حذف فوري */}
                   <div className="space-y-2">
                     <Label className="font-bold">{t.settings.accountPhoto}</Label>
-                    <input
-                      ref={photoInputRef}
-                      type="file"
-                      accept="image/*,.heic,.heif"
-                      className="hidden"
-                      onChange={(e) => {
-                        void pickPhoto(e.target.files?.[0] || null);
-                        if (photoInputRef.current) photoInputRef.current.value = "";
-                      }}
-                    />
                     <div className="flex items-center gap-4">
                       {photo ? (
                         <div className="relative shrink-0">
@@ -1072,17 +1062,29 @@ export function SettingsView() {
                         </div>
                       )}
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="rounded-lg font-bold"
-                          disabled={photoBusy}
-                          onClick={() => photoInputRef.current?.click()}
-                        >
-                          <ImagePlus className="h-4 w-4" />
-                          {photo ? t.settings.photoChange : t.counselor.photoUploadBtn}
-                        </Button>
+                        {/* v1.19.0: المدخل شفاف فوق الزر مباشرة — يفتح منتقي الملفات على كل الهواتف */}
+                        <div className="relative">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg font-bold"
+                            disabled={photoBusy}
+                          >
+                            <ImagePlus className="h-4 w-4" />
+                            {photo ? t.settings.photoChange : t.counselor.photoUploadBtn}
+                          </Button>
+                          <input
+                            ref={photoInputRef}
+                            type="file"
+                            accept="image/*,.heic,.heif"
+                            className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${photoBusy ? "pointer-events-none" : ""}`}
+                            onChange={(e) => {
+                              void pickPhoto(e.target.files?.[0] || null);
+                              if (photoInputRef.current) photoInputRef.current.value = "";
+                            }}
+                          />
+                        </div>
                         {photo && (
                           <Button
                             type="button"

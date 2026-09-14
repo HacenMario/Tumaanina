@@ -303,6 +303,19 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
       if (data.ok) {
         setReplyIdx(null);
         setReplyText("");
+        /* v1.19.0: تحديث فوري لحالة التعليق — زر حجب/إظهار يتبدّل في النافذة
+           نفسها دون إعادة فتحها، والبطاقة خلفها تتحدث معه */
+        const patch = (row: AdRow): AdRow => {
+          if (row.id !== adId) return row;
+          const comments = row.comments.map((c, j) => {
+            if (j !== commentIndex) return c;
+            if (action === "comment-hide") return { ...c, hidden: extra?.hidden !== false };
+            return { ...c, reply: { text: String(extra?.text || ""), at: new Date().toISOString() } };
+          });
+          return { ...row, comments };
+        };
+        setAds((p) => p.map(patch));
+        setCommentsAd((p) => (p ? patch(p) : p));
         load(true);
       } else {
         showAppToast(t.common.errorServer, "");
@@ -464,85 +477,87 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
               <Label className="font-bold">{t.clinicDash.adMedia}</Label>
               <p className="text-[10px] text-muted-foreground font-semibold">{t.clinicDash.adMediaHintMulti ?? t.clinicDash.adMediaHint}</p>
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-lg font-bold gap-1.5"
-                  disabled={vidUploading || adMedia.filter((m) => m.kind === "image").length >= 5}
-                  onClick={() => document.getElementById("ad-img-input")?.click()}
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  {t.clinicDash.addImage} ({adMedia.filter((m) => m.kind === "image").length}/5)
-                </Button>
+                {/* v1.19.0: ملف شفاف فوق الزر مباشرة بدل النقر البرمجي على input مخفي —
+                    display:none يمنع فتح منتقي الملفات على بعض هواتف iOS/Android */}
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg font-bold gap-1.5"
+                    disabled={vidUploading || adMedia.filter((m) => m.kind === "image").length >= 5}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {t.clinicDash.addImage} ({adMedia.filter((m) => m.kind === "image").length}/5)
+                  </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    /* v1.15.1: multiple — اختيار كل الصور دفعة واحدة (حتى 5) بدل صورة بعد صورة */
+                    multiple
+                    className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${vidUploading || adMedia.filter((m) => m.kind === "image").length >= 5 ? "pointer-events-none" : ""}`}
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      e.currentTarget.value = "";
+                      if (!files.length) return;
+                      /* حتى 5 صور + فيديو واحد = 6 وسائط كحد أقصى */
+                      const room = 6 - adMedia.length;
+                      const imgRoom = 5 - adMedia.filter((m) => m.kind === "image").length;
+                      const take = Math.min(files.length, room, imgRoom);
+                      if (take <= 0) {
+                        showAppToast(t.clinicDash.adMaxMedia, "");
+                        return;
+                      }
+                      if (files.length > take) showAppToast(t.clinicDash.adMaxMedia, "");
+                      const picked = files.slice(0, take);
+                      const compressed: string[] = [];
+                      for (const f of picked) {
+                        try {
+                          compressed.push(await compressImage(f, 1200, MAX_ADIMG_B64));
+                        } catch {
+                          showAppToast(t.clinicDash.adMediaBig, "");
+                        }
+                      }
+                      if (compressed.length) setAdMedia((p) => [...p, ...compressed.map((src) => ({ src, kind: "image" as const }))]);
+                    }}
+                  />
+                </div>
                 {/* v1.18.0: الفيديو بلا حد للحجم — يُرفع على دفعات ويُخزّن في GridFS */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-lg font-bold gap-1.5"
-                  disabled={vidUploading || adMedia.some((m) => m.kind === "video")}
-                  onClick={() => document.getElementById("ad-vid-input")?.click()}
-                >
-                  {vidUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                  {vidUploading ? `${t.clinicDash.videoUploading} ${vidPct}%` : t.clinicDash.addVideo}
-                </Button>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg font-bold gap-1.5"
+                    disabled={vidUploading || adMedia.some((m) => m.kind === "video")}
+                  >
+                    {vidUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {vidUploading ? `${t.clinicDash.videoUploading} ${vidPct}%` : t.clinicDash.addVideo}
+                  </Button>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${vidUploading || adMedia.some((m) => m.kind === "video") ? "pointer-events-none" : ""}`}
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      e.currentTarget.value = "";
+                      if (!f || vidUploading) return;
+                      setVidUploading(true);
+                      setVidPct(0);
+                      try {
+                        /* v1.18.0: رفع على دفعات — بلا حد لحجم الفيديو */
+                        const r = await uploadVideoToMedia(f, userId, setVidPct);
+                        setAdMedia((p) => [...p, { src: r.url, kind: "video" as const }]);
+                      } catch {
+                        showAppToast(t.clinicDash.videoUploadFail, "");
+                      } finally {
+                        setVidUploading(false);
+                        setVidPct(0);
+                      }
+                    }}
+                  />
+                </div>
               </div>
-              <input
-                id="ad-img-input"
-                type="file"
-                accept="image/*"
-                /* v1.15.1: multiple — اختيار كل الصور دفعة واحدة (حتى 5) بدل صورة بعد صورة */
-                multiple
-                className="hidden"
-                onChange={async (e) => {
-                  const files = Array.from(e.target.files || []);
-                  e.currentTarget.value = "";
-                  if (!files.length) return;
-                  /* حتى 5 صور + فيديو واحد = 6 وسائط كحد أقصى */
-                  const room = 6 - adMedia.length;
-                  const imgRoom = 5 - adMedia.filter((m) => m.kind === "image").length;
-                  const take = Math.min(files.length, room, imgRoom);
-                  if (take <= 0) {
-                    showAppToast(t.clinicDash.adMaxMedia, "");
-                    return;
-                  }
-                  if (files.length > take) showAppToast(t.clinicDash.adMaxMedia, "");
-                  const picked = files.slice(0, take);
-                  const compressed: string[] = [];
-                  for (const f of picked) {
-                    try {
-                      compressed.push(await compressImage(f, 1200, MAX_ADIMG_B64));
-                    } catch {
-                      showAppToast(t.clinicDash.adMediaBig, "");
-                    }
-                  }
-                  if (compressed.length) setAdMedia((p) => [...p, ...compressed.map((src) => ({ src, kind: "image" as const }))]);
-                }}
-              />
-              <input
-                id="ad-vid-input"
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.currentTarget.value = "";
-                  if (!f || vidUploading) return;
-                  setVidUploading(true);
-                  setVidPct(0);
-                  try {
-                    /* v1.18.0: رفع على دفعات — بلا حد لحجم الفيديو */
-                    const r = await uploadVideoToMedia(f, userId, setVidPct);
-                    setAdMedia((p) => [...p, { src: r.url, kind: "video" as const }]);
-                  } catch {
-                    showAppToast(t.clinicDash.videoUploadFail, "");
-                  } finally {
-                    setVidUploading(false);
-                    setVidPct(0);
-                  }
-                }}
-              />
               {adMedia.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2">
                   {adMedia.map((m, i) => (

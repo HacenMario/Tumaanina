@@ -123,6 +123,8 @@ export function AppHeader() {
     { label: t.nav.findHelp, view: role === "VICTIM" ? "client-topics" : "roles", show: !role || role === "VICTIM" },
     { label: t.nav.counselors, view: "counselors-directory", show: true, wide: true },
     { label: t.nav.clinics, view: "clinics-directory", show: true },
+    /* v1.19.0: الدورات الأونلاين — تظهر للعملاء فقط (طلب المستخدم) */
+    { label: t.nav.courses, view: "courses", show: role === "VICTIM" },
     { label: t.nav.ads, view: "ads", show: role !== "CLINIC" },
     { label: t.nav.community, view: "community", show: true },
     { label: t.nav.exercises, view: "exercises", show: true, wide: true },

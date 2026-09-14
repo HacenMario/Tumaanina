@@ -77,8 +77,11 @@ export function AdsView() {
   const [commentOpen, setCommentOpen] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  /* v1.17.0: سحب باللمس يمين/يسار على البطاقة = التنقل بين الإعلانات */
+  /* v1.17.0: سحب باللمس يمين/يسار على البطاقة = التنقل بين الإعلانات
+     v1.19.0: مع قفل المحور — التمرير العمودي لا يقلب الإعلان، واللمس
+     داخل مسار الوسائط لا يقلبه أيضاً (المسار يتصفح الصور/الفيديو نفسه) */
   const cardTouchX = useRef<number | null>(null);
+  const cardTouchY = useRef<number | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -193,13 +196,21 @@ export function AdsView() {
         <div
           className="w-full max-w-full overflow-x-hidden"
           onTouchStart={(e) => {
-            cardTouchX.current = e.touches[0]?.clientX ?? null;
+            const tch = e.touches[0];
+            if (tch && (e.target as HTMLElement | null)?.closest?.("[data-media-track]")) {
+              cardTouchX.current = null;
+              return;
+            }
+            cardTouchX.current = tch?.clientX ?? null;
+            cardTouchY.current = tch?.clientY ?? null;
           }}
           onTouchEnd={(e) => {
             if (cardTouchX.current === null) return;
             const dx = (e.changedTouches[0]?.clientX ?? 0) - cardTouchX.current;
+            const dy = (e.changedTouches[0]?.clientY ?? 0) - (cardTouchY.current ?? 0);
             cardTouchX.current = null;
-            if (Math.abs(dx) < 60) return;
+            cardTouchY.current = null;
+            if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
             if (dx < 0 && page < pages) setPage(page + 1);
             else if (dx > 0 && page > 1) setPage(page - 1);
           }}
@@ -363,54 +374,60 @@ export function AdsView() {
   );
 }
 
-/* سلايدر وسائط الإعلان — سحب يمين/يسار + أسهم */
+/* سلايدر وسائط الإعلان — v1.19.0: مسار تمرير أفقي أصلي (scroll-snap):
+   السحب باللمس يتبع الإصبع بسلاسة على الهاتف بلا أزرار، والأسهم للحاسوب
+   فقط، والفيديو بمشغّله المدمج (Range) تمريره الداخلي لا يتعارض مع السحب */
 function AdMediaCarousel({ urls, kinds, title }: { urls: string[]; kinds: string[]; title: string }) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
   const [slide, setSlide] = useState(0);
-  const touchStartX = useRef<number | null>(null);
-  const safe = Math.min(slide, urls.length - 1);
 
-  const next = () => setSlide((s) => (s < urls.length - 1 ? s + 1 : 0));
-  const prev = () => setSlide((s) => (s > 0 ? s - 1 : urls.length - 1));
+  const goTo = (i: number) => {
+    const el = trackRef.current;
+    if (!el || !el.clientWidth) return;
+    const idx = Math.max(0, Math.min(urls.length - 1, i));
+    el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+  };
 
   return (
-    <div
-      className="relative rounded-xl overflow-hidden border border-border/60 aspect-[16/10] bg-muted/40 select-none max-w-full"
-      onTouchStart={(e) => {
-        /* v1.17.0: نوقف انتقال اللمس للبطاقة حتى لا يقلب سحب الوسائط الإعلان نفسه */
-        e.stopPropagation();
-        touchStartX.current = e.touches[0]?.clientX ?? null;
-      }}
-      onTouchEnd={(e) => {
-        e.stopPropagation();
-        if (touchStartX.current === null) return;
-        const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
-        if (Math.abs(dx) > 40) {
-          if (dx < 0) next();
-          else prev();
-        }
-        touchStartX.current = null;
-      }}
-    >
-      {(kinds || [])[safe] === "video" || isVideo(urls[safe]) ? (
-        /* v1.18.0: الفيديو بمشغّل المتصفح المدمج — Range من GridFS يتيح التمرير،
-           وغير مكتوم ليقرر الزائر تشغيله بصوته */
-        <video key={urls[safe]} src={urls[safe]} className="h-full w-full object-contain bg-black" controls playsInline preload="metadata" />
-      ) : (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        /* v1.15.1: object-contain — الصورة كاملة داخل إطارها بلا قصّ، بأي أبعاد كانت */
-        <img src={urls[safe]} alt={title} loading="lazy" className="h-full w-full object-contain" draggable={false} />
-      )}
+    <div className="relative rounded-xl overflow-hidden border border-border/60 bg-muted/40 select-none max-w-full">
+      <div
+        ref={trackRef}
+        dir="ltr"
+        data-media-track
+        className="touch-scroll no-scrollbar flex aspect-[16/10] w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
+        onScroll={() => {
+          const el = trackRef.current;
+          if (!el || !el.clientWidth) return;
+          const idx = Math.max(0, Math.min(urls.length - 1, Math.round(el.scrollLeft / el.clientWidth)));
+          setSlide((s) => (s === idx ? s : idx));
+        }}
+      >
+        {urls.map((u, i) => (
+          <div key={i} className="flex h-full w-full shrink-0 snap-center items-center justify-center bg-black">
+            {(kinds || [])[i] === "video" || isVideo(u) ? (
+              /* v1.18.0: الفيديو بمشغّل المتصفح المدمج — Range من GridFS يتيح التمرير،
+                 وغير مكتوم ليقرر الزائر تشغيله بصوته */
+              <video src={u} className="h-full w-full object-contain bg-black" controls playsInline preload="metadata" />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              /* v1.15.1: object-contain — الصورة كاملة داخل إطارها بلا قصّ، بأي أبعاد كانت */
+              <img src={u} alt={`${title} ${i + 1}`} loading="lazy" className="h-full w-full object-contain" draggable={false} />
+            )}
+          </div>
+        ))}
+      </div>
       {urls.length > 1 ? (
         <>
-          <button type="button" onClick={prev} aria-label="prev" className="absolute start-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center">
+          {/* الأسهم تظهر للحاسوب فقط — على الهاتف التمرير باللمس هو الأساس */}
+          <button type="button" onClick={() => goTo(slide - 1)} aria-label="prev" className="hidden md:flex absolute start-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white items-center justify-center">
             <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
           </button>
-          <button type="button" onClick={next} aria-label="next" className="absolute end-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center">
+          <button type="button" onClick={() => goTo(slide + 1)} aria-label="next" className="hidden md:flex absolute end-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white items-center justify-center">
             <ChevronRight className="h-4 w-4 rtl:rotate-180" />
           </button>
-          <div className="absolute bottom-1.5 inset-x-0 flex items-center justify-center gap-1">
+          <div className="absolute bottom-1.5 inset-x-0 flex items-center justify-center gap-1 pointer-events-none">
             {urls.map((_, i) => (
-              <span key={i} className={cn("h-1.5 rounded-full transition-all", i === safe ? "w-4 bg-white" : "w-1.5 bg-white/50")} />
+              <span key={i} className={cn("h-1.5 rounded-full transition-all", i === slide ? "w-4 bg-white" : "w-1.5 bg-white/50")} />
             ))}
           </div>
         </>

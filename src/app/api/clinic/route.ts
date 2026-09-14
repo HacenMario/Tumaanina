@@ -421,7 +421,7 @@ async function POST_impl(req: NextRequest) {
         set.packs = [];
       } else if (Array.isArray(body.packs)) {
         if (body.packs.length > 12) return NextResponse.json({ error: "MAX_12_PACKS" }, { status: 400 });
-        const cleanPacks: { name: string; sessions: number; price: number; note: string | null }[] = [];
+        const cleanPacks: { name: string; sessions: number; price: number; note: string | null; priceEur: number | null; priceUsd: number | null }[] = [];
         for (const p of body.packs) {
           const pkName = String(p?.name ?? "").trim().slice(0, 80);
           const pkSessions = Math.round(Number(p?.sessions));
@@ -429,7 +429,13 @@ async function POST_impl(req: NextRequest) {
           if (!pkName || !Number.isFinite(pkSessions) || pkSessions < 1 || pkSessions > 200 || !Number.isFinite(pkPrice) || pkPrice < 0 || pkPrice > 100000000) {
             return NextResponse.json({ error: "INVALID_PACK" }, { status: 400 });
           }
-          cleanPacks.push({ name: pkName, sessions: pkSessions, price: pkPrice, note: p?.note ? String(p.note).trim().slice(0, 200) : null });
+          /* v1.19.0: أسعار اختيارية بالأورو/الدولار يحددها صاحب العيادة — بلا أي تحويل */
+          const pkEur = optPrice(p?.priceEur, 100000);
+          const pkUsd = optPrice(p?.priceUsd, 100000);
+          if (pkEur === "INVALID" || pkUsd === "INVALID") {
+            return NextResponse.json({ error: "INVALID_PACK" }, { status: 400 });
+          }
+          cleanPacks.push({ name: pkName, sessions: pkSessions, price: pkPrice, note: p?.note ? String(p.note).trim().slice(0, 200) : null, priceEur: pkEur, priceUsd: pkUsd });
         }
         set.packs = cleanPacks;
       } else return NextResponse.json({ error: "INVALID_PACK" }, { status: 400 });
@@ -562,7 +568,7 @@ async function GET_impl(req: NextRequest) {
       sessionPrice: (c.sessionPrice as number | null) ?? null,
       priceEur: (c.priceEur as number | null) ?? null,
       priceUsd: (c.priceUsd as number | null) ?? null,
-      packs: (c.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
+      packs: (c.packs as { name: string; sessions: number; price: number; note: string | null; priceEur: number | null; priceUsd: number | null }[]) || [],
       /* v1.18.0: فيديوهات المعرض — القائمة الموحّدة (قديم + GridFS بلا حد حجم) */
       galleryVideos: await loadClinicGalleryVideos(ClinicGalleryMedia, String(c._id), c.galleryVideoRefs as string[]),
     },

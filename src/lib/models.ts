@@ -678,6 +678,9 @@ const ClinicSchema = new Schema(
           name: { type: String, required: true, trim: true, maxlength: 80 },
           sessions: { type: Number, required: true, min: 1, max: 200 },
           price: { type: Number, required: true, min: 0, max: 100000000 },
+          /* v1.19.0: سعران اختياريان تحددهما العيادة نفسها — يظهران بجانب الدينار */
+          priceEur: { type: Number, default: null, min: 0, max: 100000 },
+          priceUsd: { type: Number, default: null, min: 0, max: 100000 },
           note: { type: String, default: null, trim: true, maxlength: 200 },
           _id: false,
         },
@@ -939,6 +942,49 @@ export const MediaUpload =
 export const MediaChunk =
   (mongoose.models.MediaChunk as mongoose.Model<any>) ||
   mongoose.model("MediaChunk", MediaChunkSchema);
+
+
+/* ═ v1.19.0 — الدورات الأونلاين ═
+   الأخصائي ينشئ دورة في موضوع يختاره مقابل مبلغ وعدد مقاعد يحددهما.
+   عدد المقاعد المشغولة = الملتحقون بحالة pending أو confirmed (يُحسب
+   لحظياً من مجموعة التسجيلات — بلا عدّاد مخزّن ينجرف). */
+const CourseSchema = new Schema(
+  {
+    specialistId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    title: { type: String, required: true, trim: true, maxlength: 150 },
+    description: { type: String, default: "", trim: true, maxlength: 2000 },
+    price: { type: Number, required: true, min: 0, max: 100000000 },
+    capacity: { type: Number, required: true, min: 1, max: 10000 },
+    startsAt: { type: Date, default: null },
+    status: { type: String, enum: ["open", "closed"], default: "open", index: true },
+  },
+  { timestamps: true }
+);
+
+/* تسجيل مقعد في دورة — الحجز يبدأ pending ويحرر مقعده عند الرفض/الإلغاء */
+const CourseEnrollmentSchema = new Schema(
+  {
+    courseId: { type: Schema.Types.ObjectId, ref: "Course", required: true, index: true },
+    clientId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    clientName: { type: String, default: null, trim: true, maxlength: 80 },
+    price: { type: Number, default: 0, min: 0 },
+    status: { type: String, enum: ["pending", "confirmed", "rejected", "cancelled"], default: "pending", index: true },
+    rejectReason: { type: String, default: null, trim: true, maxlength: 300 },
+    decidedAt: { type: Date, default: null },
+  },
+  { timestamps: true }
+);
+CourseEnrollmentSchema.index({ courseId: 1, clientId: 1 });
+
+
+/* v1.19.0: الدورات الأونلاين */
+export const Course =
+  (mongoose.models.Course as mongoose.Model<any>) ||
+  mongoose.model("Course", CourseSchema);
+
+export const CourseEnrollment =
+  (mongoose.models.CourseEnrollment as mongoose.Model<any>) ||
+  mongoose.model("CourseEnrollment", CourseEnrollmentSchema);
 
 /* أنواع مساعدة خفيفة */
 export type UserDoc = mongoose.InferSchemaType<typeof UserSchema>;

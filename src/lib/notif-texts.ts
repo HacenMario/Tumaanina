@@ -45,6 +45,11 @@ export type NotifKey =
   | "clinicAdRejected"
   | /* v1.15.0: مستحقات الإعلان */ "clinicAdDues"
   | "clinicAdPaidConfirmed"
+  | /* v1.19.0: الدورات الأونلاين */ "courseNewBooking"
+  | "coursePending"
+  | "courseConfirmed"
+  | "courseRejected"
+  | "courseCancelled"
   | "test";
 
 export type NotifLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh";
@@ -363,8 +368,50 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     tr: { title: "Tumaanina'ya hoş geldiniz 💜", body: "Bildirimler sorunsuz çalışıyor — güvenli ellerdesiniz" },
     ru: { title: "Добро пожаловать в Tumaanina 💜", body: "Уведомления работают отлично — вы в надёжных руках" },
     zh: { title: "欢迎来到 Tumaanina 💜", body: "通知功能运行正常——您在值得信赖的陪伴中" },
+  },  /* ═ v1.19.0: الدورات الأونلاين — إشعارات الحجز والتأكيد والرفض والإلغاء ═ */
+  courseNewBooking: {
+    ar: { title: "🎓 حجز مقعد في دورتك", body: "العميل {name} حجز مقعداً في دورة «{course}» — راجع تبويب الدورات في لوحتك للتأكيد أو الرفض" },
+    fr: { title: "🎓 Nouvelle inscription à votre cours", body: "Le client {name} a réservé une place dans «{course}» — confirmez ou refusez depuis l'onglet Cours de votre tableau" },
+    en: { title: "🎓 New seat booking in your course", body: "Client {name} booked a seat in «{course}» — confirm or reject from the Courses tab in your dashboard" },
+    tr: { title: "🎓 Kursunuza yeni kayıt", body: "{name} adlı müşteri «{course}» kursuna yer ayırdı — panonuzdaki Kurslar sekmesinden onaylayın veya reddedin" },
+    ru: { title: "🎓 Новая запись на ваш курс", body: "Клиент {name} забронировал место в курсе «{course}» — подтвердите или отклоните во вкладке Курсы вашей панели" },
+    zh: { title: "🎓 有客户报名您的课程", body: "客户 {name} 预订了「{course}」的席位——请在面板的“课程”标签中确认或拒绝" },
   },
+  coursePending: {
+    ar: { title: "🎓 تم استلام حجز مقعدك", body: "حجزك في دورة «{course}» بانتظار تأكيد الأخصائي {name} — ستصلك إشعارات الحالة" },
+    fr: { title: "🎓 Réservation reçue", body: "Votre place dans «{course}» attend la confirmation de {name} — vous serez notifié du statut" },
+    en: { title: "🎓 Seat booking received", body: "Your booking in «{course}» is awaiting confirmation from {name} — status notifications will follow" },
+    tr: { title: "🎓 Yer rezervasyonunuz alındı", body: "«{course}» kursundaki yeriniz {name} tarafından onaylanmayı bekliyor — durum bildirimleri gelecek" },
+    ru: { title: "🎓 Заявка получена", body: "Ваше место в курсе «{course}» ожидает подтверждения от {name} — уведомления о статусе придут позже" },
+    zh: { title: "🎓 已收到您的席位预订", body: "您在「{course}」的预订正在等待 {name} 确认——后续会有状态通知" },
+  },
+  courseConfirmed: {
+    ar: { title: "✅ تم تأكيد مقعدك في الدورة", body: "الأخصائي {name} أكّد مقعدك في دورة «{course}» — مباشرة بعد التسجيل ستصلك تفاصيل الدخول" },
+    fr: { title: "✅ Place confirmée", body: "{name} a confirmé votre place dans «{course}» — les détails d'accès vous seront envoyés" },
+    en: { title: "✅ Your seat is confirmed", body: "{name} confirmed your seat in «{course}» — access details will follow after registration" },
+    tr: { title: "✅ Yeriniz onaylandı", body: "{name}, «{course}» kursundaki yerinizi onayladı — kayıt sonrası erişim ayrıntıları iletilecek" },
+    ru: { title: "✅ Место подтверждено", body: "{name} подтвердил ваше место в курсе «{course}» — детали доступа придут после регистрации" },
+    zh: { title: "✅ 席位已确认", body: "{name} 已确认您在「{course}」的席位——注册后将发送参与详情" },
+  },
+  courseRejected: {
+    ar: { title: "ℹ️ بخصوص حجزك في الدورة", body: "{name} اعتذر عن حجزك في دورة «{course}» — السبب: {reason}" },
+    fr: { title: "ℹ️ Concernant votre inscription", body: "{name} a décliné votre inscription à «{course}» — motif : {reason}" },
+    en: { title: "ℹ️ About your course booking", body: "{name} declined your booking in «{course}» — reason: {reason}" },
+    tr: { title: "ℹ️ Kurs kaydınız hakkında", body: "{name}, «{course}» kursundaki kaydınızı reddetti — gerekçe: {reason}" },
+    ru: { title: "ℹ️ О вашей записи на курс", body: "{name} отклонил вашу запись в курс «{course}» — причина: {reason}" },
+    zh: { title: "ℹ️ 关于您的课程预订", body: "{name} 拒绝了您在「{course}」的预订——原因：{reason}" },
+  },
+  courseCancelled: {
+    ar: { title: "🎓 إلغاء مقعد في دورتك", body: "العميل {name} ألغى مقعده في دورة «{course}» — تحدّث الأماكن المتبقية في لوحتك" },
+    fr: { title: "🎓 Annulation d'une place", body: "Le client {name} a annulé sa place dans «{course}» — les places restantes ont été mises à jour" },
+    en: { title: "🎓 Seat cancelled in your course", body: "Client {name} cancelled their seat in «{course}» — remaining seats updated in your dashboard" },
+    tr: { title: "🎓 Kursunuzda iptal", body: "{name} adlı müşteri «{course}» kursundaki yerini iptal etti — kalan yerler panonuzda güncellendi" },
+    ru: { title: "🎓 Отмена места в курсе", body: "Клиент {name} отменил место в курсе «{course}» — оставшиеся места обновлены в панели" },
+    zh: { title: "🎓 课程席位已取消", body: "客户 {name} 取消了「{course}」的席位——面板中的剩余名额已更新" },
+  },
+
 };
+
 
 /**
  * ملء المتغيرات {name} {when} {reason} {excerpt}… داخل نص الإشعار

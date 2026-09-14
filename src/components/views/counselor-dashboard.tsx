@@ -40,6 +40,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { RoyalCrown } from "@/components/shared/crown-badge";
 import { openDm } from "@/components/shared/dm-dialog";
 import { CounselorsChatCard } from "@/components/shared/counselors-chat";
+import { CounselorCoursesSection } from "./counselor-courses";
 import { localDateStr } from "@/lib/utils";
 import { SLOT_TIMES } from "@/lib/constants";
 import { Clock3, CalendarCog, MessageCircle, Timer } from "lucide-react";
@@ -499,6 +500,9 @@ export function CounselorDashboardView() {
 
         {/* ─── v2.9.0: فضاء الأخصائيين — دردشة جماعية خاصة بالمختصين ─── */}
         <CounselorsChatCard />
+
+        {/* ─── v1.19.0: الدورات الأونلاين — إنشاء وإدارة الملتحقين ─── */}
+        <CounselorCoursesSection />
 
         {/* Incoming requests */}
         <section className="space-y-3">
