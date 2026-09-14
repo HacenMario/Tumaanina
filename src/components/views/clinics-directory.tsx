@@ -9,6 +9,7 @@ import { WILAYA_LIST, SPECIALTIES, type SpecialtyKey } from "@/lib/constants";
 import { LogoMark } from "@/lib/logo";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
 import { waLink } from "@/lib/whatsapp";
+import { fmtApproxFromDzd } from "@/lib/money";
 import { openClinicRatings } from "@/components/shared/clinic-ratings-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,7 +70,7 @@ export function openClinicPage(slug: string | null, id: string, autoBook = false
 
 export function ClinicsDirectoryView() {
   const { t, lang } = useI18n();
-  const { setView } = useApp();
+  const { setView, currency } = useApp();
   const [clinics, setClinics] = useState<ClinicCard[]>([]);
   const [loading, setLoading] = useState(true);
   /* v1.15.0: ترقيم الصفحات من الخادم — تُحمَّل 8 عيادات فقط لكل صفحة */
@@ -268,6 +269,10 @@ export function ClinicsDirectoryView() {
                           <div className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/25 px-2 py-0.5 text-[11px] font-black text-primary w-fit" dir="ltr">
                             {c.sessionPrice.toLocaleString("en-US")} DZD
                             <span className="text-[10px] font-bold text-muted-foreground">/ {t.clinics.sessionShort}</span>
+                            {/* v1.17.0: تقدير تقريبي بعملة العرض إن لم تكن الدينار */}
+                            {currency !== "DZD" ? (
+                              <span className="text-[10px] font-bold text-muted-foreground">{fmtApproxFromDzd(c.sessionPrice, currency, lang)}</span>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>

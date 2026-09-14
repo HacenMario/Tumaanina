@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import { CounselorProfile, SupportSession, User } from "@/lib/models";
+import { Clinic, CounselorProfile, SupportSession, User } from "@/lib/models";
 import { normalizeWhatsapp } from "@/lib/whatsapp";
 import { hashSecret, verifySecret } from "@/lib/server/auth";
 import { apiHandler } from "@/lib/server/api";
@@ -39,6 +39,8 @@ interface RegisterBody {
   diplomaImage?: string;
   photo?: string | null;
   language?: string;
+  /* v1.17.0: العيادة التابع لها الأخصائي — اختيارية من قائمة العيادات المسجلة */
+  clinicId?: string | null;
 }
 
 interface LoginBody {
@@ -96,6 +98,7 @@ async function POST_impl(req: NextRequest) {
       yearsExperience,
       diplomaImage,
       language,
+      clinicId,
     } = body as RegisterBody;
 
     if (!fullName?.trim() || !email?.trim() || !specialties?.length || !languages?.length) {
@@ -126,6 +129,13 @@ async function POST_impl(req: NextRequest) {
 
     const pw = hashSecret(password);
     const rec = hashSecret(recoveryPhrase.trim());
+    /* v1.17.0: التحقق من العيادة المختارة (اختيارية) — يجب أن تكون عيادة
+       نشطة حقيقية من الدليل، وإلا يُتجاهل الحقل بصمت (لا يفشل التسجيل) */
+    let affiliatedClinicId: string | null = null;
+    if (clinicId && /^[a-f0-9]{24}$/i.test(String(clinicId))) {
+      const cl = (await Clinic.findById(String(clinicId)).select("isActive").lean()) as { isActive?: boolean } | null;
+      if (cl && cl.isActive !== false) affiliatedClinicId = String(clinicId);
+    }
     const user = await User.create({
       role: "COUNSELOR",
       email: cleanEmail,
@@ -135,6 +145,7 @@ async function POST_impl(req: NextRequest) {
       passwordSalt: pw.salt,
       recoveryHash: rec.hash,
       recoverySalt: rec.salt,
+      clinicId: affiliatedClinicId,
     });
     /* v2.5.5: توليد slug فريد من الاسم الكامل مرة واحدة عند التسجيل
        (يُستعمل في رابط الملف العام: /counselor/{slug}) */

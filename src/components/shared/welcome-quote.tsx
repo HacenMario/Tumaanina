@@ -142,7 +142,16 @@ export function WelcomeQuote() {
       openWith(chosen, resolvedLang);
     };
 
-    const launchId = setTimeout(launch, SHOW_DELAY_MS);
+    /* v1.17.0: لا نُطلق العبارة إلا بعد اكتمال تحميل الصفحة بالكامل —
+       إحكام سباق React #418 النادر حين تصل استجابة الشبكة وتُحدَّث الحالة
+       قبل اكتمال ترطيب الشجرة (كان سبباً في ظهور الخطأ متقطعاً) */
+    let launchId: ReturnType<typeof setTimeout> | null = null;
+    const scheduleLaunch = () => {
+      if (cancelled) return;
+      launchId = setTimeout(launch, SHOW_DELAY_MS);
+    };
+    if (document.readyState === "complete") scheduleLaunch();
+    else window.addEventListener("load", scheduleLaunch, { once: true });
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
@@ -151,7 +160,8 @@ export function WelcomeQuote() {
 
     return () => {
       cancelled = true;
-      clearTimeout(launchId);
+      if (launchId) clearTimeout(launchId);
+      window.removeEventListener("load", scheduleLaunch);
       clearTimeout(timeoutId);
       if (timerRef.current) clearTimeout(timerRef.current);
       window.removeEventListener("keydown", onKey);

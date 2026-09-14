@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Megaphone, Loader2, Plus, Trash2, X, Upload, Check, Ban, Flag,
-  Eye, Heart, MessageCircle, Wallet, CalendarRange, CornerUpLeft, EyeOff,
+  Eye, Heart, MessageCircle, Wallet, CalendarRange, CornerUpLeft, EyeOff, Pencil,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -131,13 +131,15 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  /* نافذة صياغة الإعلان */
+  /* نافذة صياغة الإعلان — v1.17.0: تُستعمل للإنشاء وللتعديل معاً */
   const [adOpen, setAdOpen] = useState(false);
   const [adTitle, setAdTitle] = useState("");
   const [adBody, setAdBody] = useState("");
   const [adMedia, setAdMedia] = useState<string[]>([]);
   const [adBusy, setAdBusy] = useState(false);
   const [adError, setAdError] = useState("");
+  /* v1.17.0: الإعلان قيد التعديل (null = إنشاء جديد) */
+  const [editingAd, setEditingAd] = useState<AdRow | null>(null);
 
   /* إدارة التعليقات */
   const [commentsAd, setCommentsAd] = useState<AdRow | null>(null);
@@ -187,6 +189,45 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
     load();
   }, [load]);
 
+  /* v1.17.0: جلب وسائط الإعلان من مساراتها كـ data URLs — الاستبدال الكامل
+     عند حفظ التعديل يحتاج البيانات نفسها لا روابطها */
+  const materializeMedia = async (urls: string[]): Promise<string[]> => {
+    const out: string[] = [];
+    for (const u of urls) {
+      if (u.startsWith("data:")) {
+        out.push(u);
+        continue;
+      }
+      try {
+        const blob = await fetch(u).then((r) => r.blob());
+        const d = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        out.push(d);
+      } catch {
+        /* تجاهل ما تعذّر جلبه */
+      }
+    }
+    return out;
+  };
+
+  const openEditAd = async (a: AdRow) => {
+    setEditingAd(a);
+    setAdTitle(a.title);
+    setAdBody(a.body);
+    setAdMedia([]);
+    setAdOpen(true);
+    try {
+      const media = await materializeMedia(a.mediaUrls);
+      setAdMedia(media);
+    } catch {
+      /* تُترك الوسائط فارغة إن تعذّر جلبها — النص يُحفظ دائماً */
+    }
+  };
+
   const submitAd = async () => {
     setAdError("");
     if (!adTitle.trim() || !adBody.trim()) {
@@ -195,10 +236,14 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
     }
     setAdBusy(true);
     try {
+      /* v1.17.0: تعديل إعلان قائم — يصل للمستخدمين تلقائياً بعد الحفظ */
+      const editing = !!editingAd;
       const res = await fetch("/api/ads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", userId, title: adTitle.trim(), body: adBody.trim(), media: adMedia }),
+        body: JSON.stringify(editing
+          ? { action: "update", userId, id: editingAd!.id, title: adTitle.trim(), body: adBody.trim(), media: adMedia }
+          : { action: "create", userId, title: adTitle.trim(), body: adBody.trim(), media: adMedia }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -206,7 +251,9 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
         setAdTitle("");
         setAdBody("");
         setAdMedia([]);
-        showAppToast(t.clinicDash.adSent, t.clinicDash.adSentSub);
+        setEditingAd(null);
+        if (editing) showAppToast(t.clinicDash.adUpdated, t.clinicDash.adUpdatedSub);
+        else showAppToast(t.clinicDash.adSent, t.clinicDash.adSentSub);
         load(true);
       } else if (data.error === "ADS_LIMIT") {
         setAdError(t.clinicDash.adLimit);
@@ -214,6 +261,9 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
         setAdError(t.clinicDash.adMaxMedia);
       } else if (data.error === "MEDIA_TOO_BIG") {
         setAdError(t.clinicDash.adMediaBig);
+      } else if (data.error === "REJECTED_LOCKED") {
+        setAdError(t.clinicDash.adRejectedLocked);
+        setEditingAd(null);
       } else {
         setAdError(t.common.errorServer);
       }
@@ -345,10 +395,19 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                 ) : null}
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-[10px] text-muted-foreground/70 font-semibold">{fmtDate(a.createdAt)}</span>
-                  <Button size="sm" variant="ghost" className="rounded-lg text-destructive font-bold gap-1" onClick={() => deleteAd(a.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                    {t.common.delete}
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    {/* v1.17.0: تعديل الإعلان — المنشور يتحدّث عند المستخدمين فور الحفظ */}
+                    {a.status !== "REJECTED" ? (
+                      <Button size="sm" variant="outline" className="rounded-lg font-bold gap-1 border-primary/40 text-primary" disabled={adBusy} onClick={() => void openEditAd(a)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        {t.clinicDash.editAd}
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="ghost" className="rounded-lg text-destructive font-bold gap-1" onClick={() => deleteAd(a.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {t.common.delete}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -366,14 +425,16 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
       )}
 
       {/* نافذة إعلان جديد — وسائط: 5 صور + فيديو */}
-      <Dialog open={adOpen} onOpenChange={setAdOpen}>
+      <Dialog open={adOpen} onOpenChange={(v) => { setAdOpen(v); if (!v) setEditingAd(null); }}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-start flex items-center gap-2 text-base">
               <Megaphone className="h-4.5 w-4.5 text-primary" />
-              {t.clinicDash.newAdTitle}
+              {editingAd ? t.clinicDash.editAdTitle : t.clinicDash.newAdTitle}
             </DialogTitle>
-            <DialogDescription className="text-start text-xs leading-relaxed">{t.clinicDash.newAdDesc}</DialogDescription>
+            <DialogDescription className="text-start text-xs leading-relaxed">
+              {editingAd ? t.clinicDash.editAdDesc : t.clinicDash.newAdDesc}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -494,7 +555,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
             {adError ? <div className="rounded-xl bg-destructive/10 text-destructive text-sm font-bold px-4 py-3">{adError}</div> : null}
             <Button className="w-full gradient-primary text-white font-black rounded-xl h-12" disabled={adBusy} onClick={submitAd}>
               {adBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
-              {t.clinicDash.adSubmit}
+              {editingAd ? t.clinicDash.saveBtn ?? t.clinicDash.adSubmit : t.clinicDash.adSubmit}
             </Button>
           </div>
         </DialogContent>

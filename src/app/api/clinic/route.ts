@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import { Clinic, User } from "@/lib/models";
+import { Clinic, ClinicGalleryMedia, User } from "@/lib/models";
 import { normalizeWhatsapp } from "@/lib/whatsapp";
 import { hashSecret, verifySecret } from "@/lib/server/auth";
 import { apiHandler } from "@/lib/server/api";
@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
    إكمال بقية التفاصيل لاحقاً من لوحتها. */
 
 const MAX_LOGO_B64 = 1_500_000; // شعار العيادة بعد ضغط العميل (~700px)
+const MAX_GALLERY_VIDEO_B64 = 5_400_000; // v1.17.0: سقف فيديو المعرض (~4MB ثنائية)
+const MAX_GALLERY_VIDEOS = 2; // v1.17.0: فيديو أو اثنان لكل عيادة
 
 /* تطهير قائمة التخصصات (الجاهزة من SPECIALTIES فقط) */
 function sanitizeSpecialties(input: unknown): string[] {
@@ -94,6 +96,8 @@ interface UpdateProfileBody {
   /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
   sessionPrice?: number | null;
   packs?: { name: string; sessions: number; price: number; note?: string | null }[] | null;
+  /* v1.17.0: فيديوهات المعرض — استبدال كامل (مصفوفة data URLs)؛ [] = حذف الكل */
+  galleryVideos?: string[] | null;
 }
 
 interface ChangePasswordBody {
@@ -409,6 +413,34 @@ async function POST_impl(req: NextRequest) {
     /* اسم العيادة يُزامن مع اسم الحساب (يظهر في الهيدر) */
     if (set.name) await User.updateOne({ _id: userId }, { $set: { pseudonym: String(set.name) } });
 
+    /* ══ v1.17.0: فيديوهات المعرض — استبدال كامل لمستندات المجموعة المستقلة ══
+       الفيديو كبير على BSON لذا يُخزن خارج وثيقة العيادة (فيديو أو اثنان،
+       كل واحد حتى ~4MB ثنائية بصيغة mp4/webm) — يُقدَّم عبر مسار المعرض */
+    if (body.galleryVideos !== undefined) {
+      if (body.galleryVideos === null || (Array.isArray(body.galleryVideos) && body.galleryVideos.length === 0)) {
+        await ClinicGalleryMedia.deleteMany({ clinicId: clinic._id });
+      } else if (Array.isArray(body.galleryVideos)) {
+        if (body.galleryVideos.length > MAX_GALLERY_VIDEOS) {
+          return NextResponse.json({ error: "MAX_2_VIDEOS" }, { status: 400 });
+        }
+        const clean: { mime: string; data: string }[] = [];
+        for (const v of body.galleryVideos) {
+          if (typeof v !== "string" || !/^data:video\/(mp4|webm|quicktime|x-m4v)[;,]/i.test(v)) {
+            return NextResponse.json({ error: "INVALID_VIDEO" }, { status: 400 });
+          }
+          if (v.length > MAX_GALLERY_VIDEO_B64) {
+            return NextResponse.json({ error: "VIDEO_TOO_BIG" }, { status: 400 });
+          }
+          const mime = /^data:([^;,]+)/.exec(v)?.[1] || "video/mp4";
+          clean.push({ mime, data: v.slice(v.indexOf(",") + 1) });
+        }
+        await ClinicGalleryMedia.deleteMany({ clinicId: clinic._id });
+        if (clean.length) await ClinicGalleryMedia.insertMany(clean.map((c) => ({ clinicId: clinic._id, mime: c.mime, data: c.data })));
+      } else {
+        return NextResponse.json({ error: "INVALID_VIDEO" }, { status: 400 });
+      }
+    }
+
     const fresh = (await Clinic.findById(clinic._id).select("name slug").lean()) as { name?: string; slug?: string } | null;
     return NextResponse.json({ ok: true, name: fresh?.name, slug: fresh?.slug });
   }
@@ -468,6 +500,13 @@ async function GET_impl(req: NextRequest) {
       /* v1.16.0: سعر الجلسة الحضورية والباقات */
       sessionPrice: (c.sessionPrice as number | null) ?? null,
       packs: (c.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
+      /* v1.17.0: فيديوهات المعرض — روابط تقديم آمنة (بلا base64 داخل JSON) */
+      galleryVideos: (
+        await ClinicGalleryMedia.find({ clinicId: c._id }).sort({ createdAt: 1, _id: 1 }).select("mime").lean()
+      ).map((v: Record<string, unknown>, i: number) => ({
+        url: `/api/clinics/${String(c._id)}/gallery/media/${i}`,
+        mime: String(v.mime || "video/mp4"),
+      })),
     },
   });
 }

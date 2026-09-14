@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Wind,
+  Building2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { BreathingExerciseDialog } from "@/components/shared/breathing-exercise";
@@ -82,6 +83,12 @@ export function LandingView() {
               <Button size="lg" className="gradient-primary text-white font-bold h-13 px-7 rounded-2xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-shadow" onClick={startJourney}>
                 {t.landing.ctaPrimary}
                 <Arrow className="h-5 w-5" />
+              </Button>
+              {/* v1.17.0: زر تصفح العيادات المسجلة — بجانب زرّي البداية والانضمام،
+                  يوجّه مباشرة إلى دليل العيادات (طلب المستخدم) */}
+              <Button size="lg" variant="outline" className="font-bold h-13 px-6 rounded-2xl border-primary/40" onClick={() => setView("clinics-directory")}>
+                <Building2 className="h-5 w-5" />
+                {t.landing.ctaClinics}
               </Button>
               {/* v2.13.0: المختص المسجّل يتجاوز بوابة الدخول إلى لوحته مباشرة */}
               <Button size="lg" variant="outline" className="font-bold h-13 px-7 rounded-2xl border-primary/40" onClick={() => setView(user?.role === "COUNSELOR" ? "counselor-dashboard" : "counselor-auth")}>

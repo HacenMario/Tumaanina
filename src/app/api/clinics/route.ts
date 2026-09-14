@@ -21,9 +21,10 @@ async function GET_impl(req: NextRequest) {
   const specialty = searchParams.get("specialty");
   const minYears = Number(searchParams.get("minYears")) || 0;
   const q = (searchParams.get("q") || "").trim();
-  /* v1.15.0: ترقيم صفحات من الخادم — 8 عيادات لكل صفحة */
+  /* v1.15.0: ترقيم صفحات من الخادم — 8 عيادات لكل صفحة
+     v1.17.0: pageSize اختياري (حتى 200) — لقوائم الاختيار كتسجيل الأخصائي */
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
-  const PER = 8;
+  const PER = Math.min(200, Math.max(1, Number(searchParams.get("pageSize")) || 8));
 
   await connectDB();
 

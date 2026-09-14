@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Building2, CalendarClock, Loader2, Plus, Trash2, MapPin, Globe,
   Clock, Wallet, FileCheck2, Upload, X, Check, Ban, RefreshCw, Star, Users, Images,
-  Navigation, CalendarClock as SlotIcon, List, LocateFixed,
+  Navigation, CalendarClock as SlotIcon, List, LocateFixed, Video as VideoIcon, Play,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BackButton } from "@/components/shared/back-button";
 import { showAppToast } from "@/components/shared/app-toast";
+import { MapPicker } from "@/components/shared/map-picker";
 
 /* ═ v1.14.0 — لوحة العيادة (دخول عيادة) ═
    أربعة تبويبات:
@@ -104,6 +105,8 @@ interface ClinicProfile {
   /* v1.16.0: سعر الجلسة الحضورية + الباقات */
   sessionPrice: number | null;
   packs: { name: string; sessions: number; price: number; note: string | null }[];
+  /* v1.17.0: فيديوهات المعرض — روابط تقديم آمنة */
+  galleryVideos: { url: string; mime: string }[];
 }
 
 interface BookingRow {
@@ -116,6 +119,10 @@ interface BookingRow {
   status: string;
   clinicNote: string | null;
   cancelledBy: string | null;
+  /* v1.17.0: الباقة المختارة عند الحجز */
+  packName: string | null;
+  packSessions: number | null;
+  packPrice: number | null;
 }
 
 export function ClinicDashboardView() {
@@ -161,6 +168,11 @@ export function ClinicDashboardView() {
   const [slotDirty, setSlotDirty] = useState(false);
   const [fGallery, setFGallery] = useState<string[]>([]);
   const [galleryDirty, setGalleryDirty] = useState(false);
+  /* v1.17.0: فيديوهات المعرض — روابط أصلية أو data URLs بعد التعديل؛
+     أول تعديل يجلب الفيديوهات الحالية كـ data URLs (استبدال كامل عند الحفظ) */
+  const [fVideos, setFVideos] = useState<string[]>([]);
+  const [videosDirty, setVideosDirty] = useState(false);
+  const [videosBusy, setVideosBusy] = useState(false);
   const [fLat, setFLat] = useState<number | null>(null);
   const [fLng, setFLng] = useState<number | null>(null);
   const [locDirty, setLocDirty] = useState(false);
@@ -209,6 +221,8 @@ export function ClinicDashboardView() {
         setSlotDirty(false);
         setFGallery(c.gallery || []);
         setGalleryDirty(false);
+        setFVideos((c.galleryVideos || []).map((v) => v.url));
+        setVideosDirty(false);
         setFLat(c.location?.lat ?? null);
         setFLng(c.location?.lng ?? null);
         setLocDirty(false);
@@ -273,6 +287,7 @@ export function ClinicDashboardView() {
       /* v1.15.0: المواعيد والمعرض والموقع — تُرسل فقط عند تغييرها */
       if (slotDirty) payload.slots = fSlots;
       if (galleryDirty) payload.gallery = fGallery;
+      if (videosDirty) payload.galleryVideos = fVideos;
       if (locDirty) payload.location = { lat: fLat, lng: fLng };
       const res = await fetch("/api/clinic", {
         method: "POST",
@@ -337,6 +352,76 @@ export function ClinicDashboardView() {
       setFGallery((p) => [...p, ...added]);
       setGalleryDirty(true);
     }
+  };
+
+  /* ══ v1.17.0: فيديوهات المعرض ══
+     أول تعديل: جلب الفيديوهات الحالية من مساراتها وتحويلها data URLs
+     كي يُرسل الاستبدال الكامل بلا فقدان لما هو موجود */
+  const materializeVideos = async (): Promise<string[]> => {
+    const out: string[] = [];
+    for (const v of fVideos) {
+      if (v.startsWith("data:")) {
+        out.push(v);
+        continue;
+      }
+      try {
+        const blob = await fetch(v).then((r) => r.blob());
+        const d = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        out.push(d);
+      } catch {
+        /* تجاهل ما تعذّر جلبه */
+      }
+    }
+    return out;
+  };
+
+  const pickVideos = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setVideosBusy(true);
+    try {
+      const base = await materializeVideos();
+      const room = 2 - base.length;
+      const list = Array.from(files).slice(0, Math.max(0, room));
+      if (list.length === 0) {
+        showAppToast(t.clinicDash.videoFull, "");
+        return;
+      }
+      const added: string[] = [];
+      for (const f of list) {
+        if (f.size > 3_900_000) {
+          showAppToast(t.clinicDash.videoBig, "");
+          continue;
+        }
+        const d = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = reject;
+          reader.readAsDataURL(f);
+        });
+        if (d.length > 5_400_000 || !d.startsWith("data:video/")) {
+          showAppToast(t.clinicDash.videoBig, "");
+          continue;
+        }
+        added.push(d);
+      }
+      if (added.length) {
+        setFVideos([...base, ...added]);
+        setVideosDirty(true);
+      }
+    } finally {
+      setVideosBusy(false);
+    }
+  };
+
+  const removeVideo = async (idx: number) => {
+    const base = await materializeVideos();
+    setFVideos(base.filter((_, j) => j !== idx));
+    setVideosDirty(true);
   };
 
   /* تحديد موقع العيادة بدقة — يطلب إذن الموقع ويحفظ الإحداثيات */
@@ -842,11 +927,40 @@ export function ClinicDashboardView() {
                       ))}
                     </div>
                   ) : null}
-                  <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={fGallery.length >= 8} onClick={() => document.getElementById("clinic-gallery-input")?.click()}>
-                    <Upload className="h-3.5 w-3.5" />
-                    {t.clinicDash.galleryAdd}
-                  </Button>
-                  <input id="clinic-gallery-input" type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void pickGallery(e.target.files); e.currentTarget.value = ""; }} />
+                  {fVideos.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-2 w-full">
+                      {fVideos.map((v, i) => (
+                        <div key={`v-${i}`} className="relative rounded-lg overflow-hidden border border-border/60 aspect-square bg-black/80">
+                          <video src={v} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center">
+                              <Play className="h-3.5 w-3.5 fill-white" />
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            className="absolute top-1 end-1 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                            onClick={() => { void removeVideo(i); }}
+                            aria-label="remove video"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={fGallery.length >= 8} onClick={() => document.getElementById("clinic-gallery-input")?.click()}>
+                      <Upload className="h-3.5 w-3.5" />
+                      {t.clinicDash.galleryAdd}
+                    </Button>
+                    {/* v1.17.0: رفع فيديو (أو اثنين) — يُشغَّل بمشغّل المتصفح المدمج */}
+                    <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={videosBusy || fVideos.length >= 2} onClick={() => document.getElementById("clinic-videos-input")?.click()}>
+                      {videosBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <VideoIcon className="h-3.5 w-3.5" />}
+                      {t.clinicDash.galleryAddVideo} ({fVideos.length}/2)
+                    </Button>
+                    <input id="clinic-videos-input" type="file" accept="video/mp4,video/webm,video/quicktime" multiple className="hidden" onChange={(e) => { void pickVideos(e.target.files); e.currentTarget.value = ""; }} />
+                  </div>
                 </div>
 
                 {/* ══ v1.15.0: الموقع على الخريطة ══ */}
@@ -856,6 +970,8 @@ export function ClinicDashboardView() {
                     <Label className="font-bold">{t.clinicDash.locTitle}</Label>
                   </div>
                   <p className="text-[11px] text-muted-foreground font-semibold leading-relaxed">{t.clinicDash.locHint}</p>
+                  {/* v1.17.0: تصحيح الموقع يدوياً على الخريطة */}
+                  <p className="text-[11px] text-primary/80 font-semibold leading-relaxed">{t.clinicDash.mapPickHint}</p>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button type="button" className="gradient-primary text-white font-black rounded-xl gap-1.5" disabled={locBusy} onClick={locateClinic}>
                       {locBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
@@ -868,18 +984,29 @@ export function ClinicDashboardView() {
                       </Button>
                     ) : null}
                   </div>
+                  {/* v1.17.0: منتقي الموقع يدوياً — اسحب الخريطة وضع النقطة على
+                      موقع عيادتك بدقة (تصحيح أخطاء التحديد التلقائي)، بإطار
+                      أكبر يعرض الخريطة بشكل مريح على الهاتف والحاسوب */}
+                  <MapPicker
+                    lat={fLat}
+                    lng={fLng}
+                    onChange={(la, lo) => { setFLat(la); setFLng(lo); setLocDirty(true); }}
+                    className="h-80 sm:h-96"
+                  />
                   {fLat && fLng ? (
-                    <div className="rounded-xl overflow-hidden border border-border/60">
-                      <iframe
-                        title="clinic-location"
-                        src={`https://www.google.com/maps?q=${fLat},${fLng}&z=16&output=embed`}
-                        className="w-full h-48 sm:h-56"
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                      <p className="text-[10px] font-bold text-muted-foreground bg-card px-3 py-1.5" dir="ltr">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-[10px] font-bold text-muted-foreground font-mono" dir="ltr">
                         {fLat.toFixed(6)}, {fLng.toFixed(6)}
                       </p>
+                      <a
+                        href={`https://www.google.com/maps?q=${fLat},${fLng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400 hover:underline"
+                      >
+                        <Navigation className="h-3 w-3" />
+                        Google Maps
+                      </a>
                     </div>
                   ) : (
                     <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">{t.clinicDash.locNone}</p>
@@ -920,6 +1047,16 @@ export function ClinicDashboardView() {
                       <p className="font-black text-sm">{b.clientName}</p>
                       {b.clientPhone ? (
                         <a href={`tel:${b.clientPhone}`} className="text-xs font-bold text-primary hover:underline" dir="ltr">{b.clientPhone}</a>
+                      ) : null}
+                      {/* v1.17.0: الباقة المختارة عند الحجز */}
+                      {b.packName ? (
+                        <p className="text-[11px] font-bold text-primary flex items-center gap-1 mt-0.5 flex-wrap">
+                          <Wallet className="h-3 w-3 shrink-0" />
+                          {b.packName}
+                          {" · "}
+                          {t.clinics.packsSessions.replace("{n}", String(b.packSessions ?? 1))}
+                          {b.packPrice ? ` · ${b.packPrice.toLocaleString("en-US")} DZD` : ""}
+                        </p>
                       ) : null}
                     </div>
                     {bookingBadge(b.status)}

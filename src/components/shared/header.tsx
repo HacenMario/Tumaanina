@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { useTheme } from "next-themes";
-import { Globe, Palette, Menu, LogOut, LogIn, UserRound, Stethoscope, TriangleAlert, House, CircleHelp, HeartHandshake, Stethoscope as StethoscopeIcon, Users, CalendarDays, LayoutDashboard, MessageSquare, Shield, Settings, Heart, Info, MessagesSquare, Lock, FileText, Mail, UsersRound, Sparkles, Waves, GraduationCap, Coins, Check, BarChart3, Building2, Megaphone } from "lucide-react";
+import { Globe, Palette, Menu, LogOut, LogIn, UserRound, Stethoscope, TriangleAlert, House, CircleHelp, HeartHandshake, Users, CalendarDays, LayoutDashboard, MessageSquare, Shield, Settings, Heart, Info, MessagesSquare, Lock, FileText, Mail, UsersRound, Sparkles, Waves, GraduationCap, Coins, Check, BarChart3, Building2, Megaphone, Hospital, KeyRound, BriefcaseMedical, MessageCircleQuestion, EyeOff, CalendarClock, Video, BadgeCheck, ListChecks, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useI18n, LANG_META } from "@/lib/i18n";
 import { useApp, type ViewName } from "@/lib/store";
@@ -27,16 +27,18 @@ import type { AppLang, CurrencyCode } from "@/lib/constants";
 import { CURRENCIES, CURRENCY_CODES } from "@/lib/constants";
 import type { LucideIcon } from "lucide-react";
 
-/* v2.14.0: أيقونة معبّرة قبل اسم كل صفحة في القائمة الجانبية (طلب المستخدم) */
+/* v2.14.0: أيقونة معبّرة قبل اسم كل صفحة في القائمة الجانبية (طلب المستخدم)
+   v1.17.0: مراجعة كاملة — كل صفحة أيقونتها الخاصة المعبرة عن عنوانها
+   ولا تتكرر أيقونة واحدة بين صفحتين في القائمة */
 const VIEW_ICONS: Partial<Record<ViewName, LucideIcon | "🤲">> = {
   landing: House,
   how: CircleHelp,
   roles: HeartHandshake,
-  "counselors-directory": StethoscopeIcon,
+  "counselors-directory": Stethoscope,
   "clinics-directory": Building2,
-  "clinic-page": Building2,
-  "clinic-auth": Building2,
-  "clinic-dashboard": LayoutDashboard,
+  "clinic-page": Hospital,
+  "clinic-auth": KeyRound,
+  "clinic-dashboard": BriefcaseMedical,
   ads: Megaphone,
   community: Users,
   "client-sessions": CalendarDays,
@@ -48,22 +50,22 @@ const VIEW_ICONS: Partial<Record<ViewName, LucideIcon | "🤲">> = {
   settings: Settings,
   gratitude: Heart,
   about: Info,
-  faq: CircleHelp,
-  feedback: MessagesSquare,
-  privacy: Lock,
+  faq: MessageCircleQuestion,
+  feedback: MessageSquare,
+  privacy: EyeOff,
   terms: FileText,
   contact: Mail,
   founders: UsersRound,
   dua: "🤲",
   exercises: Waves,
   "client-start": UserRound,
-  "counselor-login": Stethoscope,
-  "counselor-auth": Stethoscope,
+  "counselor-login": LogIn,
+  "counselor-auth": BadgeCheck,
   "counselor-register": GraduationCap,
-  "client-topics": HeartHandshake,
-  "client-slots": CalendarDays,
+  "client-topics": ListChecks,
+  "client-slots": CalendarClock,
   "client-find": Sparkles,
-  "session-room": UsersRound,
+  "session-room": Video,
 };
 
 function ViewIcon({ view, className }: { view: ViewName; className?: string }) {
@@ -157,6 +159,28 @@ export function AppHeader() {
     ]
   ).filter((n) => !shownViews.has(n.view));
 
+  /* v1.17.0: شريط سطح المكتب لا يتشوه بعد اليوم — مجموعة أساسية قصيرة تظهر
+     كأزرار، وكل الباقي في قائمة «المزيد» المنسدلة مهما كان طول النص بأي لغة
+     (كانت كل الروابط تُكدّس في سطر واحد فتتداخل نصوصها على الحاسوب).
+     الشعار نفسه ينقل للرئيسية — لا زر مضاعف يضيّق المساحة، وأول صفحة
+     من صفحات الدور تظهر في الشريط والبقية داخل «المزيد». */
+  const desktopPrimary = new Set<ViewName>(["client-topics", "roles", "clinics-directory", "ads"]);
+  const desktopXlOnly = new Set<ViewName>(["counselors-directory"]);
+  const firstRole = roleImportant.find((r) => r.show) || null;
+  const desktopMain: { label: string; view: ViewName; xlOnly?: boolean }[] = [
+    ...(firstRole ? [{ label: firstRole.label, view: firstRole.view }] : []),
+    ...navItems
+      .filter((n) => n.show && (desktopPrimary.has(n.view) || desktopXlOnly.has(n.view)))
+      .map((n) => ({ label: n.label, view: n.view, xlOnly: desktopXlOnly.has(n.view) })),
+  ];
+  const moreItems: { label: string; view: ViewName }[] = [
+    ...roleImportant.filter((r) => r.show && r !== firstRole).map((r) => ({ label: r.label, view: r.view })),
+    ...navItems
+      .filter((n) => n.show && !desktopPrimary.has(n.view) && !roleImportant.some((r) => r.view === n.view && r.show) && n.view !== firstRole?.view)
+      .map((n) => ({ label: n.label, view: n.view })),
+    ...secondaryItems,
+  ];
+
   const doLogout = () => {
     setOpen(false);
     logout();
@@ -167,40 +191,65 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-50 glass border-b border-border/60">
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-1.5 sm:gap-2">
+      <div className="max-w-6xl 2xl:max-w-7xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-1.5 sm:gap-2">
         <button
           onClick={onLogoTap}
-          className="flex items-center rounded-xl focus-visible:ring-2 ring-ring outline-none"
+          className="flex items-center rounded-xl focus-visible:ring-2 ring-ring outline-none shrink-0"
           aria-label={t.common.appName}
         >
-          <LogoFull lang={lang} compact={false} />
+          {/* v1.17.0: شعار مدمج تحت 2xl — مساحة أوسع لشريط التنقل بأي لغة */}
+          <span className="2xl:hidden"><LogoFull lang={lang} compact /></span>
+          <span className="hidden 2xl:block"><LogoFull lang={lang} compact={false} /></span>
         </button>
 
-        {/* Desktop nav — الروابط الثانوية فقط على الشاشات العريضة (≥1536px)
-            حتى لا تضغط النصوص الفرنسية/الإنجليزية الطويلة، وهي متوفرة دائماً
-            في قائمة الهاتف والفوتر */}
-        <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 min-w-0" aria-label="main">
-          {navItems
-            .filter((n) => n.show)
-            .map((n) => (
-              <Button
-                key={n.view}
-                variant={view === n.view ? "secondary" : "ghost"}
-                size="sm"
-                className={cn(
-                  "text-sm font-semibold px-2.5 xl:px-3 whitespace-nowrap",
-                  n.wide && "hidden 2xl:inline-flex"
-                )}
-                onClick={() => setView(n.view)}
-              >
-                {n.label}
-              </Button>
-            ))}
+        {/* Desktop nav — v1.17.0: مجموعة أساسية قصيرة فقط + قائمة «المزيد»
+            المنسدلة لبقية الصفحات — لا تكدّس ولا تداخل نصوص على الحاسوب */}
+        <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 min-w-0 overflow-hidden" aria-label="main">
+          {desktopMain.map((n) => (
+            <Button
+              key={n.view}
+              variant={view === n.view ? "secondary" : "ghost"}
+              size="sm"
+              className={`text-sm font-semibold px-2 xl:px-2.5 whitespace-nowrap shrink-0 ${n.xlOnly ? "hidden xl:inline-flex" : ""}`}
+              onClick={() => setView(n.view)}
+            >
+              {n.label}
+            </Button>
+          ))}
+          {moreItems.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={moreItems.some((n) => n.view === view) ? "secondary" : "ghost"}
+                  size="sm"
+                  className="text-sm font-semibold px-2 xl:px-2.5 whitespace-nowrap shrink-0 gap-1"
+                >
+                  {t.nav.more}
+                  <MoreHorizontal className="h-4 w-4 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 max-h-[70vh] overflow-y-auto p-1.5">
+                {moreItems.map((n) => (
+                  <DropdownMenuItem
+                    key={n.view}
+                    onClick={() => setView(n.view)}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-lg px-2.5 py-2 cursor-pointer text-sm font-semibold",
+                      view === n.view && "bg-primary/10 text-primary"
+                    )}
+                  >
+                    <ViewIcon view={n.view} />
+                    <span className="truncate">{n.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {/* v2.9.0: زر تمرين تهدئة النفس — متاح في كل الصفحات */}
-          <BreathingTriggerButton className="hidden sm:inline-flex" />
+          <BreathingTriggerButton className="hidden 2xl:inline-flex" />
 
           {/* v2.8.0: زر «هام جدا - اقرأني» بلون يلفت الانتباه — إرشادات التثبيت والإشعارات */}
           <Button
@@ -210,7 +259,7 @@ export function AppHeader() {
             title={t.nav.important}
           >
             <TriangleAlert className="h-4 w-4 shrink-0" />
-            <span className="hidden md:inline text-[11px] whitespace-nowrap">{t.nav.important}</span>
+            <span className="hidden 2xl:inline text-[11px] whitespace-nowrap">{t.nav.important}</span>
           </Button>
 
           {/* Notifications bell */}
@@ -254,10 +303,12 @@ export function AppHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* v1.2.0: عملة عرض الأسعار — DZD افتراضياً وEUR/USD بضغطة */}
+          {/* v1.2.0: عملة عرض الأسعار — DZD افتراضياً وEUR/USD بضغطة
+              v1.17.0: على الشاشات المتوسطة يختفي من الشريط (موجود في قائمة
+              الهاتف والإعدادات) كي لا يتزاحم شريط التنقل بأي لغة */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" aria-label={t.settings.currencyLabel} className="h-8 sm:h-9 px-2.5 font-black text-xs gap-1">
+              <Button variant="ghost" aria-label={t.settings.currencyLabel} className="hidden 2xl:inline-flex h-8 sm:h-9 px-2.5 font-black text-xs gap-1">
                 <Coins className="h-4 w-4" />
                 <span dir="ltr">{currency}</span>
               </Button>

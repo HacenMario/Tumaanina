@@ -1,9 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import { Clinic, User } from "@/lib/models";
+import { Clinic, ClinicGalleryMedia, CounselorProfile, User } from "@/lib/models";
 import { apiHandler } from "@/lib/server/api";
 
 export const dynamic = "force-dynamic";
+
+/* ═ v1.17.0 — الأخصائيون التابعون للعيادة ═
+   الأخصائي يختار عيادته (اختيارياً) عند إنشاء حسابه — يظهر هنا في صفحة
+   عيادته بقائمة أخصائييها: الموثّقون غير المعلّقين فقط، بكل تفاصيلهم
+   العمومية (الاسم، التخصصات، الخبرة، النبذة، الصورة، التقييم، الرابط). */
+async function loadClinicSpecialists(clinicId: string) {
+  const users = (await User.find({ role: "COUNSELOR", suspended: false, clinicId }).select("_id").lean()) as {
+    _id: unknown;
+  }[];
+  const ids = users.map((u) => String(u._id));
+  if (!ids.length) return [];
+  const profiles = (await CounselorProfile.find({ userId: { $in: ids }, verificationStatus: "VERIFIED" }).lean()) as Record<
+    string,
+    unknown
+  >[];
+  return profiles.map((p) => {
+    const uid = String(p.userId);
+    return {
+      id: uid,
+      name: (p.fullName as string) || "—",
+      slug: (p.slug as string) || null,
+      specialties: (p.specialties as string[]) || [],
+      customSpecialties: (p.customSpecialties as string[]) || [],
+      bio: (p.bio as string) || null,
+      yearsExperience: Number(p.yearsExperience) || 0,
+      rating: Math.round((Number(p.rating) || 5) * 10) / 10,
+      sessionsCount: Number(p.sessionsCount) || 0,
+      photoUrl: p.photo ? `/api/counselors/${uid}/photo` : null,
+    };
+  });
+}
 
 /* ═ v1.14.0 — ملف عيادة عام (صفحة العيادة) ═
    GET /api/clinics/{id} — يقبل المعرّف أو الـslug.
@@ -67,6 +98,14 @@ async function GET_impl(_req: NextRequest, ctx: { params: Promise<{ id: string }
       /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
       sessionPrice: (clinic.sessionPrice as number | null) ?? null,
       packs: (clinic.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
+      /* v1.17.0: فيديوهات المعرض + الأخصائيون التابعون للعيادة */
+      galleryVideoUrls: (
+        await ClinicGalleryMedia.find({ clinicId: String(clinic._id) }).sort({ createdAt: 1, _id: 1 }).select("mime").lean()
+      ).map((v: Record<string, unknown>, i: number) => ({
+        url: `/api/clinics/${String(clinic._id)}/gallery/media/${i}`,
+        mime: String(v.mime || "video/mp4"),
+      })),
+      specialists: await loadClinicSpecialists(String(clinic._id)),
       createdAt: clinic.createdAt,
     },
   });

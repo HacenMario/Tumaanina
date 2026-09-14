@@ -101,6 +101,10 @@ async function GET_impl(req: NextRequest) {
         status: rec.status,
         clinicNote: (rec.clinicNote as string) || null,
         cancelledBy: (rec.cancelledBy as string) || null,
+        /* v1.17.0: الباقة المختارة عند الحجز — تظهر في بطاقة الحجز للعيادة */
+        packName: (rec.packName as string) || null,
+        packSessions: (rec.packSessions as number) || null,
+        packPrice: (rec.packPrice as number) || null,
         createdAt: rec.createdAt,
       };
     }),

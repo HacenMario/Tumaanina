@@ -26,7 +26,8 @@ import { cn , formatDateTime} from "@/lib/utils";
 interface PublicComment {
   name: string;
   text: string;
-  reply: { text: string | null } | null;
+  /* v1.17.0: الرد يحمل اسم العيادة صاحبة الإعلان */
+  reply: { text: string | null; name: string | null } | null;
   createdAt: string | null;
 }
 
@@ -72,6 +73,8 @@ export function AdsView() {
   const [commentOpen, setCommentOpen] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  /* v1.17.0: سحب باللمس يمين/يسار على البطاقة = التنقل بين الإعلانات */
+  const cardTouchX = useRef<number | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -174,11 +177,7 @@ export function AdsView() {
       </motion.div>
 
       {loading ? (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="h-56 animate-pulse bg-muted/50 border-border/50" />
-          ))}
-        </div>
+        <Card className="h-96 animate-pulse bg-muted/50 border-border/50 max-w-full" />
       ) : ads.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="p-10 text-center space-y-3 text-muted-foreground">
@@ -187,10 +186,23 @@ export function AdsView() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div
+          className="w-full max-w-full overflow-x-hidden"
+          onTouchStart={(e) => {
+            cardTouchX.current = e.touches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(e) => {
+            if (cardTouchX.current === null) return;
+            const dx = (e.changedTouches[0]?.clientX ?? 0) - cardTouchX.current;
+            cardTouchX.current = null;
+            if (Math.abs(dx) < 60) return;
+            if (dx < 0 && page < pages) setPage(page + 1);
+            else if (dx > 0 && page > 1) setPage(page - 1);
+          }}
+        >
           {ads.map((a, i) => (
             <motion.div key={a.id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (i % 8) * 0.05 }}>
-              <Card className="h-full border-border/70 hover:shadow-lg transition-all">
+              <Card className="w-full max-w-full border-border/70 hover:shadow-lg transition-all">
                 <CardContent className="p-5 space-y-3.5">
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="font-black text-lg leading-snug min-w-0">{a.title}</h2>
@@ -252,7 +264,8 @@ export function AdsView() {
                               <p className="text-xs text-muted-foreground leading-relaxed" dir="auto">{c.text}</p>
                               {c.reply?.text ? (
                                 <div className="rounded-lg bg-primary/5 border border-primary/20 px-2.5 py-1.5">
-                                  <p className="text-[10px] font-black text-primary">{t.ads.clinicReply}</p>
+                                  {/* v1.17.0: اسم العيادة صاحبة الرد — يأتي من الخادم */}
+                                  <p className="text-[10px] font-black text-primary">{c.reply.name || t.ads.clinicReply}</p>
                                   <p className="text-xs font-semibold leading-relaxed" dir="auto">{c.reply.text}</p>
                                 </div>
                               ) : null}
@@ -321,7 +334,7 @@ export function AdsView() {
         </div>
       )}
 
-      {/* v1.15.0: ترقيم صفحات من الخادم */}
+      {/* v1.17.0: أزرار التنقل بين الإعلانات + العدّاد — إعلان واحد لكل صفحة */}
       {pages > 1 ? (
         <div className="flex items-center justify-center gap-3 mt-8">
           <Button variant="outline" size="sm" className="rounded-lg font-bold" disabled={page <= 1} onClick={() => setPage(page - 1)}>
@@ -357,11 +370,14 @@ function AdMediaCarousel({ urls, title }: { urls: string[]; title: string }) {
 
   return (
     <div
-      className="relative rounded-xl overflow-hidden border border-border/60 aspect-[16/10] bg-muted/40 select-none"
+      className="relative rounded-xl overflow-hidden border border-border/60 aspect-[16/10] bg-muted/40 select-none max-w-full"
       onTouchStart={(e) => {
+        /* v1.17.0: نوقف انتقال اللمس للبطاقة حتى لا يقلب سحب الوسائط الإعلان نفسه */
+        e.stopPropagation();
         touchStartX.current = e.touches[0]?.clientX ?? null;
       }}
       onTouchEnd={(e) => {
+        e.stopPropagation();
         if (touchStartX.current === null) return;
         const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
         if (Math.abs(dx) > 40) {

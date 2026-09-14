@@ -22,7 +22,10 @@ export const dynamic = "force-dynamic";
 const MAX_MEDIA_ITEM = 6_000_000;   // ~4.5MB ثنائي لكل وسيط
 const MAX_MEDIA_TOTAL = 11_000_000; // سقف مجموع الوسائط داخل الوثيقة
 const MAX_ADS_PER_CLINIC = 15;
-const PUBLIC_PAGE = 8;
+/* v1.17.0: صفحة الإعلانات العمومية — إعلان واحد كامل في الصفحة (ترقيم بالبطاقة)،
+   والبانر العمومي يجلب حتى 8 للدوران */
+const PUBLIC_PAGE = 1;
+const PUBLIC_MAX = 8;
 const OWNER_PAGE = 8;
 
 /* وسائط الإعلان → روابط تقديم آمنة (بلا base64 داخل JSON) */
@@ -94,7 +97,8 @@ async function GET_impl(req: NextRequest) {
             name: (c.name as string) || "—",
             text: (c.text as string) || "",
             hidden: c.hidden === true,
-            reply: c.reply ? { text: (c.reply as { text?: string }).text || null, at: (c.reply as { at?: string }).at || null } : null,
+            /* v1.17.0: اسم العيادة صاحبة الرد — بدل عبارة «رد العيادة» */
+            reply: c.reply ? { text: (c.reply as { text?: string }).text || null, at: (c.reply as { at?: string }).at || null, name: (clinic.name as string) || "—" } : null,
             createdAt: c.createdAt,
           })),
           reviewedAt: rec.reviewedAt ?? null,
@@ -108,10 +112,14 @@ async function GET_impl(req: NextRequest) {
   }
 
   /* الجمهور: المنشورة فقط — مع بيانات العيادة للربط بصفحتها.
-     لا شيء هنا يدل على مستحقات أو سداد — الإعلان مجرد محتوى منشور. */
+     لا شيء هنا يدل على مستحقات أو سداد — الإعلان مجرد محتوى منشور.
+     v1.17.0: الترتيب من أعلى مستحقات إلى أدناها (معلومة إدارية سرّية —
+     لا تُكتب في أي استجابة ولا في الواجهة) ثم الأحدث — والعموم يرى مجرد
+     صفحات متساوية. صفحة عمومية واحدة = إعلان كامل، والبانر يجلب حتى 8. */
+  const pageSize = Math.min(PUBLIC_MAX, Math.max(1, Number(searchParams.get("pageSize")) || PUBLIC_PAGE));
   const filter = { status: "APPROVED" };
   const [rows, total] = await Promise.all([
-    ClinicAd.find(filter).sort({ reviewedAt: -1, createdAt: -1 }).skip((page - 1) * PUBLIC_PAGE).limit(PUBLIC_PAGE).lean(),
+    ClinicAd.find(filter).sort({ amountDue: -1, reviewedAt: -1, createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize).lean(),
     ClinicAd.countDocuments(filter),
   ]);
   const clinicIds = Array.from(new Set(rows.map((r) => String((r as unknown as { clinicId: { toString(): string } }).clinicId))));
@@ -142,7 +150,8 @@ async function GET_impl(req: NextRequest) {
           comments: comments.map((cm) => ({
             name: (cm.name as string) || "—",
             text: (cm.text as string) || "",
-            reply: cm.reply ? { text: (cm.reply as { text?: string }).text || null } : null,
+            /* v1.17.0: الرد يحمل اسم العيادة صاحبة الإعلان نفسه */
+            reply: cm.reply ? { text: (cm.reply as { text?: string }).text || null, name: (c.name as string) || "—" } : null,
             createdAt: cm.createdAt,
           })),
           clinic: {
@@ -163,7 +172,7 @@ async function GET_impl(req: NextRequest) {
       .filter((a) => a.clinic.slug),
     total,
     page,
-    pages: Math.max(1, Math.ceil(total / PUBLIC_PAGE)),
+    pages: Math.max(1, Math.ceil(total / pageSize)),
   });
 }
 
@@ -224,8 +233,8 @@ async function POST_impl(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  /* ─── أفعال العيادة على إعلاناتها (حجب تعليق / رد / إنشاء / حذف) ─── */
-  const ownerActions = ["create", "delete", "comment-hide", "comment-reply"];
+  /* ─── أفعال العيادة على إعلاناتها (حجب تعليق / رد / إنشاء / تعديل / حذف) ─── */
+  const ownerActions = ["create", "update", "delete", "comment-hide", "comment-reply"];
   if (ownerActions.includes(String(action))) {
     const user = await User.findById(userId).select("role suspended").lean();
     if (!user || (user as { role?: string }).role !== "CLINIC" || (user as { suspended?: boolean }).suspended) {
@@ -255,9 +264,32 @@ async function POST_impl(req: NextRequest) {
     }
 
     /* الأفعال المتبقية تشترط ملكية الإعلان */
-    const ad = (await ClinicAd.findById(body.id).select("clinicId").lean()) as Record<string, unknown> | null;
+    const ad = (await ClinicAd.findById(body.id).select("clinicId status").lean()) as Record<string, unknown> | null;
     if (!ad || String(ad.clinicId as { toString(): string }) !== String(clinic._id)) {
       return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    }
+
+    /* v1.17.0: تعديل إعلان العيادة (بانتظار المراجعة أو المنشور) —
+       التعديل على المنشور يصل للمستخدمين تلقائياً فور الحفظ (البيانات
+       تُقرأ من القاعدة في كل زيارة)، وتبقى حالة الإعلان كما هي.
+       المرفوض لا يُعدَّل — يُحذف ويُصاغ غيره بسببه المعروض للعيادة */
+    if (action === "update") {
+      const st = String(ad.status || "");
+      if (st === "REJECTED") return NextResponse.json({ error: "REJECTED_LOCKED" }, { status: 403 });
+      const title = String(body.title || "").trim().slice(0, 120);
+      const adBody = String(body.body || "").trim().slice(0, 1200);
+      if (!title || !adBody) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+      let media: string[] = Array.isArray(body.media) ? body.media.filter((m: unknown) => typeof m === "string") : [];
+      if (!media.length && typeof body.image === "string" && body.image) media = [body.image];
+      if (media.length > 6) return NextResponse.json({ error: "MAX_6_MEDIA" }, { status: 400 });
+      const images = media.filter((m) => m.startsWith("data:image/"));
+      const videos = media.filter((m) => m.startsWith("data:video/"));
+      if (images.length + videos.length !== media.length) return NextResponse.json({ error: "INVALID_MEDIA" }, { status: 400 });
+      if (images.length > 5 || videos.length > 1) return NextResponse.json({ error: "MAX_6_MEDIA" }, { status: 400 });
+      if (media.some((m) => m.length > MAX_MEDIA_ITEM)) return NextResponse.json({ error: "MEDIA_TOO_BIG" }, { status: 400 });
+      if (media.reduce((s, m) => s + m.length, 0) > MAX_MEDIA_TOTAL) return NextResponse.json({ error: "MEDIA_TOO_BIG" }, { status: 400 });
+      await ClinicAd.updateOne({ _id: body.id }, { $set: { title, body: adBody, media } });
+      return NextResponse.json({ ok: true, updated: true });
     }
 
     if (action === "delete") {

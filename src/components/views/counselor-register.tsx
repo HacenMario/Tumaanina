@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { HeartHandshake, Check, ImagePlus, Trash2, ShieldCheck, UserRound } from "lucide-react";
+import { HeartHandshake, Check, ImagePlus, Trash2, ShieldCheck, UserRound, Building2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { SPECIALTIES, CURRENCIES, CURRENCY_CODES } from "@/lib/constants";
@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { BackButton } from "@/components/shared/back-button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const MAX_RESULT_BYTES = 3_400_000; // بعد الضغط — حد الخادم ~3.3MB base64
 const MAX_AVATAR_BYTES = 900_000; // الصورة الشخصية — أصغر حجمًا
@@ -100,6 +101,27 @@ export function CounselorRegisterView({ embedded = false }: { embedded?: boolean
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  /* v1.17.0: العيادة التابع لها الأخصائي — اختيارية من قائمة العيادات المسجلة */
+  const [clinics, setClinics] = useState<{ id: string; name: string }[]>([]);
+  const [clinicId, setClinicId] = useState("none");
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/clinics?pageSize=200")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive || !Array.isArray(d?.clinics)) return;
+        setClinics(
+          d.clinics
+            .filter((c: { id?: string; name?: string }) => c.id && c.name)
+            .map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
+        );
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const toggle = (list: string[], setList: (v: string[]) => void, v: string) => {
     setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -193,6 +215,8 @@ export function CounselorRegisterView({ embedded = false }: { embedded?: boolean
           diplomaImage,
           photo,
           language: lang,
+          /* v1.17.0: العيادة المختارة (اختيارية) */
+          clinicId: clinicId === "none" ? null : clinicId,
         }),
       });
       const data = await res.json();
@@ -424,6 +448,27 @@ export function CounselorRegisterView({ embedded = false }: { embedded?: boolean
                 />
                 <p className="text-[11px] text-muted-foreground font-semibold">{t.counselor.whatsappHint}</p>
               </div>
+            </div>
+
+            {/* v1.17.0: العيادة التابع لها — اختيارية؛ عند اختيارها يظهر الأخصائي
+                في صفحة تلك العيادة ضمن قائمة أخصائييها بكل تفاصيله */}
+            <div className="space-y-1.5">
+              <Label className="font-bold flex items-center gap-1.5">
+                <Building2 className="h-4 w-4 text-primary" />
+                {t.counselor.clinicAffil}
+              </Label>
+              <Select value={clinicId} onValueChange={setClinicId} dir={lang === "ar" ? "rtl" : "ltr"}>
+                <SelectTrigger className="rounded-xl bg-card font-semibold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  <SelectItem value="none">{t.counselor.clinicAffilNone}</SelectItem>
+                  {clinics.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground font-semibold">{t.counselor.clinicAffilHint}</p>
             </div>
 
             {/* الصورة الشخصية — اختيارية: تظهر للعميل في دليل الأخصائيين */}

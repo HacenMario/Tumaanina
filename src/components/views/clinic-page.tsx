@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Building2, MapPin, Phone, Globe, Clock, Wallet, FileCheck2, Star, CalendarClock,
   BadgeCheck, MessageSquareHeart, Send, Loader2, LogIn, Users, Info, Images, Navigation, X,
+  Mail, ChevronLeft, ChevronRight, Play, Stethoscope,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -22,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BackButton } from "@/components/shared/back-button";
 import { formatDateTime } from "@/lib/utils";
+import { fmtApproxFromDzd } from "@/lib/money";
 import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from "@/components/shared/social-glyphs";
 import { showAppToast } from "@/components/shared/app-toast";
 import { openClinicPage } from "./clinics-directory";
@@ -32,6 +34,20 @@ import { openClinicPage } from "./clinics-directory";
    ساعات العمل، ملاحظة الأسعار، أرقام الاتصال، واتساب، الموقع،
    السوشيال، التقييمات (عرض + إضافة لمن حجز)، والحجز الحضوري:
    تاريخ (اليوم→+60) + ساعة من SLOT_TIMES + اسم وهاتف وسبب. */
+
+/* v1.17.0: أخصائي تابع للعيادة — يظهر في قائمة أخصائييها بكل تفاصيله */
+interface ClinicSpecialist {
+  id: string;
+  name: string;
+  slug: string | null;
+  specialties: string[];
+  customSpecialties: string[];
+  bio: string | null;
+  yearsExperience: number;
+  rating: number;
+  sessionsCount: number;
+  photoUrl: string | null;
+}
 
 interface ClinicProfile {
   id: string;
@@ -65,6 +81,9 @@ interface ClinicProfile {
   /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
   sessionPrice: number | null;
   packs: { name: string; sessions: number; price: number; note: string | null }[];
+  /* v1.17.0: فيديوهات المعرض + الأخصائيون التابعون */
+  galleryVideoUrls: { url: string; mime: string }[];
+  specialists: ClinicSpecialist[];
 }
 
 interface ReviewItem {
@@ -92,7 +111,7 @@ function Stars({ n, size = "h-4 w-4" }: { n: number; size?: string }) {
 
 export function ClinicPageView() {
   const { t, lang } = useI18n();
-  const { user, activeClinicSlug, setView } = useApp();
+  const { user, activeClinicSlug, setView, currency } = useApp();
   const [clinic, setClinic] = useState<ClinicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
@@ -111,6 +130,8 @@ export function ClinicPageView() {
   const [bookOpen, setBookOpen] = useState(false);
   const [bDate, setBDate] = useState(localDateStr2());
   const [bSlot, setBSlot] = useState("");
+  /* v1.17.0: الباقة المختارة عند الحجز — null = بدون باقة */
+  const [bPackIdx, setBPackIdx] = useState<number | null>(null);
   const [bTaken, setBTaken] = useState<string[]>([]);
   const [bName, setBName] = useState("");
   const [bPhone, setBPhone] = useState("");
@@ -123,6 +144,10 @@ export function ClinicPageView() {
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  /* v1.17.0: فيديوهات المعرض — تُجلب مع الصور عند فتح النافذة */
+  const [galleryVideos, setGalleryVideos] = useState<{ url: string; mime: string }[]>([]);
+  /* مرجع لمسة السحب داخل العارض (يمين/يسار) */
+  const lbTouch = useRef<number | null>(null);
 
   const loadClinic = useCallback(async () => {
     if (!activeClinicSlug) {
@@ -179,7 +204,7 @@ export function ClinicPageView() {
         sessionStorage.removeItem("tumaanina-clinic-book");
         if (draftRaw) {
           sessionStorage.removeItem("tumaanina-clinic-booking-draft");
-          const d = JSON.parse(draftRaw) as { clinicKey?: string; date?: string; slot?: string; name?: string; phone?: string; reason?: string };
+          const d = JSON.parse(draftRaw) as { clinicKey?: string; date?: string; slot?: string; name?: string; phone?: string; reason?: string; packIdx?: number | null };
           /* تُستعاد المسودة فقط إن كانت لنفس العيادة المعروضة */
           if (!d.clinicKey || d.clinicKey === activeClinicSlug) {
             if (d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) setBDate(d.date);
@@ -187,6 +212,7 @@ export function ClinicPageView() {
             if (d.name) setBName(d.name);
             if (d.phone) setBPhone(d.phone);
             if (d.reason) setBReason(d.reason);
+            if (typeof d.packIdx === "number" && d.packIdx >= 0) setBPackIdx(d.packIdx);
           }
         } else {
           /* عميل مسجّل: نملأ مسبقاً بما نعرفه عنه */
@@ -211,6 +237,7 @@ export function ClinicPageView() {
       const res = await fetch(`/api/clinics/${clinic?.id}/gallery`);
       const data = await res.json();
       setGalleryImages(data.images || []);
+      setGalleryVideos(Array.isArray(data.videos) ? data.videos : []);
     } catch {
       setGalleryImages([]);
     } finally {
@@ -227,6 +254,23 @@ export function ClinicPageView() {
       .then((d) => setBTaken(d.taken || []))
       .catch(() => setBTaken([]));
   }, [bookOpen, bDate, clinic]);
+
+  /* v1.17.0: تنقّل بلوحة المفاتيح داخل العارض — Esc يغلق العارض والمعرض معاً */
+  useEffect(() => {
+    if (lightbox === null) return;
+    const total = galleryImages.length + galleryVideos.length;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") setLightbox((cur) => (cur === null ? cur : Math.max(0, cur - 1)));
+      else if (e.key === "ArrowLeft") setLightbox((cur) => (cur === null ? cur : Math.min(total - 1, cur + 1)));
+      else if (e.key === "Escape") {
+        setLightbox(null);
+        setGalleryOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightbox, galleryImages.length, galleryVideos.length]);
 
   const wilayaLabel = (w: string | null) => {
     if (!w) return "";
@@ -281,7 +325,7 @@ export function ClinicPageView() {
       try {
         sessionStorage.setItem(
           "tumaanina-clinic-booking-draft",
-          JSON.stringify({ clinicKey: activeClinicSlug, date: bDate, slot: bSlot, name: bName.trim(), phone: bPhone.trim(), reason: bReason.trim() })
+          JSON.stringify({ clinicKey: activeClinicSlug, date: bDate, slot: bSlot, name: bName.trim(), phone: bPhone.trim(), reason: bReason.trim(), packIdx: bPackIdx ?? null })
         );
       } catch {
         /* تجاهل */
@@ -303,7 +347,7 @@ export function ClinicPageView() {
       const res = await fetch(`/api/clinics/${clinic?.id}/book`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, name: bName.trim(), phone: bPhone.replace(/\D/g, ""), date: bDate, slot: bSlot, reason: bReason.trim() || undefined }),
+        body: JSON.stringify({ userId: user.id, name: bName.trim(), phone: bPhone.replace(/\D/g, ""), date: bDate, slot: bSlot, reason: bReason.trim() || undefined, packIndex: bPackIdx ?? undefined }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -399,6 +443,9 @@ export function ClinicPageView() {
                     <Wallet className="h-4 w-4 text-primary" />
                     <span className="text-base font-black text-primary">{clinic.sessionPrice.toLocaleString("en-US")} DZD</span>
                     <span className="text-[11px] font-bold text-muted-foreground">/ {t.clinics.sessionShort}</span>
+                    {currency !== "DZD" ? (
+                      <span className="text-[11px] font-bold text-muted-foreground" dir="ltr">{fmtApproxFromDzd(clinic.sessionPrice, currency, lang)}</span>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -441,6 +488,49 @@ export function ClinicPageView() {
             ) : null}
 
             {/* النبذة */}
+            {/* v1.17.0: الأخصائيون التابعون للعيادة — يختارهم الأخصائي عند تسجيله */}
+            {clinic.specialists && clinic.specialists.length > 0 ? (
+              <div className="rounded-2xl border border-border/70 bg-muted/20 p-4 space-y-3">
+                <p className="text-sm font-black flex items-center gap-1.5 text-primary">
+                  <Stethoscope className="h-4 w-4" />
+                  {t.clinics.specialistsTitle.replace("{n}", String(clinic.specialists.length))}
+                </p>
+                <div className="grid sm:grid-cols-2 gap-2.5">
+                  {clinic.specialists.map((sp) => (
+                    <div key={sp.id} className="rounded-xl border border-border/60 bg-card p-3.5 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12 rounded-xl border border-border/60 shrink-0">
+                          {sp.photoUrl ? <AvatarImage src={sp.photoUrl} alt={sp.name} className="rounded-xl object-cover" /> : null}
+                          <AvatarFallback className="gradient-primary text-white rounded-xl font-black">{sp.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-black text-sm truncate">{sp.name}</p>
+                          <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground">
+                            <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400" dir="ltr">
+                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                              {sp.rating.toFixed(1)}
+                            </span>
+                            {sp.yearsExperience > 0 ? <span>{sp.yearsExperience} {t.clinics.yearsExp}</span> : null}
+                          </div>
+                        </div>
+                      </div>
+                      {sp.specialties.length || sp.customSpecialties.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {sp.specialties.slice(0, 4).map((s) => (
+                            <Badge key={s} variant="secondary" className="text-[10px] font-semibold">{t.client.specialties[s as SpecialtyKey] ?? s}</Badge>
+                          ))}
+                          {sp.customSpecialties.slice(0, 2).map((cs) => (
+                            <Badge key={`c-${cs}`} variant="secondary" className="text-[10px] font-semibold">{cs}</Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                      {sp.bio ? <p className="text-[11px] text-muted-foreground leading-relaxed">{sp.bio}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {clinic.about ? <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{clinic.about}</p> : null}
 
             {/* تفاصيل العمل */}
@@ -504,7 +594,8 @@ export function ClinicPageView() {
                 );
               })()}
               {clinic.contactEmail ? (
-                <a href={`mailto:${clinic.contactEmail}`} className="inline-flex items-center gap-1.5 rounded-xl border border-border text-muted-foreground hover:text-primary px-3.5 py-2 text-xs font-bold transition-colors" dir="ltr">
+                <a href={`mailto:${clinic.contactEmail}`} className="inline-flex items-center gap-1.5 rounded-xl border border-border text-muted-foreground hover:text-primary hover:border-primary/40 px-3.5 py-2 text-xs font-bold transition-colors" dir="ltr">
+                  <Mail className="h-3.5 w-3.5 shrink-0 text-primary" />
                   {clinic.contactEmail}
                 </a>
               ) : null}
@@ -531,11 +622,11 @@ export function ClinicPageView() {
                 v1.16.0: زر الموقع رابط حقيقي يعمل دائماً — بالإحداثيات إن وُجدت
                 وإلا بالعنوان النصي (كان window.open قابل الحجب ولا يعمل) */}
             <div className="flex flex-wrap items-center gap-2">
-              {clinic.galleryCount > 0 ? (
+              {clinic.galleryCount > 0 || (clinic.galleryVideoUrls?.length || 0) > 0 ? (
                 <Button size="sm" variant="outline" className="rounded-xl font-bold gap-1.5 border-primary/40 text-primary" onClick={() => void openGallery()}>
                   <Images className="h-4 w-4" />
                   {t.clinics.galleryBtn}
-                  <span className="text-[10px] font-black text-muted-foreground">({clinic.galleryCount})</span>
+                  <span className="text-[10px] font-black text-muted-foreground">({(clinic.galleryCount || 0) + (clinic.galleryVideoUrls?.length || 0)})</span>
                 </Button>
               ) : null}
               {mapsHref ? (
@@ -566,7 +657,7 @@ export function ClinicPageView() {
                     try {
                       sessionStorage.setItem(
                         "tumaanina-clinic-booking-draft",
-                        JSON.stringify({ clinicKey: activeClinicSlug, date: bDate, slot: bSlot, name: bName.trim(), phone: bPhone.trim(), reason: bReason.trim() })
+                        JSON.stringify({ clinicKey: activeClinicSlug, date: bDate, slot: bSlot, name: bName.trim(), phone: bPhone.trim(), reason: bReason.trim(), packIdx: bPackIdx ?? null })
                       );
                     } catch {
                       /* تجاهل */
@@ -587,11 +678,14 @@ export function ClinicPageView() {
 
       {/* التقييمات */}
       <div className="mt-8 space-y-4">
-        <h2 className="text-lg font-black flex items-center gap-2">
-          <MessageSquareHeart className="h-5 w-5 text-primary" />
-          {t.clinics.reviewsTitle}
-          <span className="text-xs font-bold text-muted-foreground">({revTotal})</span>
-        </h2>
+        {/* v1.17.0: لا عنوان «تقييمات العيادة (0)» حين لا توجد تقييمات بعد */}
+        {revTotal > 0 ? (
+          <h2 className="text-lg font-black flex items-center gap-2">
+            <MessageSquareHeart className="h-5 w-5 text-primary" />
+            {t.clinics.reviewsTitle}
+            <span className="text-xs font-bold text-muted-foreground">({revTotal})</span>
+          </h2>
+        ) : null}
 
         {/* نموذج تقييم — لمن يملك حجزاً في العيادة */}
         {(!user || user.role === "VICTIM") ? (
@@ -668,30 +762,96 @@ export function ClinicPageView() {
                   <img src={src} alt={`${clinic.name} ${i + 1}`} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                 </button>
               ))}
+              {/* v1.17.0: بلاطات الفيديو — تُفتح في العارض بمشغّل المتصفح المدمج */}
+              {galleryVideos.map((v, i) => (
+                <button
+                  key={`v-${i}`}
+                  type="button"
+                  className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square bg-black/80"
+                  onClick={() => setLightbox(galleryImages.length + i)}
+                >
+                  <video src={v.url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="h-10 w-10 rounded-full bg-black/60 group-hover:bg-black/80 text-white flex items-center justify-center transition-colors">
+                      <Play className="h-5 w-5 fill-white" />
+                    </span>
+                  </span>
+                </button>
+              ))}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
       {/* v1.15.0: عارض الصورة الكاملة (Lightbox) */}
-      {lightbox !== null && galleryImages[lightbox] ? (
-        <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
-          <button type="button" className="absolute top-4 end-4 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center" onClick={() => setLightbox(null)} aria-label={t.common.close}>
-            <X className="h-5 w-5" />
-          </button>
-          {lightbox > 0 ? (
-            <button type="button" className="absolute start-3 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-2xl font-black" onClick={(e) => { e.stopPropagation(); setLightbox(lightbox - 1); }} aria-label="prev">
-              {lang === "ar" ? "›" : "‹"}
-            </button>
-          ) : null}
-          {lightbox < galleryImages.length - 1 ? (
-            <button type="button" className="absolute end-3 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-2xl font-black" onClick={(e) => { e.stopPropagation(); setLightbox(lightbox + 1); }} aria-label="next">
-              {lang === "ar" ? "‹" : "›"}
-            </button>
-          ) : null}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={galleryImages[lightbox]} alt={`${clinic.name} ${lightbox + 1}`} className="max-h-[85vh] max-w-full object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
-        </div>
+      {/* v1.17.0: عارض الوسائط الكامل — صور وفيديوهات:
+          سحب يمين/يسار باللمس + أسهم بمواضع صحيحة تعمل بالضغط + إغلاق واحد
+          يعود مباشرة لصفحة العيادة + أسهم لوحة المفاتيح + مشغّل المتصفح للفيديو */}
+      {lightbox !== null && (galleryImages[lightbox] || galleryVideos[lightbox - galleryImages.length]) ? (
+        (() => {
+          const vid = lightbox >= galleryImages.length ? galleryVideos[lightbox - galleryImages.length] : null;
+          const total = galleryImages.length + galleryVideos.length;
+          return (
+            <div
+              className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4"
+              onClick={() => { setLightbox(null); setGalleryOpen(false); }}
+              onTouchStart={(e) => { lbTouch.current = e.touches[0]?.clientX ?? null; }}
+              onTouchEnd={(e) => {
+                if (lbTouch.current === null) return;
+                const dx = (e.changedTouches[0]?.clientX ?? 0) - lbTouch.current;
+                lbTouch.current = null;
+                if (Math.abs(dx) < 45) return;
+                setLightbox((cur) => {
+                  if (cur === null) return cur;
+                  return dx < 0 ? Math.min(cur + 1, total - 1) : Math.max(0, cur - 1);
+                });
+              }}
+            >
+              <button
+                type="button"
+                className="absolute top-4 end-4 z-10 h-11 w-11 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center"
+                onClick={(e) => { e.stopPropagation(); setLightbox(null); setGalleryOpen(false); }}
+                aria-label={t.common.close}
+              >
+                <X className="h-5 w-5" />
+              </button>
+              {lightbox > 0 ? (
+                <button
+                  type="button"
+                  className="absolute start-2 sm:start-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); setLightbox(lightbox - 1); }}
+                  aria-label="prev"
+                >
+                  <ChevronLeft className="h-6 w-6 rtl:rotate-180" />
+                </button>
+              ) : null}
+              {lightbox < total - 1 ? (
+                <button
+                  type="button"
+                  className="absolute end-2 sm:end-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); setLightbox(lightbox + 1); }}
+                  aria-label="next"
+                >
+                  <ChevronRight className="h-6 w-6 rtl:rotate-180" />
+                </button>
+              ) : null}
+              {vid ? (
+                <video
+                  key={vid.url}
+                  src={vid.url}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-[85vh] max-w-full rounded-xl bg-black"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={galleryImages[lightbox]} alt={`${clinic.name} ${lightbox + 1}`} className="max-h-[85vh] max-w-full object-contain rounded-xl" onClick={(e) => e.stopPropagation()} />
+              )}
+            </div>
+          );
+        })()
       ) : null}
 
       {/* نافذة الحجز الحضوري */}
@@ -707,9 +867,53 @@ export function ClinicPageView() {
           <div className="space-y-4">
             {/* v1.16.0: تذكير بالسعر داخل نافذة الحجز */}
             {clinic.sessionPrice !== null && clinic.sessionPrice > 0 ? (
-              <div className="flex items-center justify-between gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3.5 py-2.5" dir="ltr">
-                <span className="text-xs font-bold text-muted-foreground">{t.clinics.sessionShort}</span>
-                <span className="text-sm font-black text-primary">{clinic.sessionPrice.toLocaleString("en-US")} DZD</span>
+              <div className="rounded-xl bg-primary/5 border border-primary/20 px-3.5 py-2.5 space-y-1" dir="ltr">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-muted-foreground">{t.clinics.sessionShort}</span>
+                  <span className="text-sm font-black text-primary">{clinic.sessionPrice.toLocaleString("en-US")} DZD</span>
+                </div>
+                {currency !== "DZD" ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground/80" dir="ltr">≈</span>
+                    <span className="text-xs font-black text-primary/80" dir="ltr">{fmtApproxFromDzd(clinic.sessionPrice, currency, lang)}</span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {/* v1.17.0: اختيار باقة الجلسات (اختياري) — تُحفظ مع الحجز وتظهر للعيادة */}
+            {clinic.packs && clinic.packs.length > 0 ? (
+              <div className="space-y-1.5">
+                <Label className="font-bold">{t.clinics.packChoose}</Label>
+                <div className="grid sm:grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setBPackIdx(null)}
+                    className={`rounded-xl border px-3 py-2 text-start transition-all ${
+                      bPackIdx === null ? "gradient-primary text-white border-transparent shadow" : "border-border/70 bg-card hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="block text-xs font-black">{t.clinics.packNone}</span>
+                  </button>
+                  {clinic.packs.map((p, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setBPackIdx(i)}
+                      className={`rounded-xl border px-3 py-2 text-start transition-all ${
+                        bPackIdx === i ? "gradient-primary text-white border-transparent shadow" : "border-border/70 bg-card hover:border-primary/40"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black truncate">{p.name}</span>
+                        <span className={`text-xs font-black shrink-0 ${bPackIdx === i ? "" : "text-primary"}`} dir="ltr">{p.price.toLocaleString("en-US")} DZD</span>
+                      </span>
+                      <span className={`block text-[10px] font-bold mt-0.5 ${bPackIdx === i ? "text-white/85" : "text-muted-foreground"}`}>
+                        {t.clinics.packsSessions.replace("{n}", String(p.sessions))}
+                        {p.note ? ` · ${p.note}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : null}
             <div className="space-y-1.5">

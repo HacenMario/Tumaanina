@@ -29,6 +29,9 @@ export function GlobalAdBanner() {
   const [ads, setAds] = useState<BannerAd[]>([]);
   const [idx, setIdx] = useState(0);
   const [closed, setClosed] = useState(false);
+  /* v1.17.0: من رفض الإعلانات المدفوعة من إعداداته لا يرى البانر الإعلاني
+     أيضاً (كما لا يرى النافذة العائمة) — الحالة تُجلب من حسابه مباشرة */
+  const [optedOut, setOptedOut] = useState(false);
 
   const eligible = !!user?.id && (user.role === "VICTIM" || user.role === "COUNSELOR");
 
@@ -36,12 +39,21 @@ export function GlobalAdBanner() {
   useEffect(() => {
     if (!eligible) {
       setAds([]);
+      setOptedOut(false);
       return;
     }
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`/api/ads?viewerId=${user!.id}`);
+        const st = await fetch(`/api/user-ads-status?userId=${user!.id}`)
+          .then((r) => r.json())
+          .catch(() => ({ adsOptOut: false }));
+        if (!alive) return;
+        if (st?.adsOptOut === true) {
+          setOptedOut(true);
+          return;
+        }
+        const res = await fetch(`/api/ads?viewerId=${user!.id}&pageSize=8`);
         const data = await res.json();
         if (!alive || !Array.isArray(data?.ads)) return;
         const list: BannerAd[] = data.ads
@@ -70,7 +82,7 @@ export function GlobalAdBanner() {
     return () => clearInterval(iv);
   }, [ads.length]);
 
-  if (!eligible || closed || ads.length === 0) return null;
+  if (!eligible || optedOut || closed || ads.length === 0) return null;
   const ad = ads[Math.min(idx, ads.length - 1)];
 
   return (

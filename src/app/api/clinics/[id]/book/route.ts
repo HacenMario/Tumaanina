@@ -41,13 +41,14 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
   const body = await req.json();
   await connectDB();
 
-  const { userId, name, phone, date, slot, reason } = body as {
+  const { userId, name, phone, date, slot, reason, packIndex } = body as {
     userId?: string;
     name?: string;
     phone?: string;
     date?: string;
     slot?: string;
     reason?: string;
+    packIndex?: number;
   };
 
   if (!/^[a-f0-9]{24}$/i.test(String(userId || "")) || !/^[a-f0-9]{24}$/i.test(String(id || ""))) {
@@ -73,7 +74,7 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
 
   const [user, clinic] = await Promise.all([
     User.findById(userId).select("role suspended").lean(),
-    Clinic.findById(id).select("_id name slug isActive ownerUserId address wilaya city slots").lean(),
+    Clinic.findById(id).select("_id name slug isActive ownerUserId address wilaya city slots packs").lean(),
   ]);
   if (!user || (user as { role?: string }).role !== "VICTIM" || (user as { suspended?: boolean }).suspended) {
     return NextResponse.json({ error: "INVALID" }, { status: 401 });
@@ -98,6 +99,31 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     if (String(slot || "") <= nowHHMM) {
       return NextResponse.json({ error: "SLOT_PAST" }, { status: 400 });
     }
+  }
+
+  /* v1.17.0: اختيار باقة (Packs) عند الحجز — اختياري: إن أُرسل فهرس الباقة
+     يجب أن يطابق باقة حقيقية من باقات العيادة الحالية، وتُحفظ نسخة لحظة
+     الحجز (الاسم/عدد الجلسات/السعر بالدينار) مع الحجز نفسه */
+  const clinicPacks = ((clinic as unknown as { packs?: { name: string; sessions: number; price: number }[] }).packs || []) as {
+    name: string;
+    sessions: number;
+    price: number;
+  }[];
+  let packSnap: { packName: string | null; packSessions: number | null; packPrice: number | null } = {
+    packName: null,
+    packSessions: null,
+    packPrice: null,
+  };
+  if (packIndex !== undefined && packIndex !== null) {
+    const pi = Math.round(Number(packIndex));
+    if (!Number.isInteger(pi) || pi < 0 || pi >= clinicPacks.length) {
+      return NextResponse.json({ error: "BAD_PACK" }, { status: 400 });
+    }
+    packSnap = {
+      packName: String(clinicPacks[pi].name).slice(0, 80),
+      packSessions: Math.max(1, Math.min(200, Math.round(Number(clinicPacks[pi].sessions)))),
+      packPrice: Math.max(0, Math.round(Number(clinicPacks[pi].price))),
+    };
   }
 
   /* تصادم ذري: هل الوقت محجوز بحجز حي؟ */
@@ -136,6 +162,9 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     slot,
     reason: (reason || "").trim().slice(0, 600) || null,
     status: "PENDING",
+    packName: packSnap.packName,
+    packSessions: packSnap.packSessions,
+    packPrice: packSnap.packPrice,
   });
 
   /* إشعار فوري لصاحب العيادة بالتفاصيل الكاملة */

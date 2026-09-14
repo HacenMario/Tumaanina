@@ -69,8 +69,13 @@ const UserSchema = new Schema(
        ["male","female"] افتراضياً (لا قيد) — يُفلتر به قوائم الحجز والمطابقة */
     acceptedGenders: { type: [String], default: ["male", "female"] },
     /* v1.15.0: رفض الإعلانات المدفوعة — حق العميل من إعداداته: نافذة
-       الإعلان العائم لا تظهر له إطلاقاً */
+       الإعلان العائم لا تظهر له إطلاقاً — v1.17.0: يشمل أيضاً البانر
+       الإعلاني أعلى الصفحات (يخفى عن الرافض تماماً) */
     adsOptOut: { type: Boolean, default: false },
+    /* ═ v1.17.0: العيادة التابع لها الأخصائي (اختياري عند التسجيل) ═
+       يختار الأخصائي عيادة من الدليل عند إنشاء حسابه فيظهر في صفحة
+       تلك العيادة ضمن قائمة أخصائييها بكل تفاصيله */
+    clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", default: null, index: true },
     /* ═ v1.4.0: حسابات فريق الإدارة ═
        لحسابات role=ADMIN فقط: المالك SUPER (يدير الفريق)، مدير المنصة ADMIN
        (كل الإدارة عدا الفريق)، المسير MANAGER (قراءة ومحتوى وإشعارات فقط).
@@ -787,11 +792,32 @@ const ClinicBookingSchema = new Schema(
     /* من ألغى: CLIENT | CLINIC — مع ملاحظة العيادة التي تصل للعميل */
     cancelledBy: { type: String, default: null },
     clinicNote: { type: String, default: null, trim: true, maxlength: 400 },
+    /* ═ v1.17.0: الباقة المختارة عند الحجز (اختياري) ═
+       نسخة لحظة الحجز من باقة العيادة: الاسم + عدد الجلسات + السعر بالدينار
+       — يختارها العميل من نافذة الحجز وتظهر للعيادة في بطاقة الحجز */
+    packName: { type: String, default: null, trim: true, maxlength: 80 },
+    packSessions: { type: Number, default: null, min: 1, max: 200 },
+    packPrice: { type: Number, default: null, min: 0, max: 100000000 },
   },
   { timestamps: true, collection: "clinic_bookings" }
 );
 ClinicBookingSchema.index({ clinicId: 1, date: 1, slot: 1 });
 ClinicBookingSchema.index({ clientUserId: 1, createdAt: -1 });
+
+/* ═ v1.17.0: ClinicGalleryMedia — فيديوهات معرض العيادة ═
+   الفيديو كبير الحجم على حد BSON، لذا يُخزَّن في مجموعة مستقلة عن وثيقة
+   العيادة (فيديو أو اثنان لكل عيادة) — يُقدَّم عبر المسار
+   /api/clinics/{id}/gallery/media/{idx} بدعم Range لتمرير المشغّل،
+   ويُستبدل دفعة واحدة حين تعدّل العيادة فيديوهات معرضها من لوحتها. */
+const ClinicGalleryMediaSchema = new Schema(
+  {
+    clinicId: { type: Schema.Types.ObjectId, ref: "Clinic", required: true, index: true },
+    mime: { type: String, required: true },
+    data: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { collection: "clinic_gallery_media" }
+);
 
 /* ═ v1.14.0: ClinicSuggestion — اقتراح عيادة من المختص للعميل في غرفة الجلسة ═
    يُنشأ لحظة ضغط المختص «اقترح هذه العيادة» — يصل للعميل إشعار فوري بكامل
@@ -856,6 +882,11 @@ export const ClinicRating =
 export const ClinicSuggestion =
   (mongoose.models.ClinicSuggestion as mongoose.Model<any>) ||
   mongoose.model("ClinicSuggestion", ClinicSuggestionSchema);
+
+/* v1.17.0: فيديوهات معرض العيادة */
+export const ClinicGalleryMedia =
+  (mongoose.models.ClinicGalleryMedia as mongoose.Model<any>) ||
+  mongoose.model("ClinicGalleryMedia", ClinicGalleryMediaSchema);
 
 /* أنواع مساعدة خفيفة */
 export type UserDoc = mongoose.InferSchemaType<typeof UserSchema>;

@@ -502,3 +502,37 @@
    أبداً: لا فراغ سفلي في الصفحة الأولى ولا صفحات فارغة، وحجم النص
    مضبوط للصفحة. إزالة الكتلة تحمي أيضاً أي window.print() مباشر
    (كاحتياط طباعة الشهادات) من إخفاء كل محتوى الصفحة. */
+
+/* ═ v1.17.0: تمرير لمسي سلس في كل أنحاء المنصة ═
+   • كل المناطق القابلة للتمرير تتبع اللمس على الهاتف دون مقاومة
+   • منع انتقال التمرير من النوافذ المنبثقة إلى خلفية الصفحة (scroll chaining)
+     فلا تتحرك الصفحة خلف النافذة أثناء تصفح محتواها باللمس
+   • شرائط تمرير واضحة الملمس يسهل التقاطها بالإصبع */
+@layer utilities {
+  .touch-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-slot="dialog-content"],
+[data-slot="sheet-content"] {
+  overscroll-behavior: contain;
+}
+
+/* شرائط تمرير أعرض قليلاً على شاشات اللمس لسهولة الالتقاط بالإصبع */
+@media (pointer: coarse) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+    border-radius: 999px;
+  }
+}

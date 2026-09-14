@@ -213,6 +213,11 @@ export function AdminClinicAdsTab() {
         {t.adminAds.notice}
       </div>
 
+      {/* v1.17.0: معلومة إدارية سرّية — ترتيب صفحة الإعلانات العمومية */}
+      <div className="rounded-xl bg-indigo-500/[0.07] border border-indigo-400/40 px-4 py-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 leading-relaxed">
+        {t.adminAds.orderNote}
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
