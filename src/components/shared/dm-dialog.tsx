@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { VoiceRecorder } from "@/lib/voice-recorder";
 import { VoiceBubble } from "@/components/shared/voice-bubble";
 import { useLongPress, MessageActionMenu } from "@/components/shared/message-actions";
+import { formatDateTime } from "@/lib/utils";
 
 interface DmMessage {
   id: string;
@@ -420,7 +421,7 @@ export function DmDialog() {
                       </span>
                     )}
                     <div className={`text-[9px] font-bold mt-1 ${mine ? "text-white/70" : "text-muted-foreground"}`} dir="ltr">
-                      {new Date(m.createdAt).toLocaleTimeString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-GB", { hour: "2-digit", minute: "2-digit" })}
+                      {formatDateTime(m.createdAt)}
                     </div>
                   </div>
                   {/* v1.6.0: التعديل/الحذف عبر ضغطة مستمرة 3 ثوانٍ على الفقاعة */}

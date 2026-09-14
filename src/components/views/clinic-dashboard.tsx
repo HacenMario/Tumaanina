@@ -101,6 +101,9 @@ interface ClinicProfile {
   slots: string[];
   gallery: string[];
   location: { lat: number | null; lng: number | null };
+  /* v1.16.0: سعر الجلسة الحضورية + الباقات */
+  sessionPrice: number | null;
+  packs: { name: string; sessions: number; price: number; note: string | null }[];
 }
 
 interface BookingRow {
@@ -147,6 +150,11 @@ export function ClinicDashboardView() {
   const [fHours, setFHours] = useState("");
   const [fPriceNote, setFPriceNote] = useState("");
   const [fLicense, setFLicense] = useState("");
+
+  /* ══ v1.16.0: سعر الجلسة الحضورية + الباقات ══ */
+  const [fSessionPrice, setFSessionPrice] = useState("");
+  const [fPacks, setFPacks] = useState<{ name: string; sessions: number; price: number; note: string | null }[]>([]);
+  const [packsDirty, setPacksDirty] = useState(false);
 
   /* ══ v1.15.0: مواعيد الحجز + معرض الصور + الموقع ══ */
   const [fSlots, setFSlots] = useState<string[]>([]);          /* فارغة = الافتراضية */
@@ -204,6 +212,10 @@ export function ClinicDashboardView() {
         setFLat(c.location?.lat ?? null);
         setFLng(c.location?.lng ?? null);
         setLocDirty(false);
+        /* v1.16.0: السعر والباقات */
+        setFSessionPrice(c.sessionPrice != null ? String(c.sessionPrice) : "");
+        setFPacks((c.packs || []).map((p) => ({ ...p })));
+        setPacksDirty(false);
       }
     } finally {
       setLoading(false);
@@ -253,6 +265,9 @@ export function ClinicDashboardView() {
         workingHours: fHours.trim() || null,
         priceNote: fPriceNote.trim() || null,
         licenseNumber: fLicense.trim() || null,
+        /* v1.16.0: سعر الجلسة الحضورية + الباقات */
+        sessionPrice: fSessionPrice.trim() === "" ? null : Number(fSessionPrice),
+        packs: packsDirty ? fPacks : undefined,
       };
       if (logoDirty) payload.logo = fLogo;
       /* v1.15.0: المواعيد والمعرض والموقع — تُرسل فقط عند تغييرها */
@@ -277,6 +292,10 @@ export function ClinicDashboardView() {
         showAppToast(t.clinicDash.yearInvalid, "");
       } else if (data.error === "INVALID_LOGO") {
         showAppToast(t.clinicDash.logoTooBig, "");
+      } else if (data.error === "INVALID_PRICE") {
+        showAppToast(t.clinicDash.priceInvalid, "");
+      } else if (data.error === "INVALID_PACK" || data.error === "MAX_12_PACKS") {
+        showAppToast(t.clinicDash.packInvalid, "");
       } else {
         showAppToast(t.common.errorServer, "");
       }
@@ -636,6 +655,128 @@ export function ClinicDashboardView() {
                     <Label className="font-bold">{t.clinics.license}</Label>
                     <Input value={fLicense} onChange={(e) => setFLicense(e.target.value)} className="rounded-xl bg-card" maxLength={80} dir="auto" />
                   </div>
+                  {/* v1.16.0: سعر الجلسة الحضورية — يظهر للجمهور في البطاقة والصفحة */}
+                  <div className="space-y-1.5">
+                    <Label className="font-bold">{t.clinicDash.sessionPriceLabel}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        dir="ltr"
+                        value={fSessionPrice}
+                        onChange={(e) => setFSessionPrice(e.target.value)}
+                        className="rounded-xl bg-card"
+                        placeholder={t.clinicDash.sessionPricePh}
+                      />
+                      <span className="text-xs font-black text-muted-foreground shrink-0">DZD</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-semibold">{t.clinicDash.sessionPriceHint}</p>
+                  </div>
+                </div>
+
+                {/* ══ v1.16.0: باقات الجلسات الحضورية (Packs) ══ */}
+                <div className="space-y-2.5 rounded-2xl border border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-primary" />
+                      <Label className="font-bold">{t.clinicDash.packsTitle}</Label>
+                      <span className="text-[10px] font-black text-muted-foreground">({fPacks.length}/12)</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg font-black gap-1.5 border-primary/40 text-primary"
+                      disabled={fPacks.length >= 12}
+                      onClick={() => {
+                        setFPacks((p) => [...p, { name: "", sessions: 4, price: 0, note: null }]);
+                        setPacksDirty(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      {t.clinicDash.packAdd}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-semibold leading-relaxed">{t.clinicDash.packsHint}</p>
+                  {fPacks.length === 0 ? (
+                    <p className="text-[11px] font-bold text-muted-foreground/70">{t.clinicDash.packsEmpty}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {fPacks.map((p, i) => (
+                        <div key={i} className="rounded-xl border border-border/60 bg-card p-3 space-y-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="space-y-1 col-span-2 sm:col-span-1">
+                              <Label className="text-[10px] font-black text-muted-foreground">{t.clinicDash.packName}</Label>
+                              <Input
+                                value={p.name}
+                                maxLength={80}
+                                onChange={(e) => {
+                                  setFPacks((arr) => arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)));
+                                  setPacksDirty(true);
+                                }}
+                                className="rounded-lg bg-card h-9 text-sm"
+                                placeholder={t.clinicDash.packNamePh}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-black text-muted-foreground">{t.clinicDash.packSessions}</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={200}
+                                dir="ltr"
+                                value={String(p.sessions)}
+                                onChange={(e) => {
+                                  setFPacks((arr) => arr.map((x, j) => (j === i ? { ...x, sessions: Math.max(1, Math.round(Number(e.target.value) || 1)) } : x)));
+                                  setPacksDirty(true);
+                                }}
+                                className="rounded-lg bg-card h-9 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-black text-muted-foreground">{t.clinicDash.packPrice}</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                dir="ltr"
+                                value={String(p.price)}
+                                onChange={(e) => {
+                                  setFPacks((arr) => arr.map((x, j) => (j === i ? { ...x, price: Math.max(0, Math.round(Number(e.target.value) || 0)) } : x)));
+                                  setPacksDirty(true);
+                                }}
+                                className="rounded-lg bg-card h-9 text-sm"
+                                placeholder="DZD"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-black text-muted-foreground">{t.clinicDash.packNote}</Label>
+                              <Input
+                                value={p.note || ""}
+                                maxLength={200}
+                                onChange={(e) => {
+                                  setFPacks((arr) => arr.map((x, j) => (j === i ? { ...x, note: e.target.value.trim() || null } : x)));
+                                  setPacksDirty(true);
+                                }}
+                                className="rounded-lg bg-card h-9 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-[11px] font-black text-destructive hover:underline"
+                            onClick={() => {
+                              setFPacks((arr) => arr.filter((_, j) => j !== i));
+                              setPacksDirty(true);
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                            {t.clinicDash.packRemove}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* ══ v1.15.0: مواعيد الحجز ══ */}
@@ -784,7 +925,7 @@ export function ClinicDashboardView() {
                     {bookingBadge(b.status)}
                   </div>
                   <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground flex-wrap">
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date} — {b.slot}</span>
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date.replaceAll("-", "/")} — {b.slot}</span>
                   </div>
                   {b.reason ? <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 rounded-lg px-3 py-2">{b.reason}</p> : null}
                   {b.status === "CANCELLED" && b.clinicNote ? (
@@ -877,7 +1018,7 @@ export function ClinicDashboardView() {
                     </div>
                     {bookingBadge(b.status)}
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1 text-xs font-bold" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date} — {b.slot}</span>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1 text-xs font-bold" dir="ltr"><CalendarClock className="h-3 w-3" />{b.date.replaceAll("-", "/")} — {b.slot}</span>
                   {b.reason ? <p className="text-xs text-muted-foreground leading-relaxed bg-muted/40 rounded-lg px-3 py-2">{b.reason}</p> : null}
                   {b.status === "PENDING" || b.status === "CONFIRMED" ? (
                     <div className="flex items-center gap-2 flex-wrap">

@@ -64,6 +64,9 @@ async function GET_impl(_req: NextRequest, ctx: { params: Promise<{ id: string }
       slots: (clinic.slots as string[]) || [],
       galleryCount: ((clinic.gallery as string[]) || []).length,
       location: (clinic.location as { lat: number | null; lng: number | null }) ?? { lat: null, lng: null },
+      /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
+      sessionPrice: (clinic.sessionPrice as number | null) ?? null,
+      packs: (clinic.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
       createdAt: clinic.createdAt,
     },
   });

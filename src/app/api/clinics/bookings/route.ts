@@ -5,6 +5,11 @@ import { apiHandler } from "@/lib/server/api";
 import { notifyUser } from "@/lib/server/notify";
 import { WILAYAS, WILAYA_LABELS } from "@/lib/constants";
 
+/* v1.16.0: التاريخ الموحد YYYY/MM/DD HH:MM:SS في إشعارات الحجز */
+function fmtWhen(d: unknown, s2: unknown): string {
+  return `${String(d ?? "").replaceAll("-", "/")} ${String(s2 ?? "")}:00`;
+}
+
 export const dynamic = "force-dynamic";
 
 /* ═ v1.14.0 — إدارة الحجوزات الحضورية ═
@@ -137,7 +142,7 @@ async function POST_impl(req: NextRequest) {
         .join("، ");
       void notifyUser(clientUserId, "clinicBookingConfirmed", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
         clinic: (clinic.name as string) || "—",
-        when: `${booking.date} ${booking.slot}`,
+        when: fmtWhen(booking.date, booking.slot),
         address,
       }).catch(() => {});
       return NextResponse.json({ ok: true });
@@ -152,7 +157,7 @@ async function POST_impl(req: NextRequest) {
       );
       void notifyUser(clientUserId, "clinicBookingCancelled", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
         clinic: (clinic.name as string) || "—",
-        when: `${booking.date} ${booking.slot}`,
+        when: fmtWhen(booking.date, booking.slot),
         reason: (body.note || "").trim().slice(0, 200) || "—",
       }).catch(() => {});
       return NextResponse.json({ ok: true });
@@ -178,7 +183,7 @@ async function POST_impl(req: NextRequest) {
     const ownerId = String((clinic as unknown as { ownerUserId: unknown }).ownerUserId);
     void notifyUser(ownerId, "clinicBookingCancelledByClient", "/?view=clinic-dashboard", {
       name: (booking.clientName as string) || "—",
-      when: `${booking.date} ${booking.slot}`,
+      when: fmtWhen(booking.date, booking.slot),
       clinic: (clinic.name as string) || "—",
     }).catch(() => {});
     return NextResponse.json({ ok: true });

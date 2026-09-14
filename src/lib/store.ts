@@ -139,6 +139,12 @@ export const useApp = create<AppState>()(
       /* v2.8.0: الصفحة الحالية تُحفَظ — تحديث الصفحة (F5) يبقي المستخدم مكانه
          بدل إعادته دائماً للصفحة الرئيسية */
       partialize: (s) => ({ user: s.user, clientDraft: s.clientDraft, fontScale: s.fontScale, currency: s.currency, view: s.view }) as unknown as AppState,
+      /* v1.16.0: skipHydration — إصلاح خطأ React #418 (hydration mismatch).
+         كان persist يستعيد الحالة المحفوظة تزامنياً لحظة إنشاء المتجر (قبل
+         ترطيب React)، فيصبح أول رندر كلاينتي (مستخدم/صفحة محفوظة) مختلفاً
+         عن HTML الخادم فينهار الترطيب في الكونسول. الآن الاستعادة تتم يدوياً
+         بعد اكتمال الترطيب من page.tsx عبر useApp.persist.rehydrate(). */
+      skipHydration: true,
     }
   )
 );

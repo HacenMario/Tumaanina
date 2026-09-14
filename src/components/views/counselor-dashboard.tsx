@@ -126,7 +126,7 @@ function ConversationsCard() {
                 <span className="flex items-center gap-2">
                   <span className="text-xs font-black truncate" dir="auto">{th.peerName || "—"}</span>
                   <span className="text-[9px] font-bold text-muted-foreground shrink-0" dir="ltr">
-                    {new Date(th.lastAt).toLocaleTimeString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    {formatDateTime(th.lastAt)}
                   </span>
                 </span>
                 <span className="block text-[10px] text-primary/70 font-bold">

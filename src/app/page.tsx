@@ -45,7 +45,7 @@ import { DmDialog } from "@/components/shared/dm-dialog";
 import { ThemeStudio } from "@/components/shared/theme-studio";
 import { RatingsDialog } from "@/components/shared/ratings-dialog";
 import { ClinicRatingsDialog } from "@/components/shared/clinic-ratings-dialog";
-import { FloatingAdPopup } from "@/components/shared/floating-ad";
+import { GlobalAdBanner } from "@/components/shared/ad-banner";
 import { AppToast } from "@/components/shared/app-toast";
 import { BookingPopups } from "@/components/shared/booking-popup";
 import { FollowUpPopup } from "@/components/shared/followup-popup";
@@ -95,6 +95,17 @@ export default function Home() {
   const view = useApp((s) => s.view);
   const fontScale = useApp((s) => s.fontScale);
   const [booting, setBooting] = useState(true);
+  /* v1.16.0: استعادة المتجر المحفوظ بعد الترطيب — إصلاح خطأ React #418
+     (hydration mismatch): مع skipHydration في store.ts، أول رندر كلاينتي
+     يطابق HTML الخادم تماماً، ثم تُستعاد الحالة المحفوظة (المستخدم/الصفحة/
+     العملة…) بأمان بعد اكتمال الترطيب فتتحوّل الواجهة بتدفق طبيعي بلا انهيار. */
+  useEffect(() => {
+    try {
+      void useApp.persist.rehydrate();
+    } catch {
+      /* تجاهل — الاستعادة تحسينية */
+    }
+  }, []);
   /* v2.8.0: مع استعادة الصفحة المحفوظة بعد F5 — غرفة الجلسة بلا جلسة نشطة تعود للرئيسية
      v2.12.0: عند غلق الموقع ثم الولوج إليه مجدداً تُفتح الصفحة الرئيسية دائماً
      (وليس آخر صفحة كانت مفتوحة) — التمييز بين التحديث F5 والفتحة الجديدة
@@ -284,6 +295,8 @@ export default function Home() {
   return (
     <div className="min-h-[100dvh] flex flex-col">
       <AppHeader />
+      {/* v1.16.0: الشريط الإعلاني العام — إعلان في كل صفحة (خارج غرفة الجلسة) */}
+      {!fullBleed && <GlobalAdBanner />}
       <main className="flex-1 flex flex-col">
         <AnimatePresence mode="wait">
           {booting ? (
@@ -331,8 +344,7 @@ export default function Home() {
       <RatingsDialog />
       {/* v1.15.0: نافذة تقييمات العيادة — بنفس نمط تقييمات الأخصائيين */}
       <ClinicRatingsDialog />
-      {/* v1.15.0: نافذة الإعلان العائم — للعملاء والمختصين فقط، بحد تكرار وإغلاق تلقائي */}
-      <FloatingAdPopup />
+      {/* v1.16.0: نافذة الإعلان العائم انتقلت لصفحة العيادات (داخل clinics-directory) */}
       {/* v2.12.0: إشعار نجاح العمليات (تسجيل الدخول/الخروج) */}
       <AppToast />
       {/* نافذة «لحظة اطمئنان» — تظهر عند كل ولوج للموقع وتختفي تلقائياً بعد 7 ثوانٍ */}

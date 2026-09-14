@@ -7,7 +7,7 @@ import { useApp, type ViewName } from "@/lib/store";
 import { LogoMark } from "@/lib/logo";
 import { Mail, MessageCircle, HeartHandshake, Trophy } from "lucide-react";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
-import { AlgeriaFlag } from "@/components/shared/algeria-skeleton";
+import { AlgeriaFlag } from "@/components/shared/algeria-flag";
 import { RoyalCrown } from "@/components/shared/crown-badge";
 import { playSound } from "@/lib/sounds";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -106,6 +106,9 @@ export function AppFooter() {
     /* v2.13.0: صفحة كيف تعمل المنصة */
     { label: t.nav.how, view: "how" },
     { label: t.nav.counselors, view: "counselors-directory" },
+    /* v1.16.0: العيادات النفسية + الإعلانات الممولة */
+    { label: t.nav.clinics, view: "clinics-directory" },
+    { label: t.nav.ads, view: "ads", },
     /* v2.14.0: صفحة تمارين التهدئة */
     { label: t.nav.exercises, view: "exercises" },
     { label: t.nav.sessions, view: "client-sessions" },
@@ -124,8 +127,9 @@ export function AppFooter() {
     { label: t.nav.privacy, view: "privacy" },
     { label: t.nav.terms, view: "terms" },
     { label: t.nav.contact, view: "contact" },
-    /* دخول الإدارة — صفحة خاصة منفصلة عن بوابة العميل والأخصائي */
-    { label: t.nav.adminLogin, view: "admin-login" },
+    /* دخول الإدارة — صفحة خاصة منفصلة
+       v1.16.0: يختفي كلياً عن أي مستخدم مسجّل الدخول (عميل/مختص/عيادة) */
+    ...(user ? [] : [{ label: t.nav.adminLogin, view: "admin-login" as ViewName }]),
   ];
 
   return (
@@ -140,7 +144,11 @@ export function AppFooter() {
                 <LogoMark size={34} />
               </button>
               <div className="leading-tight">
-                <div className="font-black text-gradient text-sm">{t.common.appName}</div>
+                <div className="font-black text-gradient text-sm flex items-center gap-1.5">
+                  {t.common.appName}
+                  {/* v1.16.0: علم الجزائر الرسمي بجانب اسم المنصة في كل مكان */}
+                  <AlgeriaFlag size={18} className="shrink-0" />
+                </div>
                 <div className="text-[11px] font-bold text-muted-foreground flex items-center gap-1">
                   <HeartHandshake className="h-3 w-3 text-primary" />
                   {t.footer.byline}
@@ -225,7 +233,7 @@ export function AppFooter() {
               transition={{ duration: 0.35 }}
               className="block"
             >
-              <AlgeriaFlag size={30} className="drop-shadow-sm opacity-90 group-hover:opacity-100 transition-opacity" />
+              <AlgeriaFlag size={30} rounded={false} className="drop-shadow-sm opacity-90 group-hover:opacity-100 transition-opacity" />
             </motion.span>
             {/* عدّاد ضغطاتي اليوم — للأخصائي اللاعب فقط وبما التحدي فعالاً (v1.6.0):
                 الفوز أو التعطيل يخفيه — «تختفي النافذة الخاصة به» */}

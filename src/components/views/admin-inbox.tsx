@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/utils";
 
 /* v1.4.0: رمز الإدارة — يُرفق مع كل نداءات اللوحة (بوابة خادمية إلزامية) */
 function adminHeaders(): Record<string, string> {
@@ -133,13 +134,8 @@ export function AdminInboxTab() {
     }
   };
 
-  const timeOf = (iso: string) =>
-    new Date(iso).toLocaleString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  /* v1.16.0: التنسيق الموحد YYYY/MM/DD HH:MM:SS */
+  const timeOf = (iso: string) => formatDateTime(iso);
 
   /* ─── نافذة المحادثة المفتوحة ─── */
   if (active) {
@@ -172,10 +168,7 @@ export function AdminInboxTab() {
                         {!mine && <div className="text-[10px] font-black text-primary mb-0.5">{m.senderName || "—"}</div>}
                         {m.content}
                         <div className={`text-[9px] font-bold mt-1 ${mine ? "text-white/70" : "text-muted-foreground"}`} dir="ltr">
-                          {new Date(m.createdAt).toLocaleTimeString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-GB", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {formatDateTime(m.createdAt)}
                         </div>
                       </div>
                     </div>

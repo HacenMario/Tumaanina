@@ -104,6 +104,19 @@ export function ClientStartView() {
       phone: user.phone ?? null,
       language: (["fr", "en", "tr", "ru", "zh"].includes(user.language || "") ? user.language : "ar") as AppLang,
     });
+    /* v1.16.0: قادم من نافذة حجز عيادة (حجز → إنشاء حساب → دخول تلقائي
+       → عودة لنفس نافذة الحجز بكل البيانات المدخلة محفوظة) — المسودة تُقرأ
+       وتُستعاد داخل clinic-page عند تحميل ملف العيادة */
+    try {
+      if (sessionStorage.getItem("tumaanina-clinic-booking-draft")) {
+        const d = JSON.parse(sessionStorage.getItem("tumaanina-clinic-booking-draft") || "{}") as { clinicKey?: string };
+        useApp.getState().setActiveClinic(d.clinicKey || null);
+        setView("clinic-page");
+        return;
+      }
+    } catch {
+      /* تجاهل */
+    }
     /* v2.12.0: قادم من الرابط العام لأخصائي (؟book=) — الانتقال مباشرة
        للحجز مع نفس الأخصائي بدل بداية مسار الحجز من أول خطوة */
     let directBook = false;

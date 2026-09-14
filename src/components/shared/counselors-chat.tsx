@@ -25,6 +25,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { VoiceRecorder } from "@/lib/voice-recorder";
 import { VoiceBubble } from "@/components/shared/voice-bubble";
 import { useLongPress, MessageActionMenu } from "@/components/shared/message-actions";
+import { formatDateTime } from "@/lib/utils";
 
 interface GroupMessage {
   id: string;
@@ -315,7 +316,7 @@ export function CounselorsChat() {
                     </span>
                   )}
                   <div className={`text-[9px] font-bold mt-1 ${mine ? "text-white/70" : "text-muted-foreground"}`} dir="ltr">
-                    {new Date(m.createdAt).toLocaleTimeString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    {formatDateTime(m.createdAt)}
                   </div>
                 </div>
                 {editingId === m.id && (

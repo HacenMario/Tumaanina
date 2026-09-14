@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { BackButton } from "@/components/shared/back-button";
 import { showAppToast } from "@/components/shared/app-toast";
 import { openClinicPage } from "./clinics-directory";
-import { cn } from "@/lib/utils";
+import { cn , formatDateTime} from "@/lib/utils";
 
 /* ═ v1.15.0 — صفحة إعلانات العيادات (عامة) ═
    تعرض الإعلانات المعتمدة فقط، بترقيم صفحات من الخادم (8 لكل صفحة).
@@ -152,14 +152,12 @@ export function AdsView() {
     return rec ? (lang === "ar" ? rec.ar : lang === "fr" ? rec.fr : rec.en) : w;
   };
 
+  /* v1.16.0: التنسيق الموحد YYYY/MM/DD HH:MM:SS في كل مكان */
   const fmtDate = (iso: string | null) => {
     if (!iso) return "";
-    try {
-      const d = new Date(iso);
-      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-    } catch {
-      return "";
-    }
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return formatDateTime(d);
   };
 
   return (

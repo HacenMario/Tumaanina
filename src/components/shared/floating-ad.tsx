@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * v1.15.1 — نافذة الإعلان العائم (الإعلانات المدفوعة المعتمدة من الإدارة):
- * • تظهر في الصفحة الرئيسية فقط (view === "landing") — لا تلاحق المستخدم في باقي الصفحات
+ * v1.16.0 — نافذة الإعلان العائم (الإعلانات المدفوعة المعتمدة من الإدارة):
+ * • تظهر في صفحة العيادات (الدليل) فقط (view === "clinics-directory") — وليس في الرئيسية
  * • عائمة بالمعنى الحقيقي: تتحرك ببطء داخل المنصة بحركة انسيابية دائمة (تسطيح الإزعاج
  *   مع الحفاظ على ظهورها) — وخفيفة اللمس في الهاتف
  * • تُجلب من /api/ads/floating — لا تظهر للعيادات ولا للإدارة ولا لمن رفض
@@ -11,7 +11,7 @@
  *   كي تظهر الصورة كاملة داخل إطارها بأي أبعاد
  * • شارة «إعلان مدفوع» + زر «افتح صفحة العيادة» + زر «لا تظهر مجدداً»
  *   (محلي فوراً + مزامنة مع إعداد رفض الإعلانات المدفوعة في الحساب)
- * • إغلاق يدوي (X) وإغلاق تلقائي بعد مهلة قصيرة — ومساحة خنق بين العروض
+ * • إغلاق يدوي (X) وإغلاق تلقائي بعد 20 ثانية — ومساحة خنق بين العروض
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -33,7 +33,7 @@ interface FloatingAd {
   clinic: { id: string; name: string; slug: string | null; hasLogo: boolean; logoUrl: string };
 }
 
-const AUTO_CLOSE_MS = 14000;     /* الإغلاق التلقائي للنافذة */
+const AUTO_CLOSE_MS = 20000;     /* v1.16.0: الإغلاق التلقائي بعد 20 ثانية */
 const COOLDOWN_MS = 6 * 60000;   /* مهلة الخنق بين العروض — لا إزعاج بالتكرار */
 const POLL_MS = 5 * 60000;       /* فحص دوري خفيف */
 const DRIFT_MS = 26000;          /* دورة الحركة العائمة البطيئة */
@@ -49,7 +49,7 @@ function isVideo(url: string) {
 export function FloatingAdPopup() {
   const { t } = useI18n();
   const user = useApp((s) => s.user);
-  /* v1.15.1: الرئيسية فقط — لا نافذة إعلان في باقي صفحات المنصة */
+  /* v1.16.0: صفحة العيادات (الدليل) فقط — لا نافذة إعلان في باقي صفحات المنصة */
   const view = useApp((s) => s.view);
   const [ad, setAd] = useState<FloatingAd | null>(null);
   const [slide, setSlide] = useState(0);
@@ -95,8 +95,8 @@ export function FloatingAdPopup() {
   }, [recordImpression]);
 
   useEffect(() => {
-    /* خارج الرئيسية: لا جلب ولا عرض — وتُغلق النافذة إن كانت ظاهرة */
-    if (view !== "landing") {
+    /* خارج صفحة العيادات: لا جلب ولا عرض — وتُغلق النافذة إن كانت ظاهرة */
+    if (view !== "clinics-directory") {
       setShow(false);
       if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
       return;
@@ -171,7 +171,7 @@ export function FloatingAdPopup() {
     touchStartX.current = null;
   };
 
-  if (!ad || !show || view !== "landing") return null;
+  if (!ad || !show || view !== "clinics-directory") return null;
 
   return (
     <AnimatePresence>

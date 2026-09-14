@@ -18,7 +18,7 @@ import { showAppToast } from "@/components/shared/app-toast";
 import { WhatsAppGlyph } from "@/components/session/whatsapp-panel";
 import { waLink } from "@/lib/whatsapp";
 import { WILAYA_LIST } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn , formatDateTime} from "@/lib/utils";
 
 /* ═ v1.15.0 — تبويب «إعلانات العيادات» في لوحة الإدارة ═
    سير عمل واقعي كامل:
@@ -178,14 +178,12 @@ export function AdminClinicAdsTab() {
     return rec ? (lang === "ar" ? rec.ar : lang === "fr" ? rec.fr : rec.en) : w;
   };
 
+  /* v1.16.0: التنسيق الموحد YYYY/MM/DD HH:MM:SS في كل مكان */
   const fmtDate = (iso: string | null) => {
     if (!iso) return "—";
-    try {
-      const d = new Date(iso);
-      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-    } catch {
-      return "—";
-    }
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return formatDateTime(d);
   };
 
   return (
@@ -235,7 +233,7 @@ export function AdminClinicAdsTab() {
                   <div className="min-w-0 flex-1">
                     <p className="font-black leading-snug">{a.title}</p>
                     <p className="text-[11px] text-muted-foreground font-semibold mt-0.5" dir="auto">
-                      {new Date(a.createdAt).toLocaleString()}
+                      {formatDateTime(a.createdAt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">

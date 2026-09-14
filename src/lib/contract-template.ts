@@ -250,12 +250,7 @@ export function docDir(lang: string | null | undefined): "rtl" | "ltr" {
 export function docDate(iso: string | null | undefined, lang: string | null | undefined): string {
   const d = iso ? new Date(iso) : new Date();
   if (Number.isNaN(d.getTime())) return "—";
-  try {
-    return new Intl.DateTimeFormat(
-      lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : lang === "tr" ? "tr-TR" : lang === "ru" ? "ru-RU" : lang === "zh" ? "zh-CN" : "en-GB",
-      { year: "numeric", month: "long", day: "numeric" }
-    ).format(d);
-  } catch {
-    return d.toISOString().slice(0, 10);
-  }
+  /* v1.16.0: التنسيق الرقمي الموحد YYYY/MM/DD — بلا أسماء أشهر عربية/هجرية */
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`;
 }

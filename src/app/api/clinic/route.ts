@@ -91,6 +91,9 @@ interface UpdateProfileBody {
   slots?: string[];
   gallery?: string[] | null;
   location?: { lat: number | null; lng: number | null } | null;
+  /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
+  sessionPrice?: number | null;
+  packs?: { name: string; sessions: number; price: number; note?: string | null }[] | null;
 }
 
 interface ChangePasswordBody {
@@ -370,6 +373,38 @@ async function POST_impl(req: NextRequest) {
     if (body.priceNote !== undefined) set.priceNote = body.priceNote ? String(body.priceNote).trim().slice(0, 400) : null;
     if (body.licenseNumber !== undefined) set.licenseNumber = body.licenseNumber ? String(body.licenseNumber).trim().slice(0, 80) : null;
 
+    /* ══ v1.16.0: سعر الجلسة الحضورية + الباقات ══ */
+    if (body.sessionPrice !== undefined) {
+      if (body.sessionPrice === null || body.sessionPrice === "") {
+        set.sessionPrice = null;
+      } else {
+        const sp = Math.round(Number(body.sessionPrice));
+        if (!Number.isFinite(sp) || sp < 0 || sp > 10000000) {
+          return NextResponse.json({ error: "INVALID_PRICE" }, { status: 400 });
+        }
+        set.sessionPrice = sp;
+      }
+    }
+    /* الباقات: مصفوفة { name, sessions, price, note? } حتى 12 باقة؛ null أو [] = حذف الكل */
+    if (body.packs !== undefined) {
+      if (body.packs === null || (Array.isArray(body.packs) && body.packs.length === 0)) {
+        set.packs = [];
+      } else if (Array.isArray(body.packs)) {
+        if (body.packs.length > 12) return NextResponse.json({ error: "MAX_12_PACKS" }, { status: 400 });
+        const cleanPacks: { name: string; sessions: number; price: number; note: string | null }[] = [];
+        for (const p of body.packs) {
+          const pkName = String(p?.name ?? "").trim().slice(0, 80);
+          const pkSessions = Math.round(Number(p?.sessions));
+          const pkPrice = Math.round(Number(p?.price));
+          if (!pkName || !Number.isFinite(pkSessions) || pkSessions < 1 || pkSessions > 200 || !Number.isFinite(pkPrice) || pkPrice < 0 || pkPrice > 100000000) {
+            return NextResponse.json({ error: "INVALID_PACK" }, { status: 400 });
+          }
+          cleanPacks.push({ name: pkName, sessions: pkSessions, price: pkPrice, note: p?.note ? String(p.note).trim().slice(0, 200) : null });
+        }
+        set.packs = cleanPacks;
+      } else return NextResponse.json({ error: "INVALID_PACK" }, { status: 400 });
+    }
+
     if (Object.keys(set).length) await Clinic.updateOne({ _id: clinic._id }, { $set: set });
     /* اسم العيادة يُزامن مع اسم الحساب (يظهر في الهيدر) */
     if (set.name) await User.updateOne({ _id: userId }, { $set: { pseudonym: String(set.name) } });
@@ -430,6 +465,9 @@ async function GET_impl(req: NextRequest) {
       gallery: (c.gallery as string[]) || [],
       galleryCount: ((c.gallery as string[]) || []).length,
       location: (c.location as { lat: number | null; lng: number | null }) ?? { lat: null, lng: null },
+      /* v1.16.0: سعر الجلسة الحضورية والباقات */
+      sessionPrice: (c.sessionPrice as number | null) ?? null,
+      packs: (c.packs as { name: string; sessions: number; price: number; note: string | null }[]) || [],
     },
   });
 }

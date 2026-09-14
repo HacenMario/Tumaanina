@@ -17,6 +17,7 @@ import { useApp } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BackButton } from "@/components/shared/back-button";
+import { formatDateTime } from "@/lib/utils";
 
 interface AdminMsg {
   id: string;
@@ -193,10 +194,7 @@ export function AdminChatView() {
                       )}
                       {m.content}
                       <div className={`text-[9px] font-bold mt-1 ${mine ? "text-white/70" : "text-muted-foreground"}`} dir="ltr">
-                        {new Date(m.createdAt).toLocaleTimeString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-GB", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatDateTime(m.createdAt)}
                       </div>
                     </div>
                   </div>

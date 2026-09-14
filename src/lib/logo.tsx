@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { AlgeriaFlag } from "@/components/shared/algeria-flag";
 
 /**
  * شعار "طمأنينة" — زهرة اللوتس الهادئة داخل دائرة بنفسجية.
@@ -82,13 +83,17 @@ export function LogoFull({
       {/* النص لا يلتف أبداً على عدة أسطر في الهواتف — يُقصّ بسطر واحد،
           والوصف الفرعي يظهر على الشاشات المتوسطة فأعلى فقط */}
       <div className="flex flex-col leading-tight min-w-0">
-        <span
-          className={cn(
-            "font-extrabold tracking-tight bg-gradient-to-r from-violet-600 via-purple-600 to-violet-700 dark:from-violet-400 dark:via-purple-300 dark:to-violet-400 bg-clip-text text-transparent whitespace-nowrap overflow-hidden text-ellipsis max-w-[33vw] sm:max-w-[40vw] md:max-w-none",
-            lang === "ar" ? "text-base sm:text-lg" : "text-sm sm:text-base"
-          )}
-        >
-          {n.main}
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span
+            className={cn(
+              "font-extrabold tracking-tight bg-gradient-to-r from-violet-600 via-purple-600 to-violet-700 dark:from-violet-400 dark:via-purple-300 dark:to-violet-400 bg-clip-text text-transparent whitespace-nowrap overflow-hidden text-ellipsis max-w-[33vw] sm:max-w-[40vw] md:max-w-none",
+              lang === "ar" ? "text-base sm:text-lg" : "text-sm sm:text-base"
+            )}
+          >
+            {n.main}
+          </span>
+          {/* v1.16.0: علم الجزائر الرسمي بجانب اسم المنصة في كل مكان */}
+          <AlgeriaFlag size={compact ? 17 : 21} className="shrink-0" />
         </span>
         {!compact && (
           <span className="hidden md:block text-[10px] sm:text-[11px] text-muted-foreground font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[46vw] md:max-w-none">

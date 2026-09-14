@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BackButton } from "@/components/shared/back-button";
+import { formatDateTime } from "@/lib/utils";
 import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from "@/components/shared/social-glyphs";
 import { showAppToast } from "@/components/shared/app-toast";
 import { openClinicPage } from "./clinics-directory";
@@ -61,6 +62,9 @@ interface ClinicProfile {
   slots: string[];
   galleryCount: number;
   location: { lat: number | null; lng: number | null };
+  /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
+  sessionPrice: number | null;
+  packs: { name: string; sessions: number; price: number; note: string | null }[];
 }
 
 interface ReviewItem {
@@ -164,16 +168,37 @@ export function ClinicPageView() {
     loadReviews(1);
   }, [loadClinic, loadReviews]);
 
-  /* v1.15.0: «احجز الآن» من بطاقة العيادة بالدليل يفتح نافذة الحجز فور وصول الملف */
+  /* v1.15.0: «احجز الآن» من بطاقة العيادة بالدليل يفتح نافذة الحجز فور وصول الملف
+     v1.16.0: استعادة مسودة الحجز المحفوظة قبل التسجيل (تدفق: حجز → إنشاء حساب
+     → دخول تلقائي → العودة لنفس النافذة بكل البيانات المدخلة محفوظة) */
   useEffect(() => {
     try {
-      if (clinic && sessionStorage.getItem("tumaanina-clinic-book") === "1") {
+      const draftRaw = sessionStorage.getItem("tumaanina-clinic-booking-draft");
+      const wantsBook = sessionStorage.getItem("tumaanina-clinic-book") === "1" || !!draftRaw;
+      if (clinic && wantsBook) {
         sessionStorage.removeItem("tumaanina-clinic-book");
+        if (draftRaw) {
+          sessionStorage.removeItem("tumaanina-clinic-booking-draft");
+          const d = JSON.parse(draftRaw) as { clinicKey?: string; date?: string; slot?: string; name?: string; phone?: string; reason?: string };
+          /* تُستعاد المسودة فقط إن كانت لنفس العيادة المعروضة */
+          if (!d.clinicKey || d.clinicKey === activeClinicSlug) {
+            if (d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) setBDate(d.date);
+            if (d.slot) setBSlot(d.slot);
+            if (d.name) setBName(d.name);
+            if (d.phone) setBPhone(d.phone);
+            if (d.reason) setBReason(d.reason);
+          }
+        } else {
+          /* عميل مسجّل: نملأ مسبقاً بما نعرفه عنه */
+          if (user?.pseudonym && !bName) setBName(user.pseudonym);
+          if (user?.phone && !bPhone) setBPhone(user.phone);
+        }
         setBookOpen(true);
       }
     } catch {
       /* تجاهل */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinic]);
 
   /* مواعيد الحجز: مواعيد العيادة نفسها إن عرّفت — وإلا الافتراضية */
@@ -193,13 +218,6 @@ export function ClinicPageView() {
     }
   };
 
-  /* v1.15.0: زر الموقع على الخريطة — يفتح Google Maps بتوجيه مباشر نحو العيادة */
-  const openMaps = () => {
-    const loc = clinic?.location;
-    if (!loc?.lat || !loc?.lng) return;
-    window.open(`https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`, "_blank", "noopener,noreferrer");
-  };
-
   /* ساعات اليوم المختار المحجوزة */
   useEffect(() => {
     if (!bookOpen || !clinic) return;
@@ -215,6 +233,18 @@ export function ClinicPageView() {
     const rec = WILAYA_LIST.find((x) => x.key === w);
     return rec ? (lang === "ar" ? rec.ar : lang === "fr" ? rec.fr : rec.en) : w;
   };
+
+  /* v1.15.0: زر الموقع على الخريطة — v1.16.0: رابط <a> حقيقي يعمل دائماً
+     في كل المتصفحات (بدل window.open القابل للحجب)، بالإحداثيات إن وُجدت
+     وإلا بالعنوان النصي في Google Maps */
+  const mapsHref = (() => {
+    const loc = clinic?.location;
+    const hasCoords = loc?.lat != null && loc?.lng != null;
+    const addr = [clinic?.address, clinic?.city, wilayaLabel(clinic?.wilaya ?? null)].filter(Boolean).join("، ");
+    const query = hasCoords ? `${loc!.lat},${loc!.lng}` : addr;
+    if (!query) return null;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  })();
 
   const submitRating = async () => {
     if (!user) {
@@ -245,6 +275,17 @@ export function ClinicPageView() {
 
   const submitBooking = async () => {
     if (!user) {
+      /* v1.16.0: غير مسجّل — نحفظ كل ما أدخله (التاريخ/الساعة/الاسم/الهاتف/السبب)
+          + مفتاح العيادة، ثم نوجهه لإنشاء الحساب؛ بعد التسجيل يعود تلقائياً
+          لنفس نافذة الحجز بنفس البيانات (يضغط تأكيد فقط) */
+      try {
+        sessionStorage.setItem(
+          "tumaanina-clinic-booking-draft",
+          JSON.stringify({ clinicKey: activeClinicSlug, date: bDate, slot: bSlot, name: bName.trim(), phone: bPhone.trim(), reason: bReason.trim() })
+        );
+      } catch {
+        /* تجاهل */
+      }
       setView("client-start");
       return;
     }
@@ -272,6 +313,13 @@ export function ClinicPageView() {
       } else if (data.error === "SLOT_TAKEN") {
         setBError(t.clinics.slotTaken);
         setBTaken((prev) => (prev.includes(bSlot) ? prev : [...prev, bSlot]));
+      } else if (data.error === "SLOT_PAST") {
+        /* v1.16.0: موعد فائت — منع الخادم الجديد */
+        setBError(t.clinics.slotPast);
+        setBTaken((prev) => (prev.includes(bSlot) ? prev : [...prev, bSlot]));
+      } else if (data.error === "ALREADY_BOOKED") {
+        /* v1.16.0: له حجزاً حياً بنفس العيادة */
+        setBError(t.clinics.alreadyBooked);
       } else if (data.error === "BAD_DATE") {
         setBError(t.clinics.badDate);
       } else {
@@ -345,6 +393,14 @@ export function ClinicPageView() {
                     {fullAddress}
                   </p>
                 ) : null}
+                {/* v1.16.0: سعر الجلسة الحضورية يظهر بوضوح في صفحة العيادة */}
+                {clinic.sessionPrice !== null && clinic.sessionPrice > 0 ? (
+                  <div className="inline-flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/25 px-3.5 py-2 w-fit" dir="ltr">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    <span className="text-base font-black text-primary">{clinic.sessionPrice.toLocaleString("en-US")} DZD</span>
+                    <span className="text-[11px] font-bold text-muted-foreground">/ {t.clinics.sessionShort}</span>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -357,6 +413,30 @@ export function ClinicPageView() {
                 {clinic.customSpecialties.map((cs) => (
                   <Badge key={`c-${cs}`} variant="secondary" className="font-semibold">{cs}</Badge>
                 ))}
+              </div>
+            ) : null}
+
+            {/* v1.16.0: باقات الجلسات الحضورية (Packs) — يصوغها صاحب العيادة بحرية */}
+            {clinic.packs && clinic.packs.length > 0 ? (
+              <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 space-y-2.5">
+                <p className="text-sm font-black flex items-center gap-1.5 text-primary">
+                  <Wallet className="h-4 w-4" />
+                  {t.clinics.packsTitle}
+                </p>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {clinic.packs.map((p, i) => (
+                    <div key={i} className="rounded-xl border border-border/70 bg-card px-3.5 py-2.5 space-y-0.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-black text-sm">{p.name}</span>
+                        <span className="text-sm font-black text-primary" dir="ltr">{p.price.toLocaleString("en-US")} DZD</span>
+                      </div>
+                      <p className="text-[11px] font-bold text-muted-foreground">
+                        {t.clinics.packsSessions.replace("{n}", String(p.sessions))}
+                        {p.note ? ` · ${p.note}` : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
 
@@ -447,7 +527,9 @@ export function ClinicPageView() {
               })()}
             </div>
 
-            {/* v1.15.0: أزرار المعرض والخريطة والتقييمات */}
+            {/* v1.15.0: أزرار المعرض والخريطة والتقييمات
+                v1.16.0: زر الموقع رابط حقيقي يعمل دائماً — بالإحداثيات إن وُجدت
+                وإلا بالعنوان النصي (كان window.open قابل الحجب ولا يعمل) */}
             <div className="flex flex-wrap items-center gap-2">
               {clinic.galleryCount > 0 ? (
                 <Button size="sm" variant="outline" className="rounded-xl font-bold gap-1.5 border-primary/40 text-primary" onClick={() => void openGallery()}>
@@ -456,11 +538,16 @@ export function ClinicPageView() {
                   <span className="text-[10px] font-black text-muted-foreground">({clinic.galleryCount})</span>
                 </Button>
               ) : null}
-              {clinic.location?.lat && clinic.location?.lng ? (
-                <Button size="sm" variant="outline" className="rounded-xl font-bold gap-1.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400" onClick={openMaps}>
+              {mapsHref ? (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md border border-emerald-500/40 text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                >
                   <Navigation className="h-4 w-4" />
                   {t.clinics.mapBtn}
-                </Button>
+                </a>
               ) : null}
               <Button size="sm" variant="outline" className="rounded-xl font-bold gap-1.5 border-amber-400/50 text-amber-600 dark:text-amber-400" onClick={() => openClinicRatings(clinic.id, clinic.name)}>
                 <Star className="h-4 w-4" />
@@ -475,6 +562,15 @@ export function ClinicPageView() {
                 className="w-full gradient-primary text-white font-black rounded-2xl h-12 shadow-lg shadow-primary/25"
                 onClick={() => {
                   if (!user) {
+                    /* v1.16.0: نحفظ ما أدخله إن وُجد ثم التسجيل — وبعده العودة لنفس النافذة */
+                    try {
+                      sessionStorage.setItem(
+                        "tumaanina-clinic-booking-draft",
+                        JSON.stringify({ clinicKey: activeClinicSlug, date: bDate, slot: bSlot, name: bName.trim(), phone: bPhone.trim(), reason: bReason.trim() })
+                      );
+                    } catch {
+                      /* تجاهل */
+                    }
                     setView("client-start");
                     return;
                   }
@@ -524,9 +620,7 @@ export function ClinicPageView() {
           </Card>
         ) : null}
 
-        {reviews.length === 0 ? (
-          <p className="text-sm text-muted-foreground font-semibold">{t.clinics.noReviews}</p>
-        ) : (
+        {reviews.length === 0 ? null : (
           <div className="space-y-3">
             {reviews.map((r) => (
               <Card key={r.id} className="border-border/60">
@@ -536,7 +630,7 @@ export function ClinicPageView() {
                     <Stars n={r.stars} size="h-3.5 w-3.5" />
                   </div>
                   {r.comment ? <p className="text-xs text-muted-foreground leading-relaxed">{r.comment}</p> : null}
-                  <p className="text-[10px] text-muted-foreground/70 font-semibold">{new Date(r.createdAt).toLocaleDateString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : lang === "tr" ? "tr-TR" : lang === "ru" ? "ru-RU" : lang === "zh" ? "zh-CN" : "en-US")}</p>
+                  <p className="text-[10px] text-muted-foreground/70 font-semibold" dir="ltr">{formatDateTime(r.createdAt)}</p>
                 </CardContent>
               </Card>
             ))}
@@ -611,6 +705,13 @@ export function ClinicPageView() {
             <DialogDescription className="text-start text-xs leading-relaxed">{t.clinics.bookDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* v1.16.0: تذكير بالسعر داخل نافذة الحجز */}
+            {clinic.sessionPrice !== null && clinic.sessionPrice > 0 ? (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-primary/5 border border-primary/20 px-3.5 py-2.5" dir="ltr">
+                <span className="text-xs font-bold text-muted-foreground">{t.clinics.sessionShort}</span>
+                <span className="text-sm font-black text-primary">{clinic.sessionPrice.toLocaleString("en-US")} DZD</span>
+              </div>
+            ) : null}
             <div className="space-y-1.5">
               <Label className="font-bold">{t.clinics.bookDate} *</Label>
               <Input type="date" min={localDateStr2()} max={localDateStr2(60)} value={bDate} onChange={(e) => setBDate(e.target.value)} className="rounded-xl bg-card" dir="ltr" />
@@ -620,14 +721,19 @@ export function ClinicPageView() {
               <div className="grid grid-cols-4 gap-1.5">
                 {bookingSlots.map((s: string) => {
                   const taken = bTaken.includes(s);
+                  /* v1.16.0: الساعات الفائتة من يوم اليوم معطّلة بصرياً —
+                     تطابق منع الخادم للحجز في موعد ماضٍ (توقيت الجزائر) */
+                  const isToday = bDate === localDateStr2();
+                  const nowHHMM = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(11, 16);
+                  const past = isToday && s <= nowHHMM;
                   return (
                     <button
                       key={s}
                       type="button"
-                      disabled={taken}
+                      disabled={taken || past}
                       onClick={() => setBSlot(s)}
                       className={`rounded-lg py-2 text-xs font-black transition-all border ${
-                        taken
+                        taken || past
                           ? "border-border/40 bg-muted/40 text-muted-foreground/40 line-through cursor-not-allowed"
                           : bSlot === s
                             ? "gradient-primary text-white border-transparent shadow"

@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showAppToast } from "@/components/shared/app-toast";
+import { formatDateTime } from "@/lib/utils";
 
 const MAX_ADIMG_B64 = 1_200_000;
 const MAX_ADVID_B64 = 5_400_000;
@@ -113,14 +114,12 @@ interface DuesRow {
   createdAt: string;
 }
 
+/* v1.16.0: التنسيق الموحد YYYY/MM/DD HH:MM:SS في كل مكان */
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-  } catch {
-    return "—";
-  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return formatDateTime(d);
 }
 
 /* ═══════════════════ تبويب إعلاناتي ═══════════════════ */
@@ -145,6 +144,28 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
   const [replyText, setReplyText] = useState("");
   const [replyIdx, setReplyIdx] = useState<number | null>(null);
   const [cmBusy, setCmBusy] = useState(false);
+
+  /* v1.16.0: نافذة «من أعجب بالإعلان؟» — لصاحب العيادة حصراً */
+  const [likersAd, setLikersAd] = useState<AdRow | null>(null);
+  const [likers, setLikers] = useState<string[]>([]);
+  const [likersBusy, setLikersBusy] = useState(false);
+
+  const openLikers = async (ad: AdRow) => {
+    setLikersAd(ad);
+    setLikers([]);
+    setLikersBusy(true);
+    try {
+      const res = await fetch(`/api/ads/${ad.id}/likes?userId=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLikers(Array.isArray(data.likers) ? data.likers : []);
+      }
+    } catch {
+      /* تجاهل */
+    } finally {
+      setLikersBusy(false);
+    }
+  };
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -299,7 +320,16 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                 {a.status === "APPROVED" ? (
                   <div className="flex items-center gap-3 text-[11px] font-bold text-muted-foreground flex-wrap">
                     <span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{t.clinicDash.viewsCount.replace("{n}", String(a.views))}</span>
-                    <span className="inline-flex items-center gap-1 text-rose-500"><Heart className="h-3.5 w-3.5 fill-rose-500" />{t.clinicDash.likesCount.replace("{n}", String(a.likesCount))}</span>
+                    {/* v1.16.0: عدّاد الإعجابات زر يفتح «من أعجب بالإعلان؟» — لصاحب العيادة حصراً */}
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-rose-500 hover:text-rose-600 hover:underline transition-colors"
+                      title={t.clinicDash.whoLiked}
+                      onClick={() => void openLikers(a)}
+                    >
+                      <Heart className="h-3.5 w-3.5 fill-rose-500" />
+                      {t.clinicDash.likesCount.replace("{n}", String(a.likesCount))}
+                    </button>
                     <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" />{t.clinicDash.commentsCount.replace("{n}", String(a.commentsCount))}</span>
                     {a.expiresAt ? (
                       <span className="inline-flex items-center gap-1"><CalendarRange className="h-3.5 w-3.5" />{t.clinicDash.expiresOn.replace("{d}", fmtDate(a.expiresAt))}</span>
@@ -538,6 +568,37 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
               <p className="text-center text-sm font-bold text-muted-foreground py-6">{t.clinicDash.noComments}</p>
             ) : null}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* v1.16.0: نافذة «من أعجب بالإعلان؟» — أسماء المعجبين لصاحب العيادة حصراً */}
+      <Dialog open={!!likersAd} onOpenChange={(v) => { if (!v) setLikersAd(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-start flex items-center gap-2 text-base">
+              <Heart className="h-4.5 w-4.5 text-rose-500 fill-rose-500" />
+              {t.clinicDash.whoLiked}
+            </DialogTitle>
+            <DialogDescription className="text-start text-xs">{likersAd?.title}</DialogDescription>
+          </DialogHeader>
+          {likersBusy ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : likers.length === 0 ? (
+            <p className="text-center text-sm font-bold text-muted-foreground py-6">{t.clinicDash.noLikers}</p>
+          ) : (
+            <div className="max-h-72 overflow-y-auto space-y-1.5">
+              {likers.map((name, i) => (
+                <div key={i} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3 py-2">
+                  <span className="h-8 w-8 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center font-black text-xs shrink-0">
+                    {name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="text-sm font-bold truncate">{name}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

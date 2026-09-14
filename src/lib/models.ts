@@ -655,6 +655,29 @@ const ClinicSchema = new Schema(
       lng: { type: Number, default: null, min: -180, max: 180 },
       _id: false,
     },
+
+    /* ══ v1.16.0 ══ */
+    /* سعر الجلسة الحضورية بالدينار (DZD) — يحدده صاحب العيادة ويظهر في
+       بطاقة الدليل وصفحة العيادة ونافذة الحجز؛ null = لم يحدّد سعراً بعد */
+    sessionPrice: { type: Number, default: null, min: 0, max: 10000000 },
+    /* باقات الجلسات الحضورية (Packs) — يصوغها صاحب العيادة بحرية:
+       اسم الباقة + عدد الجلسات + سعرها + ملاحظة اختيارية */
+    packs: {
+      type: [
+        {
+          name: { type: String, required: true, trim: true, maxlength: 80 },
+          sessions: { type: Number, required: true, min: 1, max: 200 },
+          price: { type: Number, required: true, min: 0, max: 100000000 },
+          note: { type: String, default: null, trim: true, maxlength: 200 },
+          _id: false,
+        },
+      ],
+      default: [],
+      validate: {
+        validator: (v: unknown[]) => Array.isArray(v) && v.length <= 12,
+        message: "MAX_12_PACKS",
+      },
+    },
   },
   { timestamps: true, collection: "clinics" }
 );

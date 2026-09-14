@@ -16,6 +16,11 @@ export const dynamic = "force-dynamic";
    • عند النجاح يصل إشعار فوري لصاحب العيادة بالتفاصيل الكاملة.
    GET /api/clinics/{id}/book?date=YYYY-MM-DD — الساعات المحجوزة لذلك اليوم. */
 
+/* v1.16.0: التاريخ الموحد YYYY/MM/DD HH:MM:SS في إشعارات الحجز */
+function fmtWhen(d: unknown, s2: unknown): string {
+  return `${String(d ?? "").replaceAll("-", "/")} ${String(s2 ?? "")}:00`;
+}
+
 async function GET_impl(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const { searchParams } = new URL(req.url);
@@ -57,11 +62,14 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     return NextResponse.json({ error: "BAD_SLOT" }, { status: 400 });
   }
   /* التاريخ: من اليوم إلى +60 يوماً (بتوقيت الجزائر UTC+1) */
-  const today = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 10);
+  const nowDz = new Date(Date.now() + 60 * 60 * 1000);
+  const today = nowDz.toISOString().slice(0, 10);
   const maxDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   if (String(date) < today || String(date) > maxDate) {
     return NextResponse.json({ error: "BAD_DATE" }, { status: 400 });
   }
+  /* v1.16.0: الساعة يجب أن تكون من مواعيد العيادة قبل كل فحص لاحق
+     حتى نعرف قيمتها عند فحص المواعيد الماضية */
 
   const [user, clinic] = await Promise.all([
     User.findById(userId).select("role suspended").lean(),
@@ -82,6 +90,16 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     return NextResponse.json({ error: "BAD_SLOT" }, { status: 400 });
   }
 
+  /* v1.16.0: لا حجز في موعد ماضٍ — إن كان التاريخ اليوم فلا تُقبل إلا
+     الساعات اللاحقة للحظة الحالية بتوقيت الجزائر (مقارنة HH:MM نصية كافية
+     لأن الصيغة موحّدة zero-padded) */
+  if (String(date) === today) {
+    const nowHHMM = nowDz.toISOString().slice(11, 16);
+    if (String(slot || "") <= nowHHMM) {
+      return NextResponse.json({ error: "SLOT_PAST" }, { status: 400 });
+    }
+  }
+
   /* تصادم ذري: هل الوقت محجوز بحجز حي؟ */
   const clash = await ClinicBooking.findOne({
     clinicId: id,
@@ -93,6 +111,20 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     .lean();
   if (clash) {
     return NextResponse.json({ error: "SLOT_TAKEN" }, { status: 409 });
+  }
+
+  /* v1.16.0: حجز حيّ واحد لكل (عميل × عيادة) — لا يستطيع العميل حجز جلسة
+     حضورية ثانية بنفس العيادة ما دام له حجز بانتظار أو مؤكد. الحجز يتحرر
+     فقط بالإتمام (COMPLETED) أو الإلغاء (CANCELLED). */
+  const dup = await ClinicBooking.findOne({
+    clinicId: id,
+    clientUserId: userId,
+    status: { $in: ["PENDING", "CONFIRMED"] },
+  })
+    .select("_id")
+    .lean();
+  if (dup) {
+    return NextResponse.json({ error: "ALREADY_BOOKED" }, { status: 409 });
   }
 
   await ClinicBooking.create({
@@ -112,7 +144,7 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     ownerId,
     "clinicBookingNew",
     "/?view=clinic-dashboard",
-    { name: nm, when: `${date} ${slot}`, clinic: String((clinic as unknown as { name: string }).name) }
+    { name: nm, when: fmtWhen(date, slot), clinic: String((clinic as unknown as { name: string }).name) }
   ).catch(() => {});
 
   return NextResponse.json({ ok: true });

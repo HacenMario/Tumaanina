@@ -150,8 +150,10 @@ export function AppHeader() {
       { label: t.founders.title, view: "founders" as ViewName },
       /* v2.9.0: صفحة الدعاء */
       { label: t.dua.title, view: "dua" as ViewName },
-      /* دخول الإدارة — في أسفل القائمة بعيداً عن مسارات المستخدمين */
-      { label: t.nav.adminLogin, view: "admin-login" as ViewName },
+      /* دخول الإدارة — في أسفل القائمة بعيداً عن مسارات المستخدمين
+         v1.16.0: لا يظهر أبداً إذا كان المستخدم مسجلاً الدخول بأي حساب
+         (عميل/مختص/عيادة) — الإدارة لحساب الإدارة فقط */
+      ...(user ? [] : [{ label: t.nav.adminLogin, view: "admin-login" as ViewName }]),
     ]
   ).filter((n) => !shownViews.has(n.view));
 

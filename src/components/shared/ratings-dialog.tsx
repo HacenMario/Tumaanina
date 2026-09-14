@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { showAppToast } from "@/components/shared/app-toast";
 import { playSound } from "@/lib/sounds";
-import { cn } from "@/lib/utils";
+import { cn , formatDateTime} from "@/lib/utils";
 
 interface RatingItem {
   id: string;
@@ -129,14 +129,12 @@ export function RatingsDialog() {
     }
   };
 
+  /* v1.16.0: التنسيق الموحد YYYY/MM/DD HH:MM:SS في كل مكان */
   const fmtDate = (iso: string | null) => {
     if (!iso) return "";
-    try {
-      const d = new Date(iso);
-      return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-    } catch {
-      return "";
-    }
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return formatDateTime(d);
   };
 
   return (
@@ -189,9 +187,7 @@ export function RatingsDialog() {
                     </div>
                   );
                 })}
-                {(!data || data.count === 0) && (
-                  <p className="text-xs font-semibold text-muted-foreground">{t.rating.empty}</p>
-                )}
+                {/* v1.16.0: نُزعت عبارة «لا تقييمات بعد…» وما يقابلها بكل اللغات */}
               </div>
             </div>
 

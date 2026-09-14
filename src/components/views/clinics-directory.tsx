@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BackButton } from "@/components/shared/back-button";
+import { FloatingAdPopup } from "@/components/shared/floating-ad";
 import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from "@/components/shared/social-glyphs";
 
 /* ═ v1.14.0 — دليل العيادات النفسية ═
@@ -48,6 +49,9 @@ export interface ClinicCard {
   bookingsCount: number;
   logoUrl: string;
   hasLogo: boolean;
+  /* v1.16.0: سعر الجلسة الحضورية + باقات الجلسات (Packs) */
+  sessionPrice: number | null;
+  packs: { name: string; sessions: number; price: number; note: string | null }[];
 }
 
 export function openClinicPage(slug: string | null, id: string, autoBook = false) {
@@ -136,6 +140,9 @@ export function ClinicsDirectoryView() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-12 md:py-14">
+      {/* v1.16.0: نافذة الإعلان العائم — انتقلت من الصفحة الرئيسية إلى داخل صفحة العيادات
+          (طلب المستخدم): مدة 20 ثانية + إغلاق يدوي + «لا تظهر مجدداً» */}
+      <FloatingAdPopup />
       <BackButton />
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 mb-6">
         <div className="flex items-center gap-3">
@@ -164,36 +171,43 @@ export function ClinicsDirectoryView() {
           ) : null}
         </div>
         {showFilters ? (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 overflow-hidden">
-            <Select value={fWilaya} onValueChange={(v) => { setFWilaya(v); setPage(1); }}>
-              <SelectTrigger className="rounded-xl bg-card font-semibold"><SelectValue /></SelectTrigger>
-              <SelectContent className="max-h-72">
-                <SelectItem value="all">{t.clinics.allWilayas}</SelectItem>
-                {WILAYA_LIST.map((w) => (
-                  <SelectItem key={w.key} value={w.key}>{lang === "ar" ? w.ar : lang === "fr" ? w.fr : w.en}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={fSpecialty} onValueChange={(v) => { setFSpecialty(v); setPage(1); }}>
-              <SelectTrigger className="rounded-xl bg-card font-semibold"><SelectValue /></SelectTrigger>
-              <SelectContent className="max-h-72">
-                <SelectItem value="all">{t.clinics.allSpecialties}</SelectItem>
-                {SPECIALTIES.map((s) => (
-                  <SelectItem key={s} value={s}>{t.client.specialties[s as SpecialtyKey]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={fMinYears} onValueChange={(v) => { setFMinYears(v); setPage(1); }}>
-              <SelectTrigger className="rounded-xl bg-card font-semibold"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">{t.clinics.anyExperience}</SelectItem>
-                {["3", "5", "10", "15", "20"].map((y) => (
-                  <SelectItem key={y} value={y}>{t.clinics.minYears.replace("{n}", y)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input placeholder={t.clinics.cityPlaceholder} value={fCity} onChange={(e) => { setFCity(e.target.value); setPage(1); }} className="rounded-xl bg-card font-semibold" />
-            <Input placeholder={t.clinics.searchPlaceholder} value={fQuery} onChange={(e) => { setFQuery(e.target.value); setPage(1); }} className="rounded-xl bg-card font-semibold sm:col-span-2" />
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-2.5 overflow-hidden">
+            {/* v1.16.0: الفلاتر الثلاثة في سطر واحد أفقي دائماً (حتى الهاتف)
+                — كانت تتكدس عمودياً فتطيل الصفحة (طلب المستخدم) */}
+            <div className="grid grid-cols-3 gap-2">
+              <Select value={fWilaya} onValueChange={(v) => { setFWilaya(v); setPage(1); }}>
+                <SelectTrigger className="rounded-xl bg-card font-semibold text-xs sm:text-sm px-2.5"><SelectValue /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="all">{t.clinics.allWilayas}</SelectItem>
+                  {WILAYA_LIST.map((w) => (
+                    <SelectItem key={w.key} value={w.key}>{lang === "ar" ? w.ar : lang === "fr" ? w.fr : w.en}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={fSpecialty} onValueChange={(v) => { setFSpecialty(v); setPage(1); }}>
+                <SelectTrigger className="rounded-xl bg-card font-semibold text-xs sm:text-sm px-2.5"><SelectValue /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="all">{t.clinics.allSpecialties}</SelectItem>
+                  {SPECIALTIES.map((s) => (
+                    <SelectItem key={s} value={s}>{t.client.specialties[s as SpecialtyKey]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={fMinYears} onValueChange={(v) => { setFMinYears(v); setPage(1); }}>
+                <SelectTrigger className="rounded-xl bg-card font-semibold text-xs sm:text-sm px-2.5"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">{t.clinics.anyExperience}</SelectItem>
+                  {["3", "5", "10", "15", "20"].map((y) => (
+                    <SelectItem key={y} value={y}>{t.clinics.minYears.replace("{n}", y)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* البحث والمدينة في سطر ثانٍ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Input placeholder={t.clinics.cityPlaceholder} value={fCity} onChange={(e) => { setFCity(e.target.value); setPage(1); }} className="rounded-xl bg-card font-semibold" />
+              <Input placeholder={t.clinics.searchPlaceholder} value={fQuery} onChange={(e) => { setFQuery(e.target.value); setPage(1); }} className="rounded-xl bg-card font-semibold" />
+            </div>
           </motion.div>
         ) : null}
       </div>
@@ -249,6 +263,13 @@ export function ClinicsDirectoryView() {
                           {c.rating.toFixed(1)}
                           <span className="text-muted-foreground font-semibold">({c.ratingsCount})</span>
                         </div>
+                        {/* v1.16.0: سعر الجلسة الحضورية يظهر في البطاقة مباشرة */}
+                        {c.sessionPrice !== null && c.sessionPrice > 0 ? (
+                          <div className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/25 px-2 py-0.5 text-[11px] font-black text-primary w-fit" dir="ltr">
+                            {c.sessionPrice.toLocaleString("en-US")} DZD
+                            <span className="text-[10px] font-bold text-muted-foreground">/ {t.clinics.sessionShort}</span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 

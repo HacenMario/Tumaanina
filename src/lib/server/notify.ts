@@ -42,12 +42,13 @@ export function messageExcerpt(content: string, max = 90): string {
   return clean.length > max ? `${clean.slice(0, max)}…` : clean;
 }
 
-/** تنسيق موعد قصير وموحّد بالأرقام اللاتينية: YYYY/MM/DD — HH:MM (توقيت الجزائر) */
+/** v1.16.0: تنسيق موعد موحد بالأرقام اللاتينية: YYYY/MM/DD HH:MM:SS (توقيت الجزائر)
+    — نفس الصيغة الموحدة للمنصة كلها، بلا ص/م ولا تواريخ هجرية */
 export function formatWhenUTC1(d: Date | string): string {
   const dt = new Date(typeof d === "string" ? d : d.getTime());
   const shifted = new Date(dt.getTime() + 60 * 60 * 1000);
   const iso = shifted.toISOString();
-  return `${iso.slice(0, 4)}/${iso.slice(5, 7)}/${iso.slice(8, 10)} — ${iso.slice(11, 16)}`;
+  return `${iso.slice(0, 4)}/${iso.slice(5, 7)}/${iso.slice(8, 10)} ${iso.slice(11, 19)}`;
 }
 
 /**
