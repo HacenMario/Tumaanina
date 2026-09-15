@@ -1,6 +1,6 @@
 import "server-only";
 import mongoose from "mongoose";
-import { CounselorProfile, Course, CourseEnrollment, User } from "@/lib/models";
+import { Clinic, CounselorProfile, Course, CourseEnrollment, User } from "@/lib/models";
 
 /* ═ v1.19.0 — منطق الدورات الأونلاين المشترك ═
    المقاعد المشغولة = التسجيلات النشطة فقط (pending + confirmed).
@@ -17,17 +17,34 @@ export async function activeSeats(courseId: string): Promise<number> {
   return n;
 }
 
+/* v1.20.0: صاحب الدورة أخصائي أو عيادة — الاسم/الصورة/التقييم من مصدره
+   وrole يوجّه روابط الإشعارات إلى اللوحة الصحيحة */
 export async function courseSpecialist(specialistId: string) {
+  const user = (await User.findById(specialistId).select("suspended role").lean()) as { suspended?: boolean; role?: string } | null;
+  if (user?.role === "CLINIC") {
+    const clinic = (await Clinic.findOne({ ownerUserId: specialistId })
+      .select("name slug rating logo updatedAt")
+      .lean()) as Record<string, unknown> | null;
+    return {
+      id: String(specialistId),
+      name: (String(clinic?.name || "") || "—").slice(0, 80),
+      slug: (clinic?.slug as string) || null,
+      rating: Math.round((Number(clinic?.rating) || 5) * 10) / 10,
+      suspended: !!user?.suspended,
+      role: "CLINIC" as const,
+      photoUrl: clinic?.logo ? `/api/clinics/${String((clinic as { _id: unknown })._id)}/logo?v=${clinic?.updatedAt ? new Date(clinic.updatedAt as string).getTime() : 0}` : null,
+    };
+  }
   const prof = (await CounselorProfile.findOne({ userId: specialistId })
     .select("fullName rating photo updatedAt slug")
     .lean()) as Record<string, unknown> | null;
-  const user = (await User.findById(specialistId).select("suspended").lean()) as { suspended?: boolean } | null;
   return {
     id: String(specialistId),
     name: (String(prof?.fullName || "") || "—").slice(0, 80),
     slug: (prof?.slug as string) || null,
     rating: Math.round((Number(prof?.rating) || 5) * 10) / 10,
     suspended: !!user?.suspended,
+    role: "COUNSELOR" as const,
     photoUrl: prof?.photo ? `/api/counselors/${String((prof as { _id: unknown })._id)}/photo?v=${prof?.updatedAt ? new Date(prof.updatedAt as string).getTime() : 0}` : null,
   };
 }

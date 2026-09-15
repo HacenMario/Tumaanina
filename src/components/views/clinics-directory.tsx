@@ -233,7 +233,7 @@ export function ClinicsDirectoryView() {
           <div ref={gridRef} className="grid sm:grid-cols-2 gap-4 scroll-mt-24">
             {visible.map((c, i) => (
               <motion.div key={c.id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-                <Card className="h-full transition-all hover:shadow-lg border-primary/20 border-border/70">
+                <Card className="card-aurora h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 border-primary/20 border-border/70">
                   <CardContent className="p-5 space-y-3.5">
                     <div className="flex items-start gap-4">
                       <Avatar className="h-20 w-20 rounded-2xl shrink-0 border border-border/60 bg-card">

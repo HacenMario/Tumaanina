@@ -156,7 +156,7 @@ async function POST_impl(req: NextRequest) {
       await ClinicAd.updateOne({ _id: body.id }, { $set: { paid: true, paidAt: new Date() } });
     } else if (ownerId) {
       /* إشعار فوري للعيادة: تواصلي مع الإدارة وادفعي المستحقات لتأكيد إعلانك */
-      void notifyUser(ownerId, "clinicAdDues", "/?view=clinic-dashboard", {
+      await notifyUser(ownerId, "clinicAdDues", "/?view=clinic-dashboard", {
         title: String(ad.title || "").slice(0, 60),
         amount: String(amount),
       }).catch(() => {});
@@ -169,7 +169,7 @@ async function POST_impl(req: NextRequest) {
     const paid = body.paid === true;
     await ClinicAd.updateOne({ _id: body.id }, { $set: { paid, paidAt: paid ? new Date() : null } });
     if (paid && ownerId) {
-      void notifyUser(ownerId, "clinicAdPaidConfirmed", "/?view=clinic-dashboard", {
+      await notifyUser(ownerId, "clinicAdPaidConfirmed", "/?view=clinic-dashboard", {
         title: String(ad.title || "").slice(0, 60),
       }).catch(() => {});
     }
@@ -214,7 +214,7 @@ async function POST_impl(req: NextRequest) {
       }
     );
     if (ownerId) {
-      void notifyUser(ownerId, "clinicAdApproved", "/?view=ads", {
+      await notifyUser(ownerId, "clinicAdApproved", "/?view=ads", {
         title: String(ad.title || "").slice(0, 80),
       }).catch(() => {});
     }
@@ -235,7 +235,7 @@ async function POST_impl(req: NextRequest) {
       }
     );
     if (ownerId) {
-      void notifyUser(ownerId, "clinicAdRejected", "/?view=clinic-dashboard", {
+      await notifyUser(ownerId, "clinicAdRejected", "/?view=clinic-dashboard", {
         title: String(ad.title || "").slice(0, 80),
         reason: (body.adminNote || "").trim().slice(0, 200) || "—",
       }).catch(() => {});

@@ -6,6 +6,8 @@
  * الاشتراك، تعديل وحذف، وإدارة الملتحقين: تأكيد أو رفض مع سبب إلزامي
  * يصل للعميل إشعاراً. يصله إشعار فوري باسم العميل مع كل حجز مقعد،
  * وعدد المقاعد المتبقية يُحسب لحظياً من الخادم.
+ * v1.20.0 — من صلاحية العيادات أيضاً (طلب المستخدم): المكوّن نفسه يعمل
+ * بحساب عيادة (يُضمَّن في لوحة العيادة) بنفس كل المنطق والإشعارات.
  */
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -69,7 +71,7 @@ export function CounselorCoursesSection() {
   const [delTarget, setDelTarget] = useState<CourseRow | null>(null);
 
   const load = useCallback(async (silent = false) => {
-    if (!user?.id || user.role !== "COUNSELOR") return;
+    if (!user?.id || (user.role !== "COUNSELOR" && user.role !== "CLINIC")) return;
     if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/counselor/courses?userId=${user.id}`);

@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showAppToast } from "@/components/shared/app-toast";
 import { formatDateTime } from "@/lib/utils";
+import { SafeVideo } from "@/components/shared/safe-video";
 
 const MAX_ADIMG_B64 = 1_200_000;
 const PAGE = 8;
@@ -156,6 +157,31 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
   const [likersAd, setLikersAd] = useState<AdRow | null>(null);
   const [likers, setLikers] = useState<string[]>([]);
   const [likersBusy, setLikersBusy] = useState(false);
+
+  /* v1.20.0: نافذة «من شاهد الإعلان؟» — أسماء حسابات المشاهدين لصاحب العيادة */
+  const [viewersAd, setViewersAd] = useState<AdRow | null>(null);
+  const [viewers, setViewers] = useState<{ id: string; name: string }[]>([]);
+  const [viewersAnon, setViewersAnon] = useState(0);
+  const [viewersBusy, setViewersBusy] = useState(false);
+
+  const openViewers = async (ad: AdRow) => {
+    setViewersAd(ad);
+    setViewers([]);
+    setViewersAnon(0);
+    setViewersBusy(true);
+    try {
+      const res = await fetch(`/api/ads/viewers?id=${ad.id}&userId=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setViewers(Array.isArray(data.viewers) ? data.viewers : []);
+        setViewersAnon(Number(data.anonymous) || 0);
+      }
+    } catch {
+      /* تجاهل */
+    } finally {
+      setViewersBusy(false);
+    }
+  };
 
   const openLikers = async (ad: AdRow) => {
     setLikersAd(ad);
@@ -374,7 +400,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                     {a.mediaUrls.map((u, i) =>
                       (a.mediaKinds || [])[i] === "video" || u.startsWith("/api/media/") ? (
                         <div key={i} className="relative rounded-lg h-24 w-full border border-border/60 bg-black/80 overflow-hidden">
-                          <video src={u} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <SafeVideo src={u} controls={false} muted preload="metadata" className="h-full w-full object-cover" />
                           <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <span className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                               <Play className="h-3.5 w-3.5 fill-white" />
@@ -397,7 +423,14 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                 {/* تفاعلات الجمهور — كم شخصاً شاهده/أعجبه/علّق */}
                 {a.status === "APPROVED" ? (
                   <div className="flex items-center gap-3 text-[11px] font-bold text-muted-foreground flex-wrap">
-                    <span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{t.clinicDash.viewsCount.replace("{n}", String(a.views))}</span>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-primary hover:underline transition-colors"
+                      title={t.clinicDash.whoViewed}
+                      onClick={() => void openViewers(a)}
+                    >
+                      <Eye className="h-3.5 w-3.5" />{t.clinicDash.viewsCount.replace("{n}", String(a.views))}
+                    </button>
                     {/* v1.16.0: عدّاد الإعجابات زر يفتح «من أعجب بالإعلان؟» — لصاحب العيادة حصراً */}
                     <button
                       type="button"
@@ -565,7 +598,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                       {m.kind === "video" ? (
                         /* v1.18.0: معاينة الفيديو بإطارها الأول + زر تشغيل */
                         <span className="absolute inset-0">
-                          <video src={m.src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <SafeVideo src={m.src} controls={false} muted preload="metadata" className="h-full w-full object-cover" />
                           <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <span className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                               <Play className="h-3.5 w-3.5 fill-white" />
@@ -667,6 +700,40 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
               <p className="text-center text-sm font-bold text-muted-foreground py-6">{t.clinicDash.noComments}</p>
             ) : null}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* v1.20.0: نافذة «من شاهد الإعلان؟» — أسماء حسابات المشاهدين + الزوار العابرون */}
+      <Dialog open={!!viewersAd} onOpenChange={(v) => { if (!v) setViewersAd(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-start flex items-center gap-2 text-base">
+              <Eye className="h-4.5 w-4.5 text-primary" />
+              {t.clinicDash.whoViewed}
+            </DialogTitle>
+            <DialogDescription className="text-start text-xs">{viewersAd?.title}</DialogDescription>
+          </DialogHeader>
+          {viewersBusy ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : viewers.length === 0 ? (
+            <p className="text-center text-sm font-bold text-muted-foreground py-6">{t.clinicDash.noViewers}</p>
+          ) : (
+            <div className="max-h-72 overflow-y-auto space-y-1.5">
+              {viewers.map((v) => (
+                <div key={v.id} className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card px-3 py-2">
+                  <span className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs shrink-0">
+                    {v.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="text-sm font-bold truncate">{v.name}</span>
+                </div>
+              ))}
+              {viewersAnon > 0 ? (
+                <p className="text-[11px] text-muted-foreground font-semibold text-center pt-1">{t.clinicDash.anonViewers.replace("{n}", String(viewersAnon))}</p>
+              ) : null}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

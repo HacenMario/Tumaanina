@@ -22,6 +22,7 @@ import { openClinicPage } from "@/components/views/clinics-directory";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SafeVideo } from "@/components/shared/safe-video";
 
 interface FloatingAd {
   id: string;
@@ -231,14 +232,14 @@ export function FloatingAdPopup() {
                 onTouchEnd={onTouchEnd}
               >
                 {(ad.mediaKinds || [])[slide] === "video" || isVideo(ad.mediaUrls[slide]) ? (
-                  <video
+                  /* v1.20.0: مشغّل موحّد بنمط sanedni.com — source بنوع MIME صريح */
+                  <SafeVideo
                     key={ad.mediaUrls[slide]}
                     src={ad.mediaUrls[slide]}
+                    poster={(ad.mediaKinds || [])[0] !== "video" ? ad.mediaUrls[0] : null}
                     className="h-full w-full object-contain"
-                    controls
                     autoPlay
                     muted
-                    playsInline
                   />
                 ) : (
                   /* eslint-disable-next-line @next/next/no-img-element */

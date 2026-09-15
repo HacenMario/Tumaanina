@@ -587,3 +587,115 @@
     opacity: 0;
   }
 }
+
+/* ═ v1.20.0 — المنصة حيّة: خلفيات تفاعلية وأنيميشن خفيفة لا تحجب المحتوى ═ */
+
+/* 1) خلفية الشفق (aurora) لبطاقات الأخصائيين والعيادات والدورات:
+   فقاعتان متدرجتان تنسيان ببطء خلف المحتوى (z-0) — المحتوى فوقهما دائماً
+   بتباين كامل، والشفافية منخفضة كي لا تؤثر على قراءة أي نص */
+.card-aurora {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg,
+      color-mix(in oklch, var(--primary) 9%, transparent) 0%,
+      color-mix(in oklch, var(--primary) 3%, transparent) 45%,
+      transparent 100%);
+}
+.card-aurora::before,
+.card-aurora::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(28px);
+  z-index: -1;
+  pointer-events: none;
+}
+.card-aurora::before {
+  width: 190px;
+  height: 190px;
+  top: -70px;
+  inset-inline-start: -50px;
+  background: color-mix(in oklch, var(--primary) 22%, transparent);
+  animation: aurora-drift 14s ease-in-out infinite alternate;
+}
+.card-aurora::after {
+  width: 150px;
+  height: 150px;
+  bottom: -60px;
+  inset-inline-end: -40px;
+  background: color-mix(in oklch, var(--secondary, var(--primary)) 18%, transparent);
+  animation: aurora-drift 18s ease-in-out infinite alternate-reverse;
+}
+@keyframes aurora-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate(26px, 14px) scale(1.18);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-16px, -8px) scale(0.92);
+    opacity: 0.65;
+  }
+}
+
+/* 2) دخول ناعم للبطاقات عند الظهور (تعمل مع framer-motion أو وحدها) */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fade-up 0.45s ease-out both;
+}
+
+/* 3) نبض هادئ للشارات المهمة — يلفت النظر بلا إزعاج */
+@keyframes soft-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+.soft-glow {
+  animation: soft-glow 2.6s ease-in-out infinite;
+}
+
+/* 4) حماية التجاوب الكلي: لا تمرير أفقي للمستند أبداً، والوسائط لا تفيض
+   (طلب المستخدم: بلا تجعّد إطار ولا تشوّه هيدر/فوتر على الهاتف) */
+html,
+body {
+  overflow-x: hidden;
+}
+img,
+video,
+canvas,
+svg,
+iframe {
+  max-width: 100%;
+}
+
+/* 5) احترام تفضيل تقليل الحركة — كل الأنيميشن الجديدة تتعطل بأمان */
+@media (prefers-reduced-motion: reduce) {
+  .card-aurora::before,
+  .card-aurora::after {
+    animation: none;
+  }
+  .fade-up {
+    animation: none;
+  }
+  .soft-glow {
+    animation: none;
+  }
+}

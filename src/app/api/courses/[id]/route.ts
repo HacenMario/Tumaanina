@@ -17,7 +17,8 @@ function bad(error: string, status = 400) {
 async function ownerOf(courseId: string, userId: unknown) {
   if (!userId || !/^[a-f0-9]{24}$/i.test(String(userId))) return null;
   const u = (await User.findById(String(userId)).select("role suspended").lean()) as { role?: string; suspended?: boolean } | null;
-  if (!u || u.suspended || u.role !== "COUNSELOR") return null;
+  /* v1.20.0: صاحب الدورة أخصائي أو عيادة */
+  if (!u || u.suspended || !(u.role === "COUNSELOR" || u.role === "CLINIC")) return null;
   return getOwnedCourse(courseId, String(userId));
 }
 

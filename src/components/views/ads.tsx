@@ -16,6 +16,7 @@ import { BackButton } from "@/components/shared/back-button";
 import { showAppToast } from "@/components/shared/app-toast";
 import { openClinicPage } from "./clinics-directory";
 import { cn , formatDateTime} from "@/lib/utils";
+import { SafeVideo } from "@/components/shared/safe-video";
 
 /* ═ v1.15.0 — صفحة إعلانات العيادات (عامة) ═
    تعرض الإعلانات المعتمدة فقط، بترقيم صفحات من الخادم (8 لكل صفحة).
@@ -105,6 +106,20 @@ export function AdsView() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /* v1.20.0: تسجيل مشاهدة الإعلان المعروض — مرة واحدة لكل إعلان في الجلسة
+     (الخادم يعمل تفرداً للمستخدمين المسجّلين عبر viewers؛ للزائر عدّاد فقط) */
+  const viewedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const current = ads[0];
+    if (!current || viewedRef.current.has(current.id)) return;
+    viewedRef.current.add(current.id);
+    void fetch("/api/ads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "view", userId: user?.id || null, id: current.id }),
+    }).catch(() => {});
+  }, [ads, user?.id]);
 
   const toggleLike = async (adId: string) => {
     if (!user) {
@@ -380,6 +395,9 @@ export function AdsView() {
 function AdMediaCarousel({ urls, kinds, title }: { urls: string[]; kinds: string[]; title: string }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [slide, setSlide] = useState(0);
+  /* v1.20.0: أول صورة في الإعلان تُستعمل ملصقاً (poster) للفيديو —
+     إحساس بصري فوري قبل التحميل بنمط sanedni.com */
+  const firstImage = urls.find((u, i) => (kinds || [])[i] !== "video") || null;
 
   const goTo = (i: number) => {
     const el = trackRef.current;
@@ -405,9 +423,9 @@ function AdMediaCarousel({ urls, kinds, title }: { urls: string[]; kinds: string
         {urls.map((u, i) => (
           <div key={i} className="flex h-full w-full shrink-0 snap-center items-center justify-center bg-black">
             {(kinds || [])[i] === "video" || isVideo(u) ? (
-              /* v1.18.0: الفيديو بمشغّل المتصفح المدمج — Range من GridFS يتيح التمرير،
-                 وغير مكتوم ليقرر الزائر تشغيله بصوته */
-              <video src={u} className="h-full w-full object-contain bg-black" controls playsInline preload="metadata" />
+              /* v1.20.0: مشغّل موحّد بنمط sanedni.com — source بنوع MIME صريح
+                 + playsinline + ملصق أول صورة — يعمل على هاتف وحاسوب وتطبيق */
+              <SafeVideo src={u} poster={firstImage} className="h-full w-full object-contain bg-black" />
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
               /* v1.15.1: object-contain — الصورة كاملة داخل إطارها بلا قصّ، بأي أبعاد كانت */

@@ -20,7 +20,8 @@ async function GET_impl(req: NextRequest) {
   if (!userId || !/^[a-f0-9]{24}$/i.test(String(userId))) return bad("INVALID", 401);
   await connectDB();
   const u = (await User.findById(String(userId)).select("role suspended").lean()) as { role?: string; suspended?: boolean } | null;
-  if (!u || u.suspended || u.role !== "COUNSELOR") return bad("INVALID", 401);
+  /* v1.20.0: الدورات من صلاحية الأخصائيين والعيادات معاً (طلب المستخدم) */
+  if (!u || u.suspended || !(u.role === "COUNSELOR" || u.role === "CLINIC")) return bad("INVALID", 401);
 
   const rows = (await Course.find({ specialistId: userId }).sort({ createdAt: -1 }).limit(100).lean()) as Record<string, unknown>[];
   const courses: Record<string, unknown>[] = [];

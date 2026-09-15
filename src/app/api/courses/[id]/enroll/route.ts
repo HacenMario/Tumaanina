@@ -8,12 +8,15 @@ import { ACTIVE_STATUSES, activeSeats, courseSpecialist } from "@/lib/server/cou
 
 export const dynamic = "force-dynamic";
 
-/* ═ v1.19.0 — حجز مقعد في دورة (للعميل حصراً) ═
+/* ═ v1.19.0 — حجز مقعد في دورة ═
    POST /api/courses/{id}/enroll { userId, name? }
-   • الدورة مفتوحة + مقعد متاح + لا حجز نشط سابق لنفس العميل
+   • v1.20.0: الحجز متاح لكل الأدوار المسجّلة (عميل/أخصائي/عيادة)
+     غير صاحب الدورة — الإدارة لا تحجز.
+   • الدورة مفتوحة + مقعد متاح + لا حجز نشط سابق لنفس المستخدم
    • الحجز يُنشأ بحالة pending — المقعد محجوز فوراً (يبقى متاحاً للآخرين
      فقط بعد رفض/إلغاء الحجز)
-   • إشعار فوري: الأخصائي صاحب الدورة باسم العميل + العميل بتأكيد الاستلام */
+   • إشعار فوري للطرفين — منتظَر (await) ضماناً للحفظ حتى على مضيفي
+     الدوال المؤقتة، وبلغة كل حساب */
 
 function bad(error: string, status = 400) {
   return NextResponse.json({ error }, { status });
@@ -26,8 +29,10 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
   if (!/^[a-f0-9]{24}$/i.test(id) || !/^[a-f0-9]{24}$/i.test(userId)) return bad("INVALID");
   await connectDB();
 
-  const u = (await User.findById(userId).select("role suspended pseudonym").lean()) as { role?: string; suspended?: boolean; pseudonym?: string } | null;
-  if (!u || u.suspended || u.role !== "VICTIM") return bad("CLIENT_ONLY", 403);
+  const u = (await User.findById(userId).select("role suspended pseudonym fullName").lean()) as
+    | { role?: string; suspended?: boolean; pseudonym?: string; fullName?: string }
+    | null;
+  if (!u || u.suspended || u.role === "ADMIN") return bad("CLIENT_ONLY", 403);
 
   const course = (await Course.findById(id).lean()) as Record<string, unknown> | null;
   if (!course) return bad("NOT_FOUND", 404);
@@ -48,7 +53,8 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
   const capacity = Number(course.capacity) || 0;
   if (taken >= capacity) return bad("COURSE_FULL", 409);
 
-  const clientName = String(body.name || u.pseudonym || "").trim().slice(0, 80) || null;
+  const clientName =
+    String(body.name || u.pseudonym || u.fullName || "").trim().slice(0, 80) || null;
   const created = await CourseEnrollment.create({
     courseId: new mongoose.Types.ObjectId(id),
     clientId: new mongoose.Types.ObjectId(userId),
@@ -65,16 +71,21 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     return bad("COURSE_FULL", 409);
   }
 
-  /* إشعارات فورية للطرفين — كلٌّ بلغة حسابه */
+  /* إشعارات فورية للطرفين — منتظَرة (await) ضماناً للحفظ */
   const specialist = await courseSpecialist(String(course.specialistId));
-  void notifyUser(String(course.specialistId), "courseNewBooking", "/?view=counselor-dashboard", {
-    name: clientName || "—",
-    course: String(course.title || "").slice(0, 80),
-  });
-  void notifyUser(userId, "coursePending", "/?view=courses", {
-    name: specialist.name,
-    course: String(course.title || "").slice(0, 80),
-  });
+  const ownerUrl = specialist.role === "CLINIC" ? "/?view=clinic-dashboard" : "/?view=counselor-dashboard";
+  try {
+    await notifyUser(String(course.specialistId), "courseNewBooking", ownerUrl, {
+      name: clientName || "—",
+      course: String(course.title || "").slice(0, 80),
+    });
+    await notifyUser(userId, "coursePending", "/?view=courses", {
+      name: specialist.name,
+      course: String(course.title || "").slice(0, 80),
+    });
+  } catch {
+    /* الإشعار لا يُفشل الحجز */
+  }
 
   return NextResponse.json({ ok: true, remaining: Math.max(0, capacity - after) });
 }

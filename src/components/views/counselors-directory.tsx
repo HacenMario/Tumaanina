@@ -127,7 +127,7 @@ export function CounselorsDirectoryView() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
               >
-                <Card className={`h-full transition-all hover:shadow-lg ${c.available ? "border-primary/30" : "opacity-75"} border-border/70`}>
+                <Card className={`card-aurora h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${c.available ? "border-primary/30" : "opacity-75"} border-border/70`}>
                   <CardContent className="p-5 space-y-3.5">
                     <div className="flex items-start gap-4">
                       {/* v2.7.0: التاج الملكي فوق صورة فائز التحدي في الدليل أيضاً */}

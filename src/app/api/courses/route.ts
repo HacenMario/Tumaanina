@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
-import { Course, CourseEnrollment, User } from "@/lib/models";
+import { Clinic, Course, CourseEnrollment, User } from "@/lib/models";
 import { apiHandler } from "@/lib/server/api";
 import { counselorVerified, courseSpecialist, serializeCourse } from "@/lib/server/courses";
 
 export const dynamic = "force-dynamic";
 
-/* ═ v1.19.0 — الدورات الأونلاين (قائمة العملاء + إنشاء الأخصائي) ═
-   GET  /api/courses?userId={حساب عميل} → الدورات المفتوحة + ما يخصّ العميل:
-        المقاعد المتبقية لحظياً + حالة حجزه في كل دورة. الدورات تظهر
-        للعملاء فقط (طلب صريح) — الأخصائي يدير دوراته من مساره الخاص.
-   POST /api/courses { userId(أخصائي), title, description?, price,
-        capacity, startsAt? } → إنشاء دورة جديدة (لأخصائي موثّق غير معلّق).
-        تظهر للعملاء فوراً. */
+/* ═ v1.19.0 — الدورات الأونلاين (v1.20.0: لكل الأدوار المسجّلة) ═
+   GET  /api/courses?userId={حساب} → الدورات المفتوحة + ما يخصّ المتصفح:
+        المقاعد المتبقية لحظياً + حالة حجزه في كل دورة. تظهر للعملاء
+        والأخصائيين والعيادات والإدارة (طلب المستخدم) — صاحب الدورة
+        يدير دوراته من مساره الخاص بلوحته.
+   POST /api/courses { userId(أخصائي موثّق أو عيادة نشطة), title,
+        description?, price, capacity, startsAt? } → إنشاء دورة جديدة. */
 
 function bad(error: string, status = 400) {
   return NextResponse.json({ error }, { status });
@@ -24,8 +24,11 @@ async function GET_impl(req: NextRequest) {
   if (!userId || !/^[a-f0-9]{24}$/i.test(String(userId))) return bad("CLIENT_ONLY", 403);
   await connectDB();
   const u = (await User.findById(String(userId)).select("role suspended").lean()) as { role?: string; suspended?: boolean } | null;
-  /* الدورات تظهر للعملاء حصراً — غير المسجل والأدوار الأخرى لا تُجلب قائمة */
-  if (!u || u.suspended || u.role !== "VICTIM") return bad("CLIENT_ONLY", 403);
+  /* v1.20.0: صفحة الدورات لكل الأدوار المسجّلة غير المعلّقة
+     (عميل/أخصائي/عيادة/إدارة — طلب المستخدم) */
+  if (!u || u.suspended || !(u.role === "VICTIM" || u.role === "COUNSELOR" || u.role === "CLINIC" || u.role === "ADMIN")) {
+    return bad("CLIENT_ONLY", 403);
+  }
 
   const rows = (await Course.find({ status: "open" }).sort({ createdAt: -1 }).limit(100).lean()) as Record<string, unknown>[];
   const courses: Record<string, unknown>[] = [];
@@ -61,8 +64,14 @@ async function POST_impl(req: NextRequest) {
   if (!/^[a-f0-9]{24}$/i.test(userId)) return bad("INVALID", 401);
   await connectDB();
   const u = (await User.findById(userId).select("role suspended").lean()) as { role?: string; suspended?: boolean } | null;
-  if (!u || u.suspended || u.role !== "COUNSELOR") return bad("INVALID", 401);
-  if (!(await counselorVerified(userId))) return bad("NOT_VERIFIED", 403);
+  if (!u || u.suspended || !(u.role === "COUNSELOR" || u.role === "CLINIC")) return bad("INVALID", 401);
+  /* الأخصائي الموثّق أو العيادة النشطة — طلب المستخدم: الدورات من صلاحية الاثنين */
+  if (u.role === "COUNSELOR") {
+    if (!(await counselorVerified(userId))) return bad("NOT_VERIFIED", 403);
+  } else {
+    const clinic = (await Clinic.findOne({ ownerUserId: userId }).select("isActive").lean()) as { isActive?: boolean } | null;
+    if (!clinic || clinic.isActive === false) return bad("NOT_VERIFIED", 403);
+  }
 
   const title = String(body.title || "").trim().slice(0, 150);
   const description = String(body.description || "").trim().slice(0, 2000);

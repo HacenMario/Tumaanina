@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Building2, CalendarClock, Loader2, Plus, Trash2, MapPin, Globe,
   Clock, Wallet, FileCheck2, Upload, X, Check, Ban, RefreshCw, Star, Users, Images,
-  Navigation, CalendarClock as SlotIcon, List, LocateFixed, Video as VideoIcon, Play,
+  Navigation, CalendarClock as SlotIcon, List, LocateFixed, Video as VideoIcon, Play, GraduationCap,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -23,6 +23,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { BackButton } from "@/components/shared/back-button";
 import { showAppToast } from "@/components/shared/app-toast";
 import { MapPicker } from "@/components/shared/map-picker";
+import { SafeVideo } from "@/components/shared/safe-video";
+import { CounselorCoursesSection } from "./counselor-courses";
 
 /* ═ v1.14.0 — لوحة العيادة (دخول عيادة) ═
    أربعة تبويبات:
@@ -132,7 +134,7 @@ interface BookingRow {
 export function ClinicDashboardView() {
   const { t, lang } = useI18n();
   const { user, setUser, setView } = useApp();
-  const [tab, setTab] = useState<"info" | "bookings" | "ads" | "dues">("info");
+  const [tab, setTab] = useState<"info" | "bookings" | "ads" | "dues" | "courses">("info");
 
   /* ─── الملف ─── */
   const [clinic, setClinic] = useState<ClinicProfile | null>(null);
@@ -496,7 +498,7 @@ export function ClinicDashboardView() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
         <button onClick={() => setTab("info")} className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs sm:text-sm font-black transition-all ${tab === "info" ? "gradient-primary text-white shadow" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
           <Building2 className="h-4 w-4 shrink-0" />
           <span className="truncate">{t.clinicDash.tabInfo}</span>
@@ -512,6 +514,11 @@ export function ClinicDashboardView() {
         <button onClick={() => setTab("dues")} className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs sm:text-sm font-black transition-all ${tab === "dues" ? "gradient-primary text-white shadow" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
           <Wallet className="h-4 w-4 shrink-0" />
           <span className="truncate">{t.clinicDash.tabDues}</span>
+        </button>
+        {/* v1.20.0: تبويب الدورات الأونلاين — من صلاحية العيادات أيضاً */}
+        <button onClick={() => setTab("courses")} className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs sm:text-sm font-black transition-all ${tab === "courses" ? "gradient-primary text-white shadow" : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
+          <GraduationCap className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t.courses.tabTitle}</span>
         </button>
       </div>
 
@@ -983,7 +990,7 @@ export function ClinicDashboardView() {
                     <div className="grid grid-cols-4 gap-2 w-full">
                       {fVideos.map((v, i) => (
                         <div key={`v-${i}`} className="relative rounded-lg overflow-hidden border border-border/60 aspect-square bg-black/80">
-                          <video src={v} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <SafeVideo src={v} controls={false} muted preload="metadata" className="h-full w-full object-cover" />
                           <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <span className="h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center">
                               <Play className="h-3.5 w-3.5 fill-white" />
@@ -1218,6 +1225,9 @@ export function ClinicDashboardView() {
 
       {/* ════ المستحقات المدفوعة للمنصة مقابل الإعلانات ════ */}
       {tab === "dues" && user ? <ClinicDuesTab userId={user.id} /> : null}
+
+      {/* ════ v1.20.0: الدورات الأونلاين — إنشاء وإدارة الملتحقين بحساب العيادة ════ */}
+      {tab === "courses" && user ? <CounselorCoursesSection /> : null}
 
       {/* نافذة إلغاء الحجز بسبب */}
       <Dialog open={!!cancelId} onOpenChange={(v) => { if (!v) setCancelId(null); }}>

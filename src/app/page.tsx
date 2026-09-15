@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useApp } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import { playSound, initGlobalSounds } from "@/lib/sounds";
-import { syncPushSubscription } from "@/lib/push-client";
+import { syncPushSubscription, enablePush } from "@/lib/push-client";
 import { AppHeader } from "@/components/shared/header";
 import { AppFooter } from "@/components/shared/footer";
 import { BackToTop } from "@/components/shared/back-to-top";
@@ -166,15 +166,36 @@ export default function Home() {
     initGlobalSounds();
   }, []);
 
-  /* 🔄 مزامنة صامتة لاشتراك الإشعارات عند كل ولوج: إن تغيّر مفتاح الخادم
-     (تحديث/نشر جديد) يُجدّد اشتراك من فعّل الإشعارات سابقاً تلقائياً —
-     بلا أي رسالة أو تدخل (جزء من الحل النهائي لإشعارات الهاتف) */
+  /* 🔄 مزامنة صامتة لاشتراك الإشعارات عند كل ولوج أو تبديل حساب:
+     v1.20.0 — كانت المزامنة تعمل مرة واحدة عند الإقلاع فقط وقبل اكتمال
+     استعادة الحالة المحفوظة أحياناً، وكان حساب عيادة/مختص يسجّل الدخول
+     في جلسة حية لا يُزامَن اشتراكه أبداً فلا تصله إشعارات الهاتف.
+     الآن: مع كل تغيّر للمستخدم — إن كان الإذن ممنوحاً والحساب لا يملك
+     اشتراكاً مفعّلاً يُفعَّل تلقائياً بلا أي تدخل، وإلا مُوظّف الاشتراك القائم */
+  const userId = useApp((s) => s.user?.id);
+  const userRole = useApp((s) => s.user?.role);
   useEffect(() => {
-    const u = useApp.getState().user;
-    if (u?.id && u.role !== "ADMIN") {
-      void syncPushSubscription(u.id, u.role).catch(() => {});
-    }
-  }, []);
+    if (!userId || userRole === "ADMIN") return;
+    void (async () => {
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          let state: { userId?: string } | null = null;
+          try {
+            state = JSON.parse(localStorage.getItem("tumaanina-push-state") || "null");
+          } catch {
+            /* بلا حالة محفوظة */
+          }
+          if (!state?.userId || state.userId !== userId) {
+            const r = await enablePush(userId, userRole as "VICTIM" | "COUNSELOR" | "CLINIC");
+            if (r.ok) return;
+          }
+        }
+      } catch {
+        /* تجاهل — المزامنة العادية تأتي بعدها */
+      }
+      void syncPushSubscription(userId, userRole as "VICTIM" | "COUNSELOR" | "CLINIC").catch(() => {});
+    })();
+  }, [userId, userRole]);
 
   /* v2.5.5: ربط عميق من الملف العام للأخصائي —
      /?book={userId}&lang=ar يفتح المنصة ويبدأ عملية حجز جلسة مع

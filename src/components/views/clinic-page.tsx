@@ -26,6 +26,7 @@ import { formatDateTime } from "@/lib/utils";
 import { fmtMoney } from "@/lib/money";
 import { FacebookGlyph, InstagramGlyph, TikTokGlyph } from "@/components/shared/social-glyphs";
 import { showAppToast } from "@/components/shared/app-toast";
+import { SafeVideo } from "@/components/shared/safe-video";
 import { openClinicPage } from "./clinics-directory";
 
 /* ═ v1.14.0 — صفحة العيادة العامة ═
@@ -160,13 +161,23 @@ export function ClinicPageView() {
   /* v1.17.0: فيديوهات المعرض — تُجلب مع الصور عند فتح النافذة */
   const [galleryVideos, setGalleryVideos] = useState<{ url: string; mime: string }[]>([]);
   /* v1.19.0: عارض الوسائط بمسار تمرير أفقي أصلي (scroll-snap) — السحب باللمس
-     يتبع الإصبع بسلاسة على الهاتف بلا أزرار، والأسهم للحاسوب فقط */
+     يتبع الإصبع بسلاسة على الهاتف، والأسهم للحاسوب والهاتف معاً */
   const lbTrack = useRef<HTMLDivElement | null>(null);
   const lbInitial = useRef(0);
+  /* v1.20.0 — إصلاح «الصورة لا تتغير والتمرير لا ينفع»:
+     كان كل onScroll يُحدّث المؤشر فتُعيد النافذة التمرير إلى نفس الموضع
+     (توصيل دائري) فيُلغى سحب الإصبع وتعود الصورة إلى مكانها. الآن
+     تغيّر المؤشر القادم من التمرير الداخلي لا يُولّد تمريراً مضاداً —
+     التمرير البرمجي فقط عند النقر من خارج المسار (صورة مصغّرة/أسهم/لوحة مفاتيح) */
+  const lbFromScrollRef = useRef(false);
 
-  /* مزامنة المؤشر مع المسار — أسهم لوحة المفاتيح تحرّك التمرير فعلياً */
+  /* مزامنة المؤشر مع المسار — أسهم لوحة المفاتيح والأسهم المرئية تحرّك التمرير فعلياً */
   useEffect(() => {
     if (lightbox === null) return;
+    if (lbFromScrollRef.current) {
+      lbFromScrollRef.current = false; /* جاء من التمرير الداخلي — لا تدخل سحب الإصبع */
+      return;
+    }
     const el = lbTrack.current;
     if (!el || !el.clientWidth) return;
     const target = lightbox * el.clientWidth;
@@ -789,7 +800,7 @@ export function ClinicPageView() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {galleryImages.map((src, i) => (
-                <button key={i} type="button" className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square" onClick={() => { lbInitial.current = i; setLightbox(i); }}>
+                <button key={i} type="button" className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square" onClick={() => { lbInitial.current = i; /* v1.20.0: نغلق نافذة المعرض أولاً — radix يضع pointer-events:none على الجسم ما دامت مفتوحة فتُصبح النافذة الكاملة ميّتة اللمس */ setGalleryOpen(false); setLightbox(i); }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt={`${clinic.name} ${i + 1}`} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                 </button>
@@ -800,9 +811,9 @@ export function ClinicPageView() {
                   key={`v-${i}`}
                   type="button"
                   className="group relative rounded-xl overflow-hidden border border-border/60 aspect-square bg-black/80"
-                  onClick={() => { lbInitial.current = galleryImages.length + i; setLightbox(galleryImages.length + i); }}
+                  onClick={() => { lbInitial.current = galleryImages.length + i; setGalleryOpen(false); setLightbox(galleryImages.length + i); }}
                 >
-                  <video src={v.url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                  <SafeVideo src={v.url} mime={v.mime} controls={false} muted preload="metadata" className="h-full w-full object-cover" />
                   <span className="absolute inset-0 flex items-center justify-center">
                     <span className="h-10 w-10 rounded-full bg-black/60 group-hover:bg-black/80 text-white flex items-center justify-center transition-colors">
                       <Play className="h-5 w-5 fill-white" />
@@ -838,13 +849,15 @@ export function ClinicPageView() {
           <div
             ref={lbTrack}
             dir="ltr"
-            className="touch-scroll no-scrollbar h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
+            className="touch-scroll no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
             onScroll={() => {
               const el = lbTrack.current;
               if (!el || !el.clientWidth) return;
               const total = galleryImages.length + galleryVideos.length;
               const idx = Math.max(0, Math.min(total - 1, Math.round(el.scrollLeft / el.clientWidth)));
-              setLightbox((cur) => (cur === idx ? cur : idx));
+              if (idx === lightbox) return;
+              lbFromScrollRef.current = true;
+              setLightbox(idx);
             }}
           >
             {galleryImages.map((src, i) => (
@@ -863,11 +876,9 @@ export function ClinicPageView() {
                 className="flex h-full w-full shrink-0 snap-center items-center justify-center p-3 sm:p-10"
                 onClick={() => { setLightbox(null); setGalleryOpen(false); }}
               >
-                <video
+                <SafeVideo
                   src={v.url}
-                  controls
-                  playsInline
-                  preload="metadata"
+                  mime={v.mime}
                   autoPlay={galleryImages.length + i === lbInitial.current}
                   className="max-h-full max-w-full rounded-xl bg-black"
                   onClick={(e) => e.stopPropagation()}
@@ -876,25 +887,25 @@ export function ClinicPageView() {
             ))}
           </div>
 
-          {/* أسهم الحاسوب فقط — على الهاتف التمرير باللمس دون أزرار */}
+          {/* أسهم التنقل — للهاتف أيضاً (أصغر حجماً) — السحب اللمسي يبقى الأساس */}
           {lightbox > 0 ? (
             <button
               type="button"
-              className="hidden md:flex absolute start-3 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white items-center justify-center"
+              className="flex absolute start-2 sm:start-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 sm:h-12 sm:w-12 rounded-full bg-white/10 hover:bg-white/25 text-white items-center justify-center backdrop-blur-sm transition-colors"
               onClick={(e) => { e.stopPropagation(); setLightbox((c) => (c === null ? c : Math.max(0, c - 1))); }}
               aria-label="prev"
             >
-              <ChevronLeft className="h-6 w-6 rtl:rotate-180" />
+              <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6 rtl:rotate-180" />
             </button>
           ) : null}
           {lightbox < galleryImages.length + galleryVideos.length - 1 ? (
             <button
               type="button"
-              className="hidden md:flex absolute end-3 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full bg-white/10 hover:bg-white/25 text-white items-center justify-center"
+              className="flex absolute end-2 sm:end-3 top-1/2 -translate-y-1/2 z-20 h-9 w-9 sm:h-12 sm:w-12 rounded-full bg-white/10 hover:bg-white/25 text-white items-center justify-center backdrop-blur-sm transition-colors"
               onClick={(e) => { e.stopPropagation(); setLightbox((c) => (c === null ? c : Math.min(galleryImages.length + galleryVideos.length - 1, c + 1))); }}
               aria-label="next"
             >
-              <ChevronRight className="h-6 w-6 rtl:rotate-180" />
+              <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6 rtl:rotate-180" />
             </button>
           ) : null}
 

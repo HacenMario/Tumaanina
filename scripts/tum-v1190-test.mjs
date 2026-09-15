@@ -71,10 +71,10 @@ const run = async () => {
     await wait(500);
     try {
       const h = await req("GET", "/api/health");
-      if (h.json?.version === "1.19.0" && h.json?.ok) { ready = true; break; }
+      if (h.json?.version === "1.20.0" && h.json?.ok) { ready = true; break; }
     } catch {}
   }
-  check("الخادم جاهز ويقول 1.19.0", ready);
+  check("الخادم جاهز ويقول 1.20.0", ready);
   if (!ready) { console.log("SERVER STDERR:\n" + stderrTail.join("")); server.kill(); await mongod.stop(); process.exit(1); }
 
   const admin = await req("POST", "/api/admin", { action: "login", passcode: "tum-pass-19" });
@@ -172,9 +172,10 @@ const run = async () => {
   const anon = await req("GET", "/api/courses");
   check("الدورات ترفض الزائر غير المسجل (403)", anon.status === 403);
   const asClinic = await req("GET", `/api/courses?userId=${A_uid}`);
-  check("الدورات ترفض حساب العيادة (403)", asClinic.status === 403);
+  // v1.20.0 (طلب المستخدم): صفحة الدورات لكل الأدوار المسجّلة — العيادة تُسمح الآن
+  check("v1.20: الدورات تُسمح لحساب العيادة", asClinic.status === 200);
   const asCounselor = await req("GET", `/api/courses?userId=${C_uid}`);
-  check("الدورات ترفض حساب الأخصائي (403)", asCounselor.status === 403);
+  check("v1.20: الدورات تُسمح لحساب الأخصائي", asCounselor.status === 200);
 
   /* إنشاء الدورة */
   const createByClient = await req("POST", "/api/courses", { userId: c1.id, title: "دورة مسروقة", price: 1, capacity: 5 });

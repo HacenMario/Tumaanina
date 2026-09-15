@@ -8,12 +8,13 @@ import { courseSpecialist } from "@/lib/server/courses";
 
 export const dynamic = "force-dynamic";
 
-/* ═ v1.19.0 — إدارة تسجيل دورة: تأكيد/رفض بالسبب (الأخصائي) وإلغاء (العميل) ═
+/* ═ v1.19.0 — إدارة تسجيل دورة: تأكيد/رفض بالسبب (صاحب الدورة) وإلغاء (المحجز) ═
    POST /api/courses/enrollments/{id}
-     { userId(صاحب الدورة), action: "confirm" }            → العميل يُبلغ فوراً
-     { userId(صاحب الدورة), action: "reject", reason }     → السبب إلزامي ويصل للعميل
-     { userId(العميل صاحب الحجز), action: "cancel" }       → يُحرَّر المقعد ويُبلغ الأخصائي
-   عدد المقاعد يُحسب لحظياً من الحالات النشطة فلا حاجة لتصحيح عدّاد. */
+     { userId(صاحب الدورة), action: "confirm" }            → يُبلغ فوراً
+     { userId(صاحب الدورة), action: "reject", reason }     → السبب إلزامي ويصل للطرف الآخر
+     { userId(صاحب الحجز), action: "cancel" }              → يُحرَّر المقعد ويُبلغ صاحب الدورة
+   v1.20.0: صاحب الدورة أخصائي أو عيادة — الإشعارات منتظَرة (await)
+   ضماناً للحفظ، وروابطها تفتح لوحة صاحب الدورة الصحيحة. */
 
 function bad(error: string, status = 400) {
   return NextResponse.json({ error }, { status });
@@ -37,9 +38,11 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
   if (!u || u.suspended) return bad("INVALID", 401);
   const courseIdStr = String(course._id);
 
-  /* ─── قرار الأخصائي: تأكيد أو رفض بالسبب ─── */
+  /* ─── قرار صاحب الدورة: تأكيد أو رفض بالسبب ─── */
   if (action === "confirm" || action === "reject") {
-    if (u.role !== "COUNSELOR" || String(course.specialistId) !== userId) return bad("FORBIDDEN", 403);
+    const isOwner =
+      String(course.specialistId) === userId && (u.role === "COUNSELOR" || u.role === "CLINIC");
+    if (!isOwner) return bad("FORBIDDEN", 403);
     if (String(enrollment.status) !== "pending") return bad("ALREADY_DECIDED", 409);
     const reason = String(body.reason || "").trim().slice(0, 300);
     if (action === "reject" && !reason) return bad("REASON_REQUIRED");
@@ -50,30 +53,40 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     );
 
     const specialist = await courseSpecialist(userId);
-    if (action === "confirm") {
-      void notifyUser(String(enrollment.clientId), "courseConfirmed", "/?view=courses", {
-        name: specialist.name,
-        course: String(course.title || "").slice(0, 80),
-      });
-    } else {
-      void notifyUser(String(enrollment.clientId), "courseRejected", "/?view=courses", {
-        name: specialist.name,
-        course: String(course.title || "").slice(0, 80),
-        reason: reason.slice(0, 120),
-      });
+    try {
+      if (action === "confirm") {
+        await notifyUser(String(enrollment.clientId), "courseConfirmed", "/?view=courses", {
+          name: specialist.name,
+          course: String(course.title || "").slice(0, 80),
+        });
+      } else {
+        await notifyUser(String(enrollment.clientId), "courseRejected", "/?view=courses", {
+          name: specialist.name,
+          course: String(course.title || "").slice(0, 80),
+          reason: reason.slice(0, 120),
+        });
+      }
+    } catch {
+      /* الإشعار لا يُفشل القرار */
     }
     return NextResponse.json({ ok: true });
   }
 
-  /* ─── إلغاء العميل لحجزه — المقعد يتحرر لأن العدّ يخصّ النشطة فقط ─── */
-  if (u.role !== "VICTIM" || String(enrollment.clientId) !== userId) return bad("FORBIDDEN", 403);
+  /* ─── إلغاء المحجز لحجزه — المقعد يتحرر لأن العدّ يخصّ النشطة فقط ─── */
+  if (String(enrollment.clientId) !== userId) return bad("FORBIDDEN", 403);
   if (!["pending", "confirmed"].includes(String(enrollment.status))) return bad("ALREADY_DECIDED", 409);
   await CourseEnrollment.updateOne({ _id: enrollment._id }, { $set: { status: "cancelled", decidedAt: new Date() } });
 
-  void notifyUser(String(course.specialistId), "courseCancelled", "/?view=counselor-dashboard", {
-    name: String(enrollment.clientName || "").slice(0, 60) || "—",
-    course: String(course.title || "").slice(0, 80),
-  });
+  try {
+    const specialist = await courseSpecialist(String(course.specialistId));
+    const ownerUrl = specialist.role === "CLINIC" ? "/?view=clinic-dashboard" : "/?view=counselor-dashboard";
+    await notifyUser(String(course.specialistId), "courseCancelled", ownerUrl, {
+      name: String(enrollment.clientName || "").slice(0, 60) || "—",
+      course: String(course.title || "").slice(0, 80),
+    });
+  } catch {
+    /* الإشعار لا يُفشل الإلغاء */
+  }
   return NextResponse.json({ ok: true, courseId: courseIdStr });
 }
 

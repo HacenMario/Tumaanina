@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import { InAppNotification, User } from "@/lib/models";
 import { apiHandler } from "@/lib/server/api";
@@ -21,14 +22,34 @@ async function GET_impl(req: NextRequest) {
   /* v2.8.0: نبض الحضور العام — الجرس يستقصي كل 12 ثانية لكل مستخدم ولوج،
      فهو مقياس مثالي لـ«هل المستخدم حاضر في المنصة الآن؟» الذي يعتمد عليه
      إرسال إشعارات الرسائل الجديدة (لا إشعار لمن هو حاضر يقرأ بنفسه) */
-  void User.updateOne({ _id: userId }, { $set: { lastSeenAt: new Date() } })
-    .catch(() => {})
-    .then(() => undefined);
+  if (/^[a-f0-9]{24}$/i.test(userId)) {
+    void User.updateOne({ _id: userId }, { $set: { lastSeenAt: new Date() } })
+      .catch(() => {})
+      .then(() => undefined);
+  }
 
-  const [items, unread] = await Promise.all([
-    InAppNotification.find({ userId }).sort({ createdAt: -1 }).limit(50).lean(),
-    InAppNotification.countDocuments({ userId, read: false }),
-  ]);
+  /* v1.20.0 — إصلاح جذري لـ«لا إشعار يصل»:
+     1) التوافق مع مخازن قديمة وجديدة معاً: بعض الإصدارات السابقة كانت تخزن
+        userId كـ ObjectId وأخرى كنص — الاستعلام بـ$in يجلب كليهما دائماً.
+     2) المعرّف الاصطناعي "admin" (تثبيتات برمز الإدارة بلا مستند User) —
+        مخطط قديم مترجم كان يرمي CastError فتنهار القائمة برقم 500 ولا يرى
+        الإدارة أي إشعار داخل المنصة أبداً. الآن أي فشل صبّ يعيد قائمة فارغة
+        بدل انهيار المسار، والاستعلام النصي يمرّ آمناً على المخطط الحالي. */
+  const idFilter = /^[a-f0-9]{24}$/i.test(userId)
+    ? { userId: { $in: [userId, new mongoose.Types.ObjectId(userId)] } }
+    : { userId };
+
+  let items: Record<string, unknown>[] = [];
+  let unread = 0;
+  try {
+    [items, unread] = (await Promise.all([
+      InAppNotification.find(idFilter).sort({ createdAt: -1 }).limit(50).lean(),
+      InAppNotification.countDocuments({ ...idFilter, read: false }),
+    ])) as [Record<string, unknown>[], number];
+  } catch {
+    /* صبّ فاسد (بناء قديم) — قائمة فارغة بدل 500 */
+    return NextResponse.json({ notifications: [], unread: 0 });
+  }
 
   /* v2.11.0: تعقيم الإشعارات القديمة المحفوظة قبل إصلاح «عبارة name» —
      بعض الإشعارات المخزنة سابقاً كانت تحوي متغيرات قالب غير مُملوءة
@@ -39,8 +60,8 @@ async function GET_impl(req: NextRequest) {
     notifications: items.map((n) => ({
       id: String(n._id),
       key: n.key ?? null,
-      title: clean(n.title),
-      body: clean(n.body),
+      title: clean(String(n.title ?? "")),
+      body: clean(String(n.body ?? "")),
       /* v1.6.0: متغيرات القالب تُعاد للعميل كي يُعيد توليد النص بلغة
          واجهته الحالية من src/lib/notif-texts — الإشعارات تُترجم للغات الست */
       vars: (n as { vars?: Record<string, string> | null }).vars || null,
@@ -52,6 +73,15 @@ async function GET_impl(req: NextRequest) {
   });
 }
 
+/* v1.20.0: فلتر موحّد للقراءة/المسح — يتوافق مع userId مخزّناً نصاً أو
+   ObjectId (بيانات قديمة)، ويطابق معرّف الإشعار إن حُدّد */
+function readFilter(userId: string, id: string | null): Record<string, unknown> {
+  const userMatch = /^[a-f0-9]{24}$/i.test(userId)
+    ? { userId: { $in: [userId, new mongoose.Types.ObjectId(userId)] } }
+    : { userId };
+  return id ? { ...userMatch, _id: id } : userMatch;
+}
+
 async function POST_impl(req: NextRequest) {
   const body = await req.json();
   const { action, userId, id } = body;
@@ -61,15 +91,15 @@ async function POST_impl(req: NextRequest) {
 
   if (action === "read") {
     if (id) {
-      await InAppNotification.updateOne({ _id: id, userId }, { $set: { read: true } });
+      await InAppNotification.updateOne(readFilter(userId, id), { $set: { read: true } });
     } else {
-      await InAppNotification.updateMany({ userId, read: false }, { $set: { read: true } });
+      await InAppNotification.updateMany(readFilter(userId, null), { $set: { read: true } });
     }
     return NextResponse.json({ ok: true });
   }
 
   if (action === "clear") {
-    await InAppNotification.deleteMany({ userId });
+    await InAppNotification.deleteMany(readFilter(userId, null));
     return NextResponse.json({ ok: true });
   }
 

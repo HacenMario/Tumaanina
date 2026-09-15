@@ -58,6 +58,7 @@ const VIEW_ICONS: Partial<Record<ViewName, LucideIcon | "🤲">> = {
   founders: UsersRound,
   dua: "🤲",
   exercises: Waves,
+  courses: GraduationCap,
   "client-start": UserRound,
   "counselor-login": LogIn,
   "counselor-auth": BadgeCheck,
@@ -123,8 +124,8 @@ export function AppHeader() {
     { label: t.nav.findHelp, view: role === "VICTIM" ? "client-topics" : "roles", show: !role || role === "VICTIM" },
     { label: t.nav.counselors, view: "counselors-directory", show: true, wide: true },
     { label: t.nav.clinics, view: "clinics-directory", show: true },
-    /* v1.19.0: الدورات الأونلاين — تظهر للعملاء فقط (طلب المستخدم) */
-    { label: t.nav.courses, view: "courses", show: role === "VICTIM" },
+    /* v1.19.0: الدورات الأونلاين — v1.20.0: لكل الأدوار (عميل/أخصائي/عيادة/إدارة) */
+    { label: t.nav.courses, view: "courses", show: true },
     { label: t.nav.ads, view: "ads", show: role !== "CLINIC" },
     { label: t.nav.community, view: "community", show: true },
     { label: t.nav.exercises, view: "exercises", show: true, wide: true },

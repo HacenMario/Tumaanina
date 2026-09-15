@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db";
 import { Clinic, ClinicAd, User } from "@/lib/models";
 import { apiHandler } from "@/lib/server/api";
 import { deleteOrphanMedia, gridfsFileInfo, isVideoItem } from "@/lib/server/media";
+import { notifyAdminsByKey, notifyUser } from "@/lib/server/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -234,6 +235,30 @@ async function POST_impl(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  /* ─── v1.20.0: تسجيل مشاهدة الإعلان (لقائمة «من شاهد الإعلان») ───
+     للمستخدم المسجّل: مشاهدة فريدة — يُضاف للمشاهدين ويُحسب مرة واحدة فقط،
+     وللزائر العابر: عدّاد مشاهدات فقط بلا هوية. */
+  if (action === "view") {
+    const adId = String(body.id || "");
+    if (!adId || !/^[a-f0-9]{24}$/i.test(adId)) {
+      return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
+    }
+    const uid = String(userId || "");
+    if (uid && /^[a-f0-9]{24}$/i.test(uid)) {
+      const u = await User.findById(uid).select("suspended").lean();
+      if (u && !(u as { suspended?: boolean }).suspended) {
+        const seen = (await ClinicAd.findById(adId).select("viewers").lean()) as unknown as { viewers?: string[] } | null;
+        if (seen && (seen.viewers || []).some((v) => String(v) === uid)) {
+          return NextResponse.json({ ok: true, counted: false });
+        }
+        await ClinicAd.updateOne({ _id: adId }, { $addToSet: { viewers: uid }, $inc: { views: 1 } });
+        return NextResponse.json({ ok: true, counted: true });
+      }
+    }
+    await ClinicAd.updateOne({ _id: adId }, { $inc: { views: 1 } });
+    return NextResponse.json({ ok: true, counted: true });
+  }
+
   /* ─── إعجاب (تبديل) — للعملاء والمختصين ─── */
   if (action === "like") {
     if (!userId || !body.id || !/^[a-f0-9]{24}$/i.test(String(userId))) {
@@ -268,12 +293,26 @@ async function POST_impl(req: NextRequest) {
     }
     const text = String(body.text || "").trim().slice(0, 300);
     if (!text) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
-    const ad = (await ClinicAd.findById(body.id).select("status comments").lean()) as unknown as { status: string; comments: unknown[] } | null;
+    const ad = (await ClinicAd.findById(body.id).select("status comments title clinicId").lean()) as unknown as { status: string; comments: unknown[]; title?: string; clinicId?: unknown } | null;
     if (!ad || ad.status !== "APPROVED") return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
     if ((ad.comments || []).length >= 200) return NextResponse.json({ error: "COMMENTS_FULL" }, { status: 409 });
     await ClinicAd.updateOne({ _id: body.id }, {
       $push: { comments: { userId, name: (user.pseudonym || "—").slice(0, 80), text, hidden: false, createdAt: new Date() } },
     });
+    /* v1.20.0: إشعار فوري لصاحبة العيادة بتعليق جديد على إعلانها —
+       منتظَر (await) كي يُحفظ الإشعار حتى على مضيفي الدوال المؤقتة */
+    try {
+      const ownerClinic = (await Clinic.findById(String(ad.clinicId as unknown)).select("ownerUserId name").lean()) as Record<string, unknown> | null;
+      const ownerId = ownerClinic ? String(ownerClinic.ownerUserId as string) : "";
+      if (ownerId && ownerId !== String(userId)) {
+        await notifyUser(ownerId, "clinicAdComment", "/?view=clinic-dashboard", {
+          name: (user.pseudonym || "—").slice(0, 60),
+          title: String(ad.title || "").slice(0, 60),
+        });
+      }
+    } catch {
+      /* الإشعار لا يُفشل التعليق */
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -284,7 +323,7 @@ async function POST_impl(req: NextRequest) {
     if (!user || (user as { role?: string }).role !== "CLINIC" || (user as { suspended?: boolean }).suspended) {
       return NextResponse.json({ error: "INVALID" }, { status: 401 });
     }
-    const clinic = (await Clinic.findOne({ ownerUserId: userId }).select("_id isActive").lean()) as Record<string, unknown> | null;
+    const clinic = (await Clinic.findOne({ ownerUserId: userId }).select("_id isActive name").lean()) as Record<string, unknown> | null;
     if (!clinic || clinic.isActive === false) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
 
     if (action === "create") {
@@ -300,6 +339,15 @@ async function POST_impl(req: NextRequest) {
       const count = await ClinicAd.countDocuments({ clinicId: clinic._id });
       if (count >= MAX_ADS_PER_CLINIC) return NextResponse.json({ error: "ADS_LIMIT" }, { status: 409 });
       await ClinicAd.create({ clinicId: clinic._id, title, body: adBody, media, status: "PENDING" });
+      /* v1.20.0: إشعار فوري للإدارة بوجود إعلان جديد بانتظار المراجعة */
+      try {
+        await notifyAdminsByKey("clinicAdSubmitted", "/?view=admin-panel", {
+          clinic: String((clinic as unknown as { name?: string }).name || "").slice(0, 60) || "—",
+          title: title.slice(0, 60),
+        });
+      } catch {
+        /* الإشعار لا يُفشل إنشاء الإعلان */
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -350,9 +398,21 @@ async function POST_impl(req: NextRequest) {
       const idx = Number(body.commentIndex);
       const text = String(body.text || "").trim().slice(0, 300);
       if (!Number.isInteger(idx) || idx < 0 || !text) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
-      const target = await ClinicAd.findById(body.id).select("comments").lean() as unknown as { comments: unknown[] } | null;
+      const target = await ClinicAd.findById(body.id).select("comments title").lean() as unknown as { comments: { userId?: unknown }[]; title?: string } | null;
       if (!target || !target.comments?.[idx]) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
       await ClinicAd.updateOne({ _id: body.id }, { $set: { [`comments.${idx}.reply`]: { text, at: new Date() } } });
+      /* v1.20.0: إشعار المعلّق برد العيادة — منتظَر ضماناً للحفظ */
+      try {
+        const commentUserId = target.comments[idx].userId ? String(target.comments[idx].userId) : "";
+        if (commentUserId && commentUserId !== String(userId)) {
+          await notifyUser(commentUserId, "clinicAdReply", "/?view=ads", {
+            clinic: String((clinic as unknown as { name?: string }).name || "").slice(0, 60) || "—",
+            title: String(target.title || "").slice(0, 60),
+          });
+        }
+      } catch {
+        /* الإشعار لا يُفشل الرد */
+      }
       return NextResponse.json({ ok: true });
     }
   }

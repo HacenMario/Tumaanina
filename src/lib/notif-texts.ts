@@ -45,6 +45,9 @@ export type NotifKey =
   | "clinicAdRejected"
   | /* v1.15.0: مستحقات الإعلان */ "clinicAdDues"
   | "clinicAdPaidConfirmed"
+  | /* v1.20.0: دورة حياة الإعلان — تقديم للإدارة وتفاعل الجمهور */ "clinicAdSubmitted"
+  | "clinicAdComment"
+  | "clinicAdReply"
   | /* v1.19.0: الدورات الأونلاين */ "courseNewBooking"
   | "coursePending"
   | "courseConfirmed"
@@ -361,6 +364,30 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     ru: { title: "ℹ️ О вашем объявлении", body: "{title} — публикация пока не одобрена — причина: {reason} — отредактируйте объявление в вашей панели" },
     zh: { title: "ℹ️ 关于您的诊所广告", body: "「{title}」——该广告暂未获批——原因：{reason}——请在您的面板中修改" },
   },
+  clinicAdSubmitted: {
+    ar: { title: "📣 إعلان جديد بانتظار المراجعة", body: "عيادة «{clinic}» صاغت إعلاناً جديداً بعنوان «{title}» — راجعه من لوحة الإدارة" },
+    fr: { title: "📣 Nouvelle annonce à examiner", body: "La clinique «{clinic}» a rédigé une nouvelle annonce «{title}» — examinez-la depuis le panneau d'administration" },
+    en: { title: "📣 New ad awaiting review", body: "Clinic «{clinic}» created a new ad «{title}» — review it from the admin panel" },
+    tr: { title: "📣 İnceleme bekleyen yeni ilan", body: "«{clinic}» kliniği «{title}» başlıklı yeni bir ilan hazırladı — yönetim panelinden inceleyin" },
+    ru: { title: "📣 Новое объявление на проверке", body: "Клиника «{clinic}» создала новое объявление «{title}» — проверьте его в панели администратора" },
+    zh: { title: "📣 有新广告待审核", body: "诊所「{clinic}」创建了新广告「{title}」——请在管理面板中审核" },
+  },
+  clinicAdComment: {
+    ar: { title: "💬 تعليق جديد على إعلانك", body: "{name} علّق على إعلان «{title}» — راجع التعليقات من لوحة عيادتك" },
+    fr: { title: "💬 Nouveau commentaire sur votre annonce", body: "{name} a commenté l'annonce «{title}» — consultez les commentaires depuis votre tableau de bord" },
+    en: { title: "💬 New comment on your ad", body: "{name} commented on the ad «{title}» — review comments from your clinic dashboard" },
+    tr: { title: "💬 İlanınıza yeni yorum", body: "{name}, «{title}» ilanına yorum yaptı — yorumları klinik panonuzdan inceleyin" },
+    ru: { title: "💬 Новый комментарий к объявлению", body: "{name} прокомментировал объявление «{title}» — смотрите комментарии в панели клиники" },
+    zh: { title: "💬 您的广告有新评论", body: "{name} 评论了广告「{title}」——请在诊所面板中查看" },
+  },
+  clinicAdReply: {
+    ar: { title: "💬 رد على تعليقك", body: "عيادة «{clinic}» ردت على تعليقك في إعلان «{title}» — افتح صفحة الإعلانات لقراءة الرد" },
+    fr: { title: "💬 Réponse à votre commentaire", body: "La clinique «{clinic}» a répondu à votre commentaire sur «{title}» — ouvrez la page des annonces" },
+    en: { title: "💬 Reply to your comment", body: "Clinic «{clinic}» replied to your comment on «{title}» — open the ads page to read it" },
+    tr: { title: "💬 Yorumunuza yanıt", body: "«{clinic}» kliniği «{title}» ilanındaki yorumunuza yanıt verdi — okumak için ilanlar sayfasını açın" },
+    ru: { title: "💬 Ответ на ваш комментарий", body: "Клиника «{clinic}» ответила на ваш комментарий к «{title}» — откройте страницу объявлений" },
+    zh: { title: "💬 您的评论收到回复", body: "诊所「{clinic}」回复了您在「{title}」下的评论——请打开广告页面查看" },
+  },
   test: {
     ar: { title: "مرحباً بك في طمأنينة 💜", body: "الإشعارات تعمل بنجاح — أنت في أيدٍ أمينة" },
     fr: { title: "Bienvenue sur Tumaanina 💜", body: "Les notifications fonctionnent — vous êtes entre de bonnes mains" },
@@ -378,7 +405,7 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🎓 有客户报名您的课程", body: "客户 {name} 预订了「{course}」的席位——请在面板的“课程”标签中确认或拒绝" },
   },
   coursePending: {
-    ar: { title: "🎓 تم استلام حجز مقعدك", body: "حجزك في دورة «{course}» بانتظار تأكيد الأخصائي {name} — ستصلك إشعارات الحالة" },
+    ar: { title: "🎓 تم استلام حجز مقعدك", body: "حجزك في دورة «{course}» بانتظار تأكيد {name} — ستصلك إشعارات الحالة" },
     fr: { title: "🎓 Réservation reçue", body: "Votre place dans «{course}» attend la confirmation de {name} — vous serez notifié du statut" },
     en: { title: "🎓 Seat booking received", body: "Your booking in «{course}» is awaiting confirmation from {name} — status notifications will follow" },
     tr: { title: "🎓 Yer rezervasyonunuz alındı", body: "«{course}» kursundaki yeriniz {name} tarafından onaylanmayı bekliyor — durum bildirimleri gelecek" },

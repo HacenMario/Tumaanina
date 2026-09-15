@@ -144,7 +144,7 @@ async function POST_impl(req: NextRequest) {
       ]
         .filter(Boolean)
         .join("، ");
-      void notifyUser(clientUserId, "clinicBookingConfirmed", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
+      await notifyUser(clientUserId, "clinicBookingConfirmed", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
         clinic: (clinic.name as string) || "—",
         when: fmtWhen(booking.date, booking.slot),
         address,
@@ -159,7 +159,7 @@ async function POST_impl(req: NextRequest) {
         { _id: id },
         { $set: { status: "CANCELLED", cancelledBy: "CLINIC", clinicNote: (body.note || "").trim().slice(0, 400) || null } }
       );
-      void notifyUser(clientUserId, "clinicBookingCancelled", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
+      await notifyUser(clientUserId, "clinicBookingCancelled", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
         clinic: (clinic.name as string) || "—",
         when: fmtWhen(booking.date, booking.slot),
         reason: (body.note || "").trim().slice(0, 200) || "—",
@@ -171,7 +171,7 @@ async function POST_impl(req: NextRequest) {
     await ClinicBooking.updateOne({ _id: id }, { $set: { status: "COMPLETED" } });
     await Clinic.updateOne({ _id: clinicId }, { $inc: { bookingsCount: 1 } });
     /* إشعار الاكتمال يطلب من العميل تقييم العيادة */
-    void notifyUser(clientUserId, "clinicVisitCompleted", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
+    await notifyUser(clientUserId, "clinicVisitCompleted", `/?clinic=${encodeURIComponent(String(clinic.slug || clinicId))}`, {
       clinic: (clinic.name as string) || "—",
     }).catch(() => {});
     return NextResponse.json({ ok: true });
@@ -185,7 +185,7 @@ async function POST_impl(req: NextRequest) {
     }
     await ClinicBooking.updateOne({ _id: id }, { $set: { status: "CANCELLED", cancelledBy: "CLIENT" } });
     const ownerId = String((clinic as unknown as { ownerUserId: unknown }).ownerUserId);
-    void notifyUser(ownerId, "clinicBookingCancelledByClient", "/?view=clinic-dashboard", {
+    await notifyUser(ownerId, "clinicBookingCancelledByClient", "/?view=clinic-dashboard", {
       name: (booking.clientName as string) || "—",
       when: fmtWhen(booking.date, booking.slot),
       clinic: (clinic.name as string) || "—",

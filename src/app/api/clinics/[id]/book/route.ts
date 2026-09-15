@@ -169,7 +169,7 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
 
   /* إشعار فوري لصاحب العيادة بالتفاصيل الكاملة */
   const ownerId = String((clinic as unknown as { ownerUserId: unknown }).ownerUserId);
-  void notifyUser(
+  await notifyUser(
     ownerId,
     "clinicBookingNew",
     "/?view=clinic-dashboard",

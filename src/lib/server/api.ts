@@ -17,9 +17,10 @@ export function apiHandler(fn: AnyFn): AnyFn {
     try {
       return await fn(...args);
     } catch (e) {
-      const err = e as { name?: string; message?: string };
+      const err = e as { name?: string; message?: string; stack?: string };
       const msg = String(err?.message ?? e ?? "unexpected");
-      console.error("[api-error]", err?.name ?? "Error", "-", msg);
+      /* v1.20.0: الستاك كامل في السجل — يسرّع تشخيص الأخطاء النادرة */
+      console.error("[api-error]", err?.name ?? "Error", "-", msg, "\n", err?.stack || "(بدون ستاك)");
       const dbDown =
         err?.name === "MongooseServerSelectionError" ||
         err?.name === "MongooseError" ||

@@ -18,7 +18,7 @@
 import { spawn } from "child_process";
 import { MongoMemoryServer } from "mongodb-memory-server";
 
-const PORT = "3994";
+const PORT = "3991";
 const BASE = `http://127.0.0.1:${PORT}`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -73,10 +73,10 @@ const run = async () => {
     await wait(500);
     try {
       const h = await req("GET", "/api/health");
-      if (h.json?.version === "1.19.0" && h.json?.ok) { ready = true; break; }
+      if (h.json?.version === "1.20.0" && h.json?.ok) { ready = true; break; }
     } catch {}
   }
-  check("الخادم جاهز ويقول 1.18.0", ready);
+  check("الخادم جاهز ويقول 1.20.0", ready);
   if (!ready) { console.log("SERVER STDERR:\n" + stderrTail.join("")); server.kill(); await mongod.stop(); process.exit(1); }
 
   const admin = await req("POST", "/api/admin", { action: "login", passcode: "tum-pass-18" });

@@ -284,6 +284,38 @@ export async function notifyBulk(
 }
 
 /**
+ * v1.20.0 — إشعار كل حسابات الإدارة بمفتاح قالب موحّد.
+ * يُستعمل عند تقديم عيادة إعلاناً جديداً بانتظار المراجعة.
+ * فشل إشعار واحد لا يوقف البقية. الانتظار مقصود (await) — على مضيفي
+ * الدوال المؤقتة (serverless) قد يُقتل الوعد الطافي `void` بعد إرسال
+ * الرد فلا يصل الإشعار أبداً؛ الاستدعاء المنتظر مضمون الحفظ.
+ */
+export async function notifyAdminsByKey(
+  key: NotifKey,
+  url: string = "/",
+  vars?: Record<string, string>
+): Promise<{ sent: number }> {
+  let sent = 0;
+  let targets: string[] = [];
+  try {
+    const admins = (await User.find({ role: "ADMIN" }).select("_id").lean()) as { _id: unknown }[];
+    targets = admins.map((a) => String(a._id));
+  } catch {
+    /* قاعدة البيانات — يُعاد صفر */
+  }
+  if (targets.length === 0) targets.push("admin"); // المعرّف الاصطناعي احتياطاً
+  for (const id of targets) {
+    try {
+      await notifyUser(id, key, url, vars);
+      sent += 1; /* الإشعار الداخلي يُحفظ دوماً حتى لو فشل الـ push */
+    } catch {
+      /* إشعار أدمين فاشل لا يوقف البقية */
+    }
+  }
+  return { sent };
+}
+
+/**
  * v2.9.0 — إشعار فوز تحدي الالتزام للعميلين — يصل لكل حسابات الأدمين
  * (أو المعرّف الاصطناعي "admin" كاحتياط) باسم الفائز الأول.
  */

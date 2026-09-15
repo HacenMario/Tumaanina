@@ -30,6 +30,9 @@ async function GET_impl(req: NextRequest, ctx: { params: Promise<{ id: string }>
     "Content-Type": type,
     "Accept-Ranges": "bytes",
     "Cache-Control": "public, max-age=3600",
+    /* v1.20.0: inline — بعض المضيفين/الوكلاء يفرضون attachment فيحمّل
+       الفيديو بدل تشغيله داخل المشغّل (نمط sanedni.com) */
+    "Content-Disposition": `inline; filename="video"`,
   };
 
   if (range) {
