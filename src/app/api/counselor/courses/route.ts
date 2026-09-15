@@ -45,6 +45,10 @@ async function GET_impl(req: NextRequest) {
       enrollments: enrollments.map((e) => ({
         id: String(e._id),
         clientName: (e.clientName as string) || "—",
+        /* v1.21.0: معلومات تواصل المسجّل — تُظهر للمالك وحده عند الضغط على الاسم */
+        contactPhone: (e.contactPhone as string) || null,
+        contactEmail: (e.contactEmail as string) || null,
+        contactNote: (e.contactNote as string) || null,
         price: Number(e.price) || 0,
         status: String(e.status || "pending"),
         rejectReason: (e.rejectReason as string) || null,

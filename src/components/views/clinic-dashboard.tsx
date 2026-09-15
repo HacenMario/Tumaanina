@@ -5,11 +5,10 @@ import { motion } from "framer-motion";
 import {
   Building2, CalendarClock, Loader2, Plus, Trash2, MapPin, Globe,
   Clock, Wallet, FileCheck2, Upload, X, Check, Ban, RefreshCw, Star, Users, Images,
-  Navigation, CalendarClock as SlotIcon, List, LocateFixed, Video as VideoIcon, Play, GraduationCap,
+  Navigation, CalendarClock as SlotIcon, List, LocateFixed, Play, GraduationCap,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
-import { uploadVideoToMedia } from "@/lib/media-upload";
 import { WILAYA_LIST, SPECIALTIES, SLOT_TIMES, type SpecialtyKey } from "@/lib/constants";
 import { ClinicAdsTab, ClinicDuesTab } from "./clinic-dashboard-ads";
 import { Button } from "@/components/ui/button";
@@ -180,7 +179,6 @@ export function ClinicDashboardView() {
      أول تعديل يجلب الفيديوهات الحالية كـ data URLs (استبدال كامل عند الحفظ) */
   const [fVideos, setFVideos] = useState<string[]>([]);
   const [videosDirty, setVideosDirty] = useState(false);
-  const [videosBusy, setVideosBusy] = useState(false);
   const [fLat, setFLat] = useState<number | null>(null);
   const [fLng, setFLng] = useState<number | null>(null);
   const [locDirty, setLocDirty] = useState(false);
@@ -366,37 +364,6 @@ export function ClinicDashboardView() {
     }
   };
 
-  /* ══ v1.18.0: فيديوهات المعرض — GridFS بلا حد للحجم ══
-     الفيديو يُرفع على دفعات عبر /api/media فيصبح مرجعاً «/api/media/{id}»،
-     والمراجع القديمة (روابط المعرض) يغادرها الخادم يرحّلها تلقائياً عند الحفظ
-     — لا حاجة لجلب الفيديوهات الحالية ولا لأي حد حجم */
-  const pickVideos = async (files: FileList | null) => {
-    if (!files?.length || !user?.id) return;
-    const room = 2 - fVideos.length;
-    const list = Array.from(files).slice(0, Math.max(0, room));
-    if (list.length === 0) {
-      showAppToast(t.clinicDash.videoFull, "");
-      return;
-    }
-    setVideosBusy(true);
-    try {
-      const added: string[] = [];
-      for (const f of list) {
-        try {
-          const r = await uploadVideoToMedia(f, user.id);
-          added.push(r.url);
-        } catch {
-          showAppToast(t.clinicDash.videoUploadFail, "");
-        }
-      }
-      if (added.length) {
-        setFVideos((p) => [...p, ...added]);
-        setVideosDirty(true);
-      }
-    } finally {
-      setVideosBusy(false);
-    }
-  };
 
   const removeVideo = (idx: number) => {
     setFVideos((p) => p.filter((_, j) => j !== idx));
@@ -1023,20 +990,6 @@ export function ClinicDashboardView() {
                         multiple
                         className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${fGallery.length >= 8 ? "pointer-events-none" : ""}`}
                         onChange={(e) => { void pickGallery(e.target.files); e.currentTarget.value = ""; }}
-                      />
-                    </div>
-                    {/* v1.17.0: رفع فيديو (أو اثنين) — يُشغَّل بمشغّل المتصفح المدمج */}
-                    <div className="relative">
-                      <Button type="button" variant="outline" size="sm" className="rounded-lg font-bold gap-1.5" disabled={videosBusy || fVideos.length >= 2}>
-                        {videosBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <VideoIcon className="h-3.5 w-3.5" />}
-                        {t.clinicDash.galleryAddVideo} ({fVideos.length}/2)
-                      </Button>
-                      <input
-                        type="file"
-                        accept="video/*"
-                        multiple
-                        className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${videosBusy || fVideos.length >= 2 ? "pointer-events-none" : ""}`}
-                        onChange={(e) => { void pickVideos(e.target.files); e.currentTarget.value = ""; }}
                       />
                     </div>
                   </div>

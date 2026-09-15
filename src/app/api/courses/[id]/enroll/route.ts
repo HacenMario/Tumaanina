@@ -9,9 +9,12 @@ import { ACTIVE_STATUSES, activeSeats, courseSpecialist } from "@/lib/server/cou
 export const dynamic = "force-dynamic";
 
 /* ═ v1.19.0 — حجز مقعد في دورة ═
-   POST /api/courses/{id}/enroll { userId, name? }
+   POST /api/courses/{id}/enroll { userId, name?, contactPhone, contactEmail?, contactNote? }
    • v1.20.0: الحجز متاح لكل الأدوار المسجّلة (عميل/أخصائي/عيادة)
      غير صاحب الدورة — الإدارة لا تحجز.
+   • v1.21.0: رقم الهاتف إلزامي عند الحجز (والبريد والملاحظة اختياريان)
+     — تُخزّن معلومات التواصل مع الحجز ويراها صاحب الدورة وحده في نافذة
+     الملتحقين عند الضغط على اسم المسجّل.
    • الدورة مفتوحة + مقعد متاح + لا حجز نشط سابق لنفس المستخدم
    • الحجز يُنشأ بحالة pending — المقعد محجوز فوراً (يبقى متاحاً للآخرين
      فقط بعد رفض/إلغاء الحجز)
@@ -48,6 +51,13 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
   }).lean();
   if (dup) return bad("ALREADY_BOOKED", 409);
 
+  /* v1.21.0: معلومات التواصل — الهاتف إلزامي كي يتمكن صاحب الدورة من التواصل */
+  const contactPhone = String(body.contactPhone || "").trim().slice(0, 40) || null;
+  if (!contactPhone || !/^\+?[0-9][0-9\s().-]{5,19}$/.test(contactPhone)) return bad("CONTACT_REQUIRED");
+  const contactEmail = String(body.contactEmail || "").trim().slice(0, 160).toLowerCase() || null;
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contactEmail)) return bad("INVALID_EMAIL");
+  const contactNote = String(body.contactNote || "").trim().slice(0, 500) || null;
+
   /* المقعد الفعلي — عدّ لحظي تحت قفل تحقق قبل الإنشاء */
   const taken = await activeSeats(id);
   const capacity = Number(course.capacity) || 0;
@@ -59,6 +69,9 @@ async function POST_impl(req: NextRequest, ctx: { params: Promise<{ id: string }
     courseId: new mongoose.Types.ObjectId(id),
     clientId: new mongoose.Types.ObjectId(userId),
     clientName,
+    contactPhone,
+    contactEmail,
+    contactNote,
     price: Number(course.price) || 0,
     status: "pending",
   });

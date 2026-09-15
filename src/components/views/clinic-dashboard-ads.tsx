@@ -17,7 +17,6 @@ import {
   Eye, Heart, MessageCircle, Wallet, CalendarRange, CornerUpLeft, EyeOff, Pencil, Play,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { uploadVideoToMedia } from "@/lib/media-upload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -141,8 +140,6 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
   const [adBody, setAdBody] = useState("");
   const [adMedia, setAdMedia] = useState<{ src: string; kind: "image" | "video" }[]>([]);
   const [adBusy, setAdBusy] = useState(false);
-  const [vidUploading, setVidUploading] = useState(false);
-  const [vidPct, setVidPct] = useState(0);
   const [adError, setAdError] = useState("");
   /* v1.17.0: الإعلان قيد التعديل (null = إنشاء جديد) */
   const [editingAd, setEditingAd] = useState<AdRow | null>(null);
@@ -518,7 +515,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                     variant="outline"
                     size="sm"
                     className="rounded-lg font-bold gap-1.5"
-                    disabled={vidUploading || adMedia.filter((m) => m.kind === "image").length >= 5}
+                    disabled={adMedia.filter((m) => m.kind === "image").length >= 5}
                   >
                     <Upload className="h-3.5 w-3.5" />
                     {t.clinicDash.addImage} ({adMedia.filter((m) => m.kind === "image").length}/5)
@@ -528,7 +525,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                     accept="image/*"
                     /* v1.15.1: multiple — اختيار كل الصور دفعة واحدة (حتى 5) بدل صورة بعد صورة */
                     multiple
-                    className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${vidUploading || adMedia.filter((m) => m.kind === "image").length >= 5 ? "pointer-events-none" : ""}`}
+                    className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${adMedia.filter((m) => m.kind === "image").length >= 5 ? "pointer-events-none" : ""}`}
                     onChange={async (e) => {
                       const files = Array.from(e.target.files || []);
                       e.currentTarget.value = "";
@@ -552,41 +549,6 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
                         }
                       }
                       if (compressed.length) setAdMedia((p) => [...p, ...compressed.map((src) => ({ src, kind: "image" as const }))]);
-                    }}
-                  />
-                </div>
-                {/* v1.18.0: الفيديو بلا حد للحجم — يُرفع على دفعات ويُخزّن في GridFS */}
-                <div className="relative">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg font-bold gap-1.5"
-                    disabled={vidUploading || adMedia.some((m) => m.kind === "video")}
-                  >
-                    {vidUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                    {vidUploading ? `${t.clinicDash.videoUploading} ${vidPct}%` : t.clinicDash.addVideo}
-                  </Button>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    className={`absolute inset-0 h-full w-full cursor-pointer opacity-0 ${vidUploading || adMedia.some((m) => m.kind === "video") ? "pointer-events-none" : ""}`}
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      e.currentTarget.value = "";
-                      if (!f || vidUploading) return;
-                      setVidUploading(true);
-                      setVidPct(0);
-                      try {
-                        /* v1.18.0: رفع على دفعات — بلا حد لحجم الفيديو */
-                        const r = await uploadVideoToMedia(f, userId, setVidPct);
-                        setAdMedia((p) => [...p, { src: r.url, kind: "video" as const }]);
-                      } catch {
-                        showAppToast(t.clinicDash.videoUploadFail, "");
-                      } finally {
-                        setVidUploading(false);
-                        setVidPct(0);
-                      }
                     }}
                   />
                 </div>
@@ -623,7 +585,7 @@ export function ClinicAdsTab({ userId }: { userId: string }) {
               ) : null}
             </div>
             {adError ? <div className="rounded-xl bg-destructive/10 text-destructive text-sm font-bold px-4 py-3">{adError}</div> : null}
-            <Button className="w-full gradient-primary text-white font-black rounded-xl h-12" disabled={adBusy || vidUploading} onClick={submitAd}>
+            <Button className="w-full gradient-primary text-white font-black rounded-xl h-12" disabled={adBusy} onClick={submitAd}>
               {adBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Megaphone className="h-4 w-4" />}
               {/* v1.18.0: زر نافذة الإعلان يقول «حفظ الإعلان» لا «حفظ معلومات العيادة» */}
               {editingAd ? t.clinicDash.saveAd : t.clinicDash.adSubmit}

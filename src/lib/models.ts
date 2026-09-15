@@ -967,6 +967,11 @@ const CourseEnrollmentSchema = new Schema(
     courseId: { type: Schema.Types.ObjectId, ref: "Course", required: true, index: true },
     clientId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     clientName: { type: String, default: null, trim: true, maxlength: 80 },
+    /* v1.21.0: contact details the registrant leaves at booking time —
+       shown to the course owner only, via the registrants list popup */
+    contactPhone: { type: String, default: null, trim: true, maxlength: 40 },
+    contactEmail: { type: String, default: null, trim: true, maxlength: 160 },
+    contactNote: { type: String, default: null, trim: true, maxlength: 500 },
     price: { type: Number, default: 0, min: 0 },
     status: { type: String, enum: ["pending", "confirmed", "rejected", "cancelled"], default: "pending", index: true },
     rejectReason: { type: String, default: null, trim: true, maxlength: 300 },

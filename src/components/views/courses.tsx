@@ -15,13 +15,16 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { GraduationCap, Users, CalendarClock, Loader2, Wallet, Stethoscope, Building2, CircleCheck, CircleX, Clock4, RefreshCw, SearchX, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { GraduationCap, Users, CalendarClock, Loader2, Wallet, Stethoscope, Building2, CircleCheck, CircleX, Clock4, RefreshCw, SearchX, ChevronLeft, ChevronRight, Star, Phone } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { showAppToast } from "@/components/shared/app-toast";
 import { BackButton } from "@/components/shared/back-button";
@@ -75,8 +78,22 @@ export function CoursesView() {
   const [page, setPage] = useState(1);
   /* نافذة تأكيد الحجز */
   const [target, setTarget] = useState<CourseItem | null>(null);
+  /* v1.21.0: معلومات التواصل التي يتركها المسجّل — الهاتف إلزامي */
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactNote, setContactNote] = useState("");
+  const [contactErr, setContactErr] = useState("");
   /* إلغاء الحجز */
   const [cancelTarget, setCancelTarget] = useState<MyEnrollment | null>(null);
+
+  /* فتح نافذة الحجز — الهاتف يُعبّأ مسبقاً من حساب العميل إن وُجد */
+  const openEnroll = (c: CourseItem) => {
+    setContactPhone(user?.phone || "");
+    setContactEmail("");
+    setContactNote("");
+    setContactErr("");
+    setTarget(c);
+  };
 
   /* v1.20.0: الصفحة لكل الأدوار المسجّلة — غير المسجل يرى دعوة الدخول */
   const canBrowse = !!user?.id;
@@ -118,12 +135,30 @@ export function CoursesView() {
 
   const enroll = async (c: CourseItem) => {
     if (!user?.id) return;
+    /* v1.21.0: التحقق من معلومات التواصل قبل الإرسال — الهاتف إلزامي */
+    const phone = contactPhone.trim();
+    if (!/^\+?[0-9][0-9\s().-]{5,19}$/.test(phone)) {
+      setContactErr(t.courses.contactRequired);
+      return;
+    }
+    const email = contactEmail.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      setContactErr(t.courses.invalidEmail);
+      return;
+    }
+    setContactErr("");
     setBusy(c.id);
     try {
       const res = await fetch(`/api/courses/${c.id}/enroll`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, name: user.pseudonym || "" }),
+        body: JSON.stringify({
+          userId: user.id,
+          name: user.pseudonym || "",
+          contactPhone: phone,
+          contactEmail: email || undefined,
+          contactNote: contactNote.trim() || undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) {
@@ -140,6 +175,10 @@ export function CoursesView() {
       } else if (data.error === "COURSE_CLOSED") {
         showAppToast(t.courses.closed, "");
         load(true);
+      } else if (data.error === "CONTACT_REQUIRED") {
+        setContactErr(t.courses.contactRequired);
+      } else if (data.error === "INVALID_EMAIL") {
+        setContactErr(t.courses.invalidEmail);
       } else {
         showAppToast(t.common.errorServer, "");
       }
@@ -314,7 +353,7 @@ export function CoursesView() {
                           ) : null}
                         </div>
                       ) : (
-                        <Button size="sm" className="gradient-primary text-white font-black rounded-xl gap-1.5 shadow-md shadow-primary/20 hover:shadow-lg transition-all" disabled={c.remaining <= 0 || busy === c.id} onClick={() => setTarget(c)}>
+                        <Button size="sm" className="gradient-primary text-white font-black rounded-xl gap-1.5 shadow-md shadow-primary/20 hover:shadow-lg transition-all" disabled={c.remaining <= 0 || busy === c.id} onClick={() => openEnroll(c)}>
                           <GraduationCap className="h-3.5 w-3.5" />
                           {c.remaining <= 0 ? t.courses.seatsFull : t.courses.enroll}
                         </Button>
@@ -385,9 +424,9 @@ export function CoursesView() {
         </div>
       ) : null}
 
-      {/* نافذة تأكيد الحجز */}
+      {/* نافذة تأكيد الحجز — v1.21.0: تطلب معلومات التواصل */}
       <Dialog open={!!target} onOpenChange={(v) => { if (!v) setTarget(null); }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-start text-base flex items-center gap-2">
               <GraduationCap className="h-4.5 w-4.5 text-primary" />
@@ -400,6 +439,50 @@ export function CoursesView() {
               <span className="inline-flex items-center gap-1.5"><Wallet className="h-4 w-4 text-primary" />{target?.price.toLocaleString("en-US")} DZD</span>
               <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Users className="h-4 w-4" />{target ? t.courses.seatsRemaining.replace("{n}", String(target.remaining)) : ""}</span>
             </div>
+            {/* v1.21.0: معلومات التواصل — تُشارك مع صاحب الدورة فقط */}
+            <div className="space-y-2.5">
+              <p className="text-xs font-black flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-primary" />
+                {t.courses.contactInfo}
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed font-semibold">{t.courses.contactHint}</p>
+              <div className="space-y-1.5">
+                <Label className="font-bold">{t.courses.contactPhone}</Label>
+                <Input
+                  dir="ltr"
+                  inputMode="tel"
+                  value={contactPhone}
+                  onChange={(e) => { setContactPhone(e.target.value); setContactErr(""); }}
+                  className="rounded-xl bg-card text-start"
+                  maxLength={40}
+                  placeholder={t.courses.contactPhonePh}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-bold">{t.courses.contactEmail}</Label>
+                <Input
+                  dir="ltr"
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="rounded-xl bg-card text-start"
+                  maxLength={160}
+                  placeholder={t.courses.contactEmailPh}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-bold">{t.courses.contactNote}</Label>
+                <Textarea
+                  value={contactNote}
+                  onChange={(e) => setContactNote(e.target.value)}
+                  className="rounded-xl min-h-16"
+                  maxLength={500}
+                  placeholder={t.courses.contactNotePh}
+                />
+              </div>
+            </div>
+            {contactErr ? <div className="rounded-xl bg-destructive/10 text-destructive text-xs font-bold px-3.5 py-2.5">{contactErr}</div> : null}
+            <p className="text-[11px] text-muted-foreground leading-relaxed font-semibold">{t.courses.contactShare}</p>
             <p className="text-xs text-muted-foreground leading-relaxed font-semibold">{t.courses.enrollNote}</p>
             <Button className="w-full gradient-primary text-white font-black rounded-xl h-11" disabled={!!busy} onClick={() => target && void enroll(target)}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <GraduationCap className="h-4 w-4" />}

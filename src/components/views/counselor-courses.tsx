@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   GraduationCap, Plus, Loader2, Users, Wallet, CalendarClock, Pencil, Trash2, Ban,
-  CircleCheck, CircleX, Clock4, Lock, LockOpen, ChevronDown,
+  CircleCheck, CircleX, Clock4, Lock, LockOpen, ChevronDown, Phone, Mail, Info, MessageSquareText,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
@@ -29,6 +29,10 @@ import { formatDateTime } from "@/lib/utils";
 interface EnrollmentRow {
   id: string;
   clientName: string;
+  /* v1.21.0: معلومات تواصل المسجّل — تُعرض للمالك عند الضغط على اسمه */
+  contactPhone: string | null;
+  contactEmail: string | null;
+  contactNote: string | null;
   price: number;
   status: string;
   rejectReason: string | null;
@@ -65,6 +69,8 @@ export function CounselorCoursesSection() {
   const [formBusy, setFormBusy] = useState(false);
   /* نافذة الملتحقين */
   const [attCourse, setAttCourse] = useState<CourseRow | null>(null);
+  /* v1.21.0: نافذة معلومات تواصل المسجّل — تفتح بالضغط على اسمه */
+  const [contactEn, setContactEn] = useState<EnrollmentRow | null>(null);
   const [rejectIdx, setRejectIdx] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   /* حذف */
@@ -339,13 +345,26 @@ export function CounselorCoursesSection() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2.5">
+            {/* v1.21.0: تنبيه المختص — الضغط على اسم المسجّل يظهر معلومات التواصل الخاصة به */}
+            <div className="flex items-start gap-1.5 rounded-xl bg-primary/10 text-primary px-3 py-2 text-[11px] font-bold leading-relaxed">
+              <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>{t.courses.tapForContact}</span>
+            </div>
             {(attCourse?.enrollments || []).length === 0 ? (
               <p className="text-center text-sm font-bold text-muted-foreground py-6">{t.courses.noEnrollmentsYet}</p>
             ) : (
               attCourse?.enrollments.map((en) => (
                 <div key={en.id} className={`rounded-xl border px-3.5 py-3 space-y-2 ${en.status === "rejected" || en.status === "cancelled" ? "border-border/40 bg-muted/30 opacity-70" : "border-border/70 bg-card"}`}>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-xs font-black truncate">{en.clientName}</span>
+                    {/* v1.21.0: الاسم زر — الضغط عليه يفتح نافذة معلومات التواصل */}
+                    <button
+                      type="button"
+                      onClick={() => setContactEn(en)}
+                      title={t.courses.tapForContact}
+                      className="text-xs font-black truncate max-w-full text-start underline decoration-dotted decoration-primary/50 underline-offset-4 hover:text-primary transition-colors"
+                    >
+                      {en.clientName}
+                    </button>
                     {statusBadge(en.status)}
                   </div>
                   <p className="text-[10px] font-bold text-muted-foreground" dir="ltr">{t.courses.bookedAt}: {formatDateTime(new Date(en.createdAt))}</p>
@@ -376,6 +395,42 @@ export function CounselorCoursesSection() {
                 </div>
               ))
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* v1.21.0: نافذة معلومات تواصل المسجّل — للمالك حصراً */}
+      <Dialog open={!!contactEn} onOpenChange={(v) => { if (!v) setContactEn(null); }}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-start text-base flex items-center gap-2">
+              <Phone className="h-4.5 w-4.5 text-primary" />
+              {t.courses.contactInfo}
+            </DialogTitle>
+            <DialogDescription className="text-start text-sm font-bold">{contactEn?.clientName}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2.5">
+            {contactEn?.contactPhone ? (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3.5 py-2.5">
+                <span className="text-xs font-bold text-muted-foreground shrink-0">{t.courses.phoneLabel}</span>
+                <a href={`tel:${contactEn.contactPhone}`} className="text-sm font-black text-primary hover:underline truncate" dir="ltr">{contactEn.contactPhone}</a>
+              </div>
+            ) : null}
+            {contactEn?.contactEmail ? (
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-3.5 py-2.5">
+                <span className="text-xs font-bold text-muted-foreground shrink-0 flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{t.courses.emailLabel}</span>
+                <a href={`mailto:${contactEn.contactEmail}`} className="text-xs font-black text-primary hover:underline truncate min-w-0" dir="ltr">{contactEn.contactEmail}</a>
+              </div>
+            ) : null}
+            {contactEn?.contactNote ? (
+              <div className="space-y-1 rounded-xl bg-muted/40 px-3.5 py-2.5">
+                <span className="text-xs font-bold text-muted-foreground flex items-center gap-1"><MessageSquareText className="h-3.5 w-3.5" />{t.courses.noteLabel}</span>
+                <p className="text-xs font-semibold leading-relaxed break-words whitespace-pre-line">{contactEn.contactNote}</p>
+              </div>
+            ) : null}
+            {!contactEn?.contactPhone && !contactEn?.contactEmail && !contactEn?.contactNote ? (
+              <p className="text-xs font-bold text-muted-foreground text-center py-3">{t.courses.noContactInfo}</p>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

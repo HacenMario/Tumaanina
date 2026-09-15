@@ -8,9 +8,9 @@
  *     قائمة أسماء المشاهدين لصاحبة العيادة حصراً (رفض غير المالك)
  *  3) الدورات للعيادات والإدارة: العيادة تنشئ دورة، كل الأدوار تتصفح،
  *     الأخصائي يحجز في دورة عيادة، الإشعارات بالاتجاه الصحيح، الإدارة تتصفح
- *  4) الفيديو: رفع دفعي → GridFS → تقديم Range 206 مع Content-Type
- *     video/mp4 و Content-Disposition inline (نمط sanedni)
- *  5) الصحة 1.20.0 + استقرار 60 طلباً
+ *  4) v1.21.0 (تعديل مقصود): رفع الفيديو مُزع — /api/media يعيد 410،
+ *     وحجز الدورة يتطلب رقم هاتف (معلومات التواصل)
+ *  5) الصحة 1.21.0 + استقرار 60 طلباً
  */
 import { spawn } from "child_process";
 import { MongoMemoryServer } from "mongodb-memory-server";
@@ -61,10 +61,10 @@ const run = async () => {
     await wait(500);
     try {
       const h = await req("GET", "/api/health");
-      if (h.json?.version === "1.20.0" && h.json?.ok) { ready = true; break; }
+      if (h.json?.version === "1.21.0" && h.json?.ok) { ready = true; break; }
     } catch {}
   }
-  check("الخادم جاهز ويقول 1.20.0", ready);
+  check("الخادم جاهز ويقول 1.21.0", ready);
   if (!ready) { console.log("SERVER STDERR:\n" + stderrTail.join("")); server.kill(); await mongod.stop(); process.exit(1); }
 
   const admin = await req("POST", "/api/admin", { action: "login", passcode: "tum-pass-20" });
@@ -173,7 +173,7 @@ const run = async () => {
   check("عيادة أخرى تتصفح قائمة الدورات", listForClinicB.status === 200);
 
   /* الأخصائي يحجز في دورة العيادة — إشعار الاتجاه الصحيح */
-  const eByCouns = await req("POST", `/api/courses/${courseClId}/enroll`, { userId: C_uid });
+  const eByCouns = await req("POST", `/api/courses/${courseClId}/enroll`, { userId: C_uid, contactPhone: "0555000111" });
   check("الأخصائي يحجز مقعداً في دورة العيادة", eByCouns.json?.ok === true && eByCouns.json?.remaining === 2);
   const nOwner3 = (await req("GET", `/api/notifications?userId=${A_uid}`)).json?.notifications || [];
   check("إشعار الحجز وصل للعيادة صاحبة الدورة", nOwner3.some((n) => n.key === "courseNewBooking" && (n.body || "").includes("د. إشعارات")));
@@ -204,25 +204,16 @@ const run = async () => {
   const enrollClosed = await req("POST", `/api/courses/${courseClId}/enroll`, { userId: c1.id });
   check("الحجز في الدورة المغلقة مرفوض", enrollClosed.status === 409 && enrollClosed.json?.error === "COURSE_CLOSED");
   await req("PATCH", `/api/courses/${courseClId}`, { userId: A_uid, action: "open" });
-  const reopen = await req("POST", `/api/courses/${courseClId}/enroll`, { userId: c1.id });
+  const reopen = await req("POST", `/api/courses/${courseClId}/enroll`, { userId: c1.id, contactPhone: "0555000001" });
   check("بعد الفتح يعود الحجز ممكناً", reopen.json?.ok === true);
   const delOther = await req("DELETE", `/api/courses/${courseClId}?userId=${B_uid}`);
   check("عيادة أخرى لا تحذف دورة غيرها (404)", delOther.status === 404);
   const delCl = await req("DELETE", `/api/courses/${courseClId}?userId=${A_uid}`);
   check("العيادة تحذف دورتها", delCl.json?.ok === true);
 
-  /* ══ 4) الفيديو: GridFS + Range + ترويسات نمط sanedni ══ */
+  /* ══ 4) v1.21.0: نزع رفع الفيديو — 410 لكل العمليات ══ */
   const st = await req("POST", "/api/media", { userId: A_uid, op: "start", mime: "video/mp4", name: "v.mp4", size: 4000 });
-  const buf = tinyMp4(9, 4000);
-  const ch = await fetch(`${BASE}/api/media?op=chunk&uid=${st.json.uploadId}&idx=0`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: buf });
-  const cm = await req("POST", "/api/media", { userId: A_uid, op: "commit", uploadId: st.json.uploadId });
-  check("رفع دفعي → GridFS commit", ch.ok && cm.json?.ok && !!cm.json?.url);
-  const vr = await fetch(`${BASE}${cm.json.url}`, { headers: { Range: "bytes=0-99" } });
-  const vh = await vr.arrayBuffer();
-  check("Range 206 مع Content-Range صحيح", vr.status === 206 && (vr.headers.get("content-range") || "").startsWith("bytes 0-99/"));
-  check("ترويسة Content-Type فيديو صريحة", (vr.headers.get("content-type") || "").startsWith("video/"));
-  check("ترويسة inline لمنع التنزيل القسري", (vr.headers.get("content-disposition") || "").includes("inline"));
-  check("قبول المحتوى أول 100 بايت مطابق", Buffer.from(vh).equals(buf.subarray(0, 100)));
+  check("رفع الفيديو مُزع — start يعيد 410 MEDIA_DISABLED", st.status === 410 && st.json?.error === "MEDIA_DISABLED");
 
   /* ══ 5) استقرار ══ */
   let okAll = 0;

@@ -71,10 +71,10 @@ const run = async () => {
     await wait(500);
     try {
       const h = await req("GET", "/api/health");
-      if (h.json?.version === "1.20.0" && h.json?.ok) { ready = true; break; }
+      if (h.json?.version === "1.21.0" && h.json?.ok) { ready = true; break; }
     } catch {}
   }
-  check("الخادم جاهز ويقول 1.20.0", ready);
+  check("الخادم جاهز ويقول 1.21.0", ready);
   if (!ready) { console.log("SERVER STDERR:\n" + stderrTail.join("")); server.kill(); await mongod.stop(); process.exit(1); }
 
   const admin = await req("POST", "/api/admin", { action: "login", passcode: "tum-pass-19" });
@@ -156,16 +156,9 @@ const run = async () => {
   const afterUnhide = (await req("GET", `/api/ads?userId=${A_uid}`)).json?.ads?.[0]?.comments?.[0];
   check("الإظهار يعمل من الخادم (hidden=false)", hide2.json?.ok === true && afterUnhide?.hidden === false);
 
-  /* ══ 5) رفع الفيديو الدفعي + Range — توافق ما زال قائماً ══ */
+  /* ══ 5) v1.21.0 (تعديل مقصود): رفع الفيديو مُزع — 410 MEDIA_DISABLED ══ */
   const st = await req("POST", "/api/media", { userId: A_uid, op: "start", mime: "video/mp4", name: "v19.mp4", size: 4000 });
-  check("جلسة رفع تبدأ", !!st.json?.uploadId);
-  const ch1 = await reqRaw("POST", `/api/media?op=chunk&uid=${st.json.uploadId}&idx=0`, tinyMp4(3, 2000));
-  const ch2 = await reqRaw("POST", `/api/media?op=chunk&uid=${st.json.uploadId}&idx=1`, tinyMp4(5, 2000));
-  const cm = await req("POST", "/api/media", { userId: A_uid, op: "commit", uploadId: st.json.uploadId });
-  check("دفعتان → GridFS commit", ch1.json?.ok && ch2.json?.ok && !!cm.json?.url);
-  const rangeRes = await fetch(`${BASE}${cm.json.url}`, { headers: { Range: "bytes=0-99" } });
-  check("Range 206 يعمل على ملف GridFS", rangeRes.status === 206 && (rangeRes.headers.get("content-range") || "").startsWith("bytes 0-99/"));
-  await rangeRes.arrayBuffer();
+  check("رفع الفيديو مُزع — start يعيد 410 MEDIA_DISABLED", st.status === 410 && st.json?.error === "MEDIA_DISABLED");
 
   /* ══ 1) الدورات الأونلاين ══ */
   /* ظهور للعملاء حصراً */
@@ -186,13 +179,13 @@ const run = async () => {
   check("الدورة الجديدة سعة 2 والمتبقي 2", createOk.json?.course?.capacity === 2 && createOk.json?.course?.remaining === 2);
 
   /* حجوزات العملاء */
-  const e1 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c1.id });
+  const e1 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c1.id, contactPhone: "0555000999" });
   check("العميل أ يحجز مقعداً (pending)", e1.json?.ok === true && e1.json?.remaining === 1);
-  const e1b = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c1.id });
+  const e1b = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c1.id, contactPhone: "0555000999" });
   check("الحجز المكرر مرفوض ALREADY_BOOKED", e1b.status === 409 && e1b.json?.error === "ALREADY_BOOKED");
-  const e2 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c2.id });
+  const e2 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c2.id, contactPhone: "0555000999" });
   check("العميل ب يحجز آخر مقعد (remaining=0)", e2.json?.ok === true && e2.json?.remaining === 0);
-  const e3 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c3.id });
+  const e3 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c3.id, contactPhone: "0555000999" });
   check("تجاوز السعة مرفوض COURSE_FULL", e3.status === 409 && e3.json?.error === "COURSE_FULL");
 
   /* حالة العميل في القائمة + myEnrollments */
@@ -231,7 +224,7 @@ const run = async () => {
   check("قرار مكرر مرفوض ALREADY_DECIDED", confirmAgain.status === 409);
 
   /* الرفض حرر مقعداً → العميل ج يستطيع الحجز الآن */
-  const e3b = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c3.id });
+  const e3b = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c3.id, contactPhone: "0555000999" });
   check("المقعد المحرر بعد الرفض يُحجز (العدّ لحظي)", e3b.json?.ok === true && e3b.json?.remaining === 0);
 
   /* إلغاء العميل ب يحرر مقعده ويُبلغ الأخصائي */
@@ -244,14 +237,14 @@ const run = async () => {
   check("إلغاء حجز غيره مرفوض", cancelForeign.status === 403);
 
   /* العميل أ بعد رفضه يعيد الحجز بنجاح (المرفوض لا يمنع) */
-  const e1c = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c1.id });
+  const e1c = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c1.id, contactPhone: "0555000999" });
   check("إعادة الحجز بعد الرفض تنجح", e1c.json?.ok === true);
 
   /* إغلاق الاشتراك يمنع الحجز الجديد */
   const closeC = await req("PATCH", `/api/courses/${courseId}`, { userId: C_uid, action: "close" });
   check("إغلاق الاشتراك ينجح", closeC.json?.ok === true);
   const c4 = (await req("POST", "/api/client", { action: "register", pseudonym: `عميل-د-${stamp}`, password: "pass-tumaanina-1", recoveryPhrase: "عبارة د", gender: "female", phone: "0555000004" })).json?.user;
-  const e4 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c4.id });
+  const e4 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c4.id, contactPhone: "0555000999" });
   check("الحجز في دورة مغلقة مرفوض COURSE_CLOSED", e4.status === 409 && e4.json?.error === "COURSE_CLOSED");
   const reopenC = await req("PATCH", `/api/courses/${courseId}`, { userId: C_uid, action: "open" });
   check("إعادة فتح الاشتراك تعمل", reopenC.json?.ok === true);
@@ -263,7 +256,7 @@ const run = async () => {
   check("تحديث عادي للدورة ينجح", upd.json?.ok === true);
 
   /* صاحب الدورة لا يحجز في دورته + قائمة دورات غير المالك مرفوضة */
-  const selfEnroll = await req("POST", `/api/courses/${courseId}/enroll`, { userId: C_uid });
+  const selfEnroll = await req("POST", `/api/courses/${courseId}/enroll`, { userId: C_uid, contactPhone: "0555000999" });
   check("الأخصائي لا يحجز في دورته", selfEnroll.status === 403);
   const foreignDecide = await req("POST", `/api/ads`, { action: "comment-hide", userId: C_uid, id: adId, commentIndex: 0, hidden: true });
   check("أخصائي لا يحجب تعليقات إعلان عيادة (401)", foreignDecide.status === 401);
@@ -272,13 +265,13 @@ const run = async () => {
   const c5 = (await req("POST", "/api/client", { action: "register", pseudonym: `عميل-هـ-${stamp}`, password: "pass-tumaanina-1", recoveryPhrase: "عبارة هـ", gender: "male", phone: "0555000005" })).json?.user;
   const c2r = (await req("GET", `/api/courses?userId=${c5.id}`)).json?.courses || [];
   const delCourse = c2r[0];
-  const e5 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c5.id });
+  const e5 = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c5.id, contactPhone: "0555000999" });
   check("العميل هـ يحجز قبل الحذف (سعة مرفوعة)", e5.json?.ok === true);
   const del = await req("DELETE", `/api/courses/${courseId}?userId=${C_uid}`);
   check("حذف الدورة ينجح", del.json?.ok === true);
   const mineAfterDel = (await req("GET", `/api/counselor/courses?userId=${C_uid}`)).json?.courses || [];
   check("الدورة المحذوفة غابت عن قائمة صاحبها", !mineAfterDel.some((x) => x.id === courseId));
-  const enrollDeleted = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c5.id });
+  const enrollDeleted = await req("POST", `/api/courses/${courseId}/enroll`, { userId: c5.id, contactPhone: "0555000999" });
   check("الحجز في دورة محذوفة مرفوض 404", enrollDeleted.status === 404);
 
   /* تراجع سريع: حجز عيادة عادي لم يُمس */
