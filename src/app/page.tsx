@@ -93,6 +93,47 @@ const VIEWS: Record<string, React.ComponentType> = {
 
 const SKELETON_MS = 420;
 
+/* v1.22.2 — الحل الجذري لمشكلة «الكاش» بعد التوثيق ─────────────────────────
+   الحالة المحفوظة محلياً (localStorage) قد تكون قديمة: الأخصائي وُثّق من
+   الإدارة بعد آخر دخول، فتظل لافتة «قيد التوثيق» ظاهرة حتى يمسح المستخدم
+   بيانات الموقع يدوياً — وكثير منهم لا يعرف كيف.
+   الحل: عند كل إقلاع تُستعلم /api/me (بلا أي تخزين no-store) وتُستبدل
+   نسخة الحساب المحلية بالنسخة الحية من الخادم عند وجود فرق فعلي فقط
+   (كي لا تُكسر مراجع useCallback في اللوحات). الخادم مصدر الحقيقة دائماً،
+   ولن يحتاج أحد لمسح الكاش أبداً بعد اليوم — صامتة وآمنة: أي فشل شبكة
+   يترك المخزن كما هو. */
+function syncAccountFromServer(): void {
+  try {
+    const u = useApp.getState().user;
+    if (!u?.id) return;
+    void fetch(`/api/me?userId=${encodeURIComponent(u.id)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const fresh = (data as { user?: Record<string, unknown> } | null)?.user;
+        const cur = useApp.getState().user;
+        if (!fresh || !cur || cur.id !== fresh.id) return;
+        const merged = { ...cur, ...fresh } as typeof cur;
+        const sig = (x: typeof cur) =>
+          JSON.stringify([
+            x.verified ?? null,
+            x.verificationStatus ?? null,
+            x.photo ?? null,
+            x.fullName ?? null,
+            x.pseudonym ?? null,
+            x.language ?? null,
+            x.wilaya ?? null,
+            x.staffRole ?? null,
+          ]);
+        if (sig(cur) !== sig(merged)) useApp.getState().setUser(merged);
+      })
+      .catch(() => {
+        /* الشبكة غائبة — يبقى المخزن كما هو */
+      });
+  } catch {
+    /* المزامنة تحسينية — لا تُعطّل الإقلاع أبداً */
+  }
+}
+
 export default function Home() {
   const view = useApp((s) => s.view);
   const fontScale = useApp((s) => s.fontScale);
@@ -103,9 +144,11 @@ export default function Home() {
      العملة…) بأمان بعد اكتمال الترطيب فتتحوّل الواجهة بتدفق طبيعي بلا انهيار. */
   useEffect(() => {
     try {
-      void useApp.persist.rehydrate();
+      const p = useApp.persist.rehydrate() as unknown as Promise<void> | undefined;
+      void Promise.resolve(p).catch(() => {}).then(syncAccountFromServer);
     } catch {
       /* تجاهل — الاستعادة تحسينية */
+      syncAccountFromServer();
     }
   }, []);
   /* v2.8.0: مع استعادة الصفحة المحفوظة بعد F5 — غرفة الجلسة بلا جلسة نشطة تعود للرئيسية

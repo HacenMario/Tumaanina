@@ -244,6 +244,20 @@ export function CounselorDashboardView() {
         const pcs = (me as { platformContractSigned?: boolean }).platformContractSigned;
         setPlatformContractSigned(typeof pcs === "boolean" ? pcs : null);
         setStats({ upcoming: 0, done: me.sessionsCount, rating: me.rating });
+        /* v1.22.2 — الحل الجذري لمشكلة «الكاش» بعد التوثيق: لافتة التوثيق تقرأ
+           user.verified من المخزن المحلي (localStorage) الذي يُكتب لحظة الدخول
+           فقط، فتظل «قيد التوثيق» ظاهرة بعد التوثيق حتى يمسح المستخدم بيانات
+           الموقع. الآن نُزامن المخزن مع الحالة الحية من الخادم عند أي تغيّر —
+           تظهر شارة التوثيق خلال ثوانٍ بلا أي تدخل من المستخدم. */
+        const nowVerified = me.verificationStatus === "VERIFIED";
+        const cur = useApp.getState().user;
+        if (cur && (cur.verified !== nowVerified || cur.verificationStatus !== me.verificationStatus)) {
+          useApp.getState().setUser({
+            ...cur,
+            verified: nowVerified,
+            verificationStatus: me.verificationStatus as typeof cur.verificationStatus,
+          });
+        }
       }
       // stats
       const list: SessionRow[] = sessData.sessions || [];

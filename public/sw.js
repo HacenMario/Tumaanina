@@ -1,5 +1,8 @@
 /* طمأنينة — Service Worker: PWA shell + Web Push (VAPID) */
-const CACHE_NAME = "tumaanina-v1";
+/* v1.22.2: تجديد اسم الكاش — عند التفعيل يُحذف كل كاش باسم آخر تلقائياً
+   (منها أي نسخة معدّلة يدوياً عند المالك) فتُستبدل الأيقونات/المانيفست
+   القديمة. معالجات Web Push كما هي حرفياً. */
+const CACHE_NAME = "tumaanina-v1.22.2";
 const PRECACHE = ["/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
