@@ -44,7 +44,8 @@ export async function sendDueReminders(): Promise<void> {
       for (const userId of [String(s.victimId), String(s.counselorId)]) {
         try {
           const u = (await User.findById(userId).select("language").lean()) as { language?: string } | null;
-          const lang = (["ar", "fr", "en", "tr", "ru", "zh"].includes(u?.language || "") ? u?.language : "ar") as "ar" | "fr" | "en" | "tr" | "ru" | "zh";
+          /* v1.22.1: القائمة من LANGUAGES نفسها — كانت سداسية فكان مستخدم الإسبانية/الألمانية/الإيطالية يتلقى التذكير بالعربية رغم أن REMINDER_TEXTS تسع لغات */
+          const lang = (["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"].includes(u?.language || "") ? (u?.language as "ar" | "fr" | "en" | "tr" | "ru" | "zh" | "es" | "de" | "it") : "ar");
           const txt = REMINDER_TEXTS[lang];
           await InAppNotification.create({ userId, key: "reminder", title: txt.title, body: txt.body, url: "/" }).catch(() => {});
           await sendPushToUser(userId, txt.title, txt.body, "/");

@@ -22,6 +22,7 @@ import {
   Building2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { LANGUAGES } from "@/lib/constants";
 import { BreathingExerciseDialog } from "@/components/shared/breathing-exercise";
 import { useApp } from "@/lib/store";
 import { LogoMark } from "@/lib/logo";
@@ -140,7 +141,8 @@ export function LandingView() {
               { value: stats.counselors, label: t.landing.statsCounselors },
               { value: stats.victims, label: t.landing.statsVictims },
               { value: stats.sessions, label: t.landing.statsSessions },
-              { value: 6, label: t.landing.statsLanguages },
+              { /* v1.22.1: العدد من قائمة اللغات نفسها — كان 6 مُصلّبًا فظلّ يظهر بعد إضافة الإسبانية/الألمانية/الإيطالية */
+                value: LANGUAGES.length, label: t.landing.statsLanguages },
               { value: "7/7", label: t.landing.statsAvailability },
             ].map((s) => (
               <div key={s.label} className="text-center">
