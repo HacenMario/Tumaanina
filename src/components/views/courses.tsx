@@ -210,9 +210,11 @@ export function CoursesView() {
     }
   };
 
-  const statusBadge = (s: string, reason?: string | null) => {
+  /* v1.21.1: الشارة تُظهر الحالة فقط — سبب الرفض يُعرض في سطر مستقل يلتفّ
+     طبيعياً (كان يُحقن داخل شارة whitespace-nowrap فيتخطى إطار الهاتف) */
+  const statusBadge = (s: string) => {
     if (s === "confirmed") return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 gap-1"><CircleCheck className="h-3 w-3" />{t.courses.statusConfirmed}</Badge>;
-    if (s === "rejected") return <Badge className="bg-destructive/10 text-destructive border-0 gap-1"><CircleX className="h-3 w-3" />{t.courses.statusRejected}{reason ? ` · ${reason}` : ""}</Badge>;
+    if (s === "rejected") return <Badge className="bg-destructive/10 text-destructive border-0 gap-1"><CircleX className="h-3 w-3" />{t.courses.statusRejected}</Badge>;
     if (s === "cancelled") return <Badge className="bg-muted text-muted-foreground border-0 gap-1"><CircleX className="h-3 w-3" />{t.courses.statusCancelled}</Badge>;
     return <Badge className="bg-amber-400/12 text-amber-600 dark:text-amber-400 border-0 gap-1"><Clock4 className="h-3 w-3" />{t.courses.statusPending}</Badge>;
   };
@@ -344,7 +346,7 @@ export function CoursesView() {
                         </div>
                       </div>
                       {c.myStatus ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap justify-end min-w-0">
                           {statusBadge(c.myStatus)}
                           {c.myEnrollmentId ? (
                             <Button size="sm" variant="outline" className="rounded-lg font-bold text-destructive border-destructive/40 h-8" disabled={busy === c.id} onClick={() => { const en = myEnrolls.find((x) => x.id === c.myEnrollmentId); setCancelTarget(en || { id: c.myEnrollmentId!, courseId: c.id, title: c.title, price: c.price, startsAt: c.startsAt, specialistName: c.specialist.name, status: c.myStatus || "pending", rejectReason: null, createdAt: "" }); }}>
@@ -409,8 +411,8 @@ export function CoursesView() {
                       <p className="text-[11px] font-semibold text-destructive mt-1">{t.courses.rejectReasonLabel}: {e.rejectReason}</p>
                     ) : null}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {statusBadge(e.status, e.rejectReason)}
+                  <div className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+                    {statusBadge(e.status)}
                     {e.status === "pending" || e.status === "confirmed" ? (
                       <Button size="sm" variant="outline" className="rounded-lg font-bold text-destructive border-destructive/40 h-8" disabled={busy === e.id} onClick={() => setCancelTarget(e)}>
                         {t.courses.cancelBooking}

@@ -337,6 +337,7 @@ export const fr: Dict = {
     recordingHint: "Enregistrement… le carré arrête et envoie",
     recCancel: "Annuler l'enregistrement",
     voiceDenied: "Micro inaccessible — vérifiez les autorisations du navigateur",
+    voiceLegacy: "Ancien enregistrement endommagé — lecture impossible",
     editedLabel: "modifié",
     deletedMsg: "Message supprimé",
     editMsg: "Modifier le message",

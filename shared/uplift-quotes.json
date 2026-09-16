@@ -282,7 +282,7 @@
   {
     "cat": "social",
     "au": "حكمة اجتماعية",
-    "ar": "أنت أقوى مما تعتقد، وأشجع مما تظن، وأحبب مما تخيّل",
+    "ar": "أنت أقوى مما تعتقد، وأشجع مما تظن",
     "fr": "Tu es plus fort que tu ne le penses, plus courageux que tu ne l'imagines",
     "en": "You are stronger than you think, braver than you believe",
     "tr": "Sandığından daha güçlü, düşündüğünden daha cesur, tahmin ettiğinden daha sevilisin",
@@ -322,7 +322,7 @@
   {
     "cat": "social",
     "au": "حكمة اجتماعية",
-    "ar": "وجودك في هذا العالم فضلٌ لنا جميعًا — كن بالخير، فأنت محبوب",
+    "ar": "وجودك في هذا العالم فضلٌ لنا جميعًا — كن بخير",
     "fr": "Ta présence en ce monde est un bien pour nous tous",
     "en": "Your presence in this world is a blessing to us all",
     "tr": "Bu dünyada var olman hepimiz için bir lütuf; iyilikte kal, sevilisin",
@@ -512,7 +512,7 @@
   {
     "cat": "wisdom",
     "au": "لاو تسو",
-    "ar": "الرحلة من ألف ميل تبدأ بخطوة واحدة",
+    "ar": "رحلة الألف ميل تبدأ بخطوة واحدة",
     "fr": "Un voyage de mille lieues commence par un seul pas",
     "en": "A journey of a thousand miles begins with a single step",
     "tr": "Bin millik yolculuk tek bir adımla başlar",
@@ -548,16 +548,6 @@
     "tr": "Çalışan bulur, eken biçer",
     "ru": "Кто усердствует — находит; кто сеет — пожинает",
     "zh": "勤者有所得，种者有所收"
-  },
-  {
-    "cat": "wisdom",
-    "au": "حكمة",
-    "ar": "خير الكلام ما قلّ ودلّ",
-    "fr": "Le meilleur discours est bref et sensé",
-    "en": "The best speech is brief and meaningful",
-    "tr": "Sözün en güzüsü az sözle çok şey anlatandır",
-    "ru": "Лучшие слова — краткие и ясные",
-    "zh": "言贵精不贵多"
   },
   {
     "cat": "wisdom",
@@ -608,16 +598,6 @@
     "tr": "Düşmek başarısızlık değildir; asıl başarısızlık yerde kalmaktır",
     "ru": "Падение — не провал; провал — остаться лежать на земле",
     "zh": "跌倒不是失败——留在地上才是"
-  },
-  {
-    "cat": "wisdom",
-    "au": "مثل عربي",
-    "ar": "الجار قبل الدار",
-    "fr": "Le voisin avant la maison",
-    "en": "The neighbor before the house",
-    "tr": "Komşu, evden önce gelir",
-    "ru": "Сначала сосед, потом дом",
-    "zh": "邻里先于居所"
   },
   {
     "cat": "wisdom",
@@ -1252,7 +1232,7 @@
   {
     "cat": "religious",
     "au": "طمأنينة",
-    "ar": "أيقظتَ اليوم؟ هذه بداية جديدة… ورب جديد في كل يوم",
+    "ar": "إستيقظتَ اليوم؟ هذه بداية جديدة… ودرب جديد في كل يوم",
     "fr": "Tu es réveillé(e) aujourd'hui ? C'est un nouveau départ… et un nouveau commencement chaque jour",
     "en": "You woke up today? That's a fresh start… and a new beginning every day",
     "tr": "Bugün uyandın mı? İşte yeni bir başlangıç… her gün yeni bir başlangıçtır",

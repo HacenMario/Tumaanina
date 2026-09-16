@@ -334,6 +334,7 @@ export const tr = {
     recordingHint: "Kaydediliyor… göndermek için kare düğme",
     recCancel: "Kaydı iptal et",
     voiceDenied: "Mikrofona erişilemedi — tarayıcı izinlerini kontrol edin",
+    voiceLegacy: "Eski kayıt bozuk — çalınamaz",
     editedLabel: "düzenlendi",
     deletedMsg: "Bu mesaj silindi",
     editMsg: "Mesajı düzenle",

@@ -335,6 +335,7 @@ export const ar = {
     recordingHint: "جارٍ التسجيل… مربع الإيقاف للإرسال",
     recCancel: "إلغاء التسجيل",
     voiceDenied: "تعذّر الوصول إلى الميكروفون — تحقق من أذونات المتصفح",
+    voiceLegacy: "تسجيل قديم تالف — لا يمكن تشغيله",
     editedLabel: "مُعدّلة",
     deletedMsg: "حُذفت هذه الرسالة",
     editMsg: "تعديل الرسالة",

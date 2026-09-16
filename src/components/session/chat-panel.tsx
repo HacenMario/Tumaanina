@@ -111,13 +111,16 @@ export function ChatPanel({ sessionId, myRole, myName, active, onCrisis, onPartn
           if (idx >= 0) {
             /* تحديث نسخة قائمة (تعديل نص/حذف/استبدال المؤقتة) */
             const old = arr[idx];
+            /* v1.21.1: القائمة تعيد content فارغاً لرسائل voice — نحافظ على
+               بيانات الصوت الجاهزة في الذاكرة (رسالتي المرسلة للتو) */
+            const merged = old.type === "voice" && old.content && !m.content ? { ...m, content: old.content } : m;
             if (
-              old.content !== m.content ||
-              old.deleted !== m.deleted ||
-              (old.editedAt || null) !== (m.editedAt || null) ||
+              old.content !== merged.content ||
+              old.deleted !== merged.deleted ||
+              (old.editedAt || null) !== (merged.editedAt || null) ||
               old.id.startsWith("tmp-")
             ) {
-              arr[idx] = m;
+              arr[idx] = merged;
               changed = true;
             }
           } else {

@@ -72,7 +72,12 @@ export function CounselorsChat() {
         lastAtRef.current = incoming[incoming.length - 1].createdAt;
         setMessages((cur) => {
           const byId = new Map(cur.map((m) => [m.id, m]));
-          for (const m of incoming) byId.set(m.id, m);
+          for (const m of incoming) {
+            /* v1.21.1: نحافظ على بيانات الصوت الجاهزة في الذاكرة عند إعادة القائمة محتوى فارغاً */
+            const old = byId.get(m.id);
+            if (old && old.type === "voice" && old.content && !m.content) byId.set(m.id, { ...m, content: old.content });
+            else byId.set(m.id, m);
+          }
           return [...byId.values()].sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );

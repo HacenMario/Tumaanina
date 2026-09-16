@@ -102,7 +102,13 @@ export function DmDialog() {
         setMessages((cur) => {
           /* نفس المعرّف → تحديث نسخة قائمة (تعديل/حذف)، غير الموجود → إضافة */
           const byId = new Map(cur.map((m) => [m.id, m]));
-          for (const m of incoming) byId.set(m.id, m);
+          for (const m of incoming) {
+            /* v1.21.1: القائمة تعيد content فارغاً لرسائل voice — نحافظ على
+               بيانات الصوت الجاهزة في الذاكرة (رسالتي المرسلة للتو) */
+            const old = byId.get(m.id);
+            if (old && old.type === "voice" && old.content && !m.content) byId.set(m.id, { ...m, content: old.content });
+            else byId.set(m.id, m);
+          }
           return [...byId.values()].sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );

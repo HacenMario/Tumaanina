@@ -331,6 +331,7 @@ export const zh = {
     recordingHint: "录音中……按方形按钮结束并发送",
     recCancel: "取消录音",
     voiceDenied: "无法访问麦克风——请检查浏览器权限",
+    voiceLegacy: "旧录音已损坏——无法播放",
     editedLabel: "已编辑",
     deletedMsg: "此消息已删除",
     editMsg: "编辑消息",

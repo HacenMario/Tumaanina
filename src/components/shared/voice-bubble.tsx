@@ -1,25 +1,23 @@
 "use client";
 
 /**
- * v1.6.0 — فقاعة الرسالة الصوتية الموحّدة (غرفة الجلسة + محادثة ما قبل
- * الجلسة + فضاء الأخصائيين).
+ * v1.21.1 — فقاعة الرسالة الصوتية الموحّدة (الجيل الثاني)
  * ─────────────────────────────────────────────────────────────
- * إصلاح جذري لمشكلتين وصفهما المستخدم:
- *  • «مدة التسجيل تبقى 0»: ملفات webm المسجّلة بـ MediaRecorder لا تحمل
- *    مدة مضمّنة فيُقرأ audio.duration = ∞ أو 0 — المدة تُقرأ الآن من
- *    حقل seconds المخزّن مع الرسالة (ثوانٍ حقيقية من مسجّل المتصفح).
- *  • «لا يمكن بدأ الاستماع»: المشغّل الأصلي <audio controls> مع data URL
- *    ثقيل كان متعثراً في عرضه وتشغيله على الهاتف — مشغّل مخصّص بزر
- *    تشغيل/إيقاف وشريط تقدّم قابل للسحب، ويجلب الصوت عند الطلب الفعلي
- *    عبر /api/messages/{id}/audio (قوائم الاستقصاء بقيت خفيفة).
- * التخزين المؤقت في الذاكرة: التشغيل الثاني فوري بلا أي شبكة.
+ * إصلاح جذري لمشكل «رمز ✕ والمدة 00:00 بعد فترة»:
+ *  1) بثّ ثنائي مباشر (mode=raw) بدل JSON يحمّل data URL كاملاً —
+ *     أخف على الشبكة، يدعم Range، ويستفيد من كاش المتصفح الآمن.
+ *  2) إعادة محاولة تلقائية واحدة عند أي فشل عابر (شبكة/خادم) قبل
+ *     إظهار ✕ — الفشل العابر لم يعد يعلق الفقاعة في خطأ للأبد،
+ *     والضغط بعد ✕ يعيد المحاولة دائماً.
+ *  3) الرسائل القديمة التالفة (خطأ قصّ v1.5.0) تُعرض برسالة واضحة
+ *     مترجمة بدل رمز غامض.
+ * المدة تُقرأ من حقل seconds المخزّن (ملفات webm بلا مدة مضمّنة).
+ * رسالة المرسل الحديثة تُشغَّل من الذاكرة (dataUrl) بلا أي شبكة.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Pause, AudioLines, Loader2 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-
-/* ذاكرة مشتركة على مستوى الصفحة — التشغيل المتكرر بلا إعادة تنزيل */
-const audioCache = new Map<string, string>();
 
 function fmt(s: number): string {
   const v = Math.max(0, Math.round(s));
@@ -42,13 +40,80 @@ export function VoiceBubble({
   dataUrl?: string | null;
   className?: string;
 }) {
-  const [src, setSrc] = useState<string | null>(dataUrl || audioCache.get(id) || null);
+  const { t } = useI18n();
+  /* بيانات رسالتي المرسلة للتو — تُثبَّت لحظة التركيب ولا تتأثر بالاستقصاء */
+  const localUrlRef = useRef<string | null>(dataUrl || null);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [pos, setPos] = useState(0);
   const [err, setErr] = useState(false);
+  const [legacy, setLegacy] = useState(false);
+  const retriedRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const total = Math.max(1, Math.round(seconds || 0));
+
+  /* مسار البث الثنائي — كاش المتصفح يتكفل بالتكرار (immutable) */
+  const rawUrl = `/api/messages/${id}/audio?mode=raw${userId ? `&userId=${encodeURIComponent(userId)}` : ""}`;
+
+  /* تصنيف الفشل: رسالة قديمة تالفة (410) → رسالة واضحة بلا إعادة محاولة،
+     غير ذلك → إعادة محاولة تلقائية واحدة ثم ✕ عند التكرار */
+  const handleFailure = useCallback(async () => {
+    if (!legacy) {
+      try {
+        const probe = await fetch(rawUrl, { headers: { Range: "bytes=0-0" } });
+        if (probe.status === 410) {
+          setLegacy(true);
+          setErr(false);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        /* شبكة — نكمل إلى إعادة المحاولة */
+      }
+    }
+    if (retriedRef.current) {
+      setErr(true);
+      setLoading(false);
+      return;
+    }
+    retriedRef.current = true;
+    const a = audioRef.current;
+    if (a) {
+      try {
+        a.load();
+        await a.play();
+        setPlaying(true);
+        setErr(false);
+        setLoading(false);
+        return;
+      } catch {
+        /* نفشل نهائياً أدناه */
+      }
+    }
+    setErr(true);
+    setLoading(false);
+  }, [rawUrl, legacy]);
+
+  const ensureAudio = useCallback((): HTMLAudioElement => {
+    if (audioRef.current) return audioRef.current;
+    const a = new Audio();
+    a.preload = "auto";
+    a.addEventListener("timeupdate", () => {
+      /* ملفات webm بلا مدة مضمّنة: نقيّد الموضع بالمدة المخزّنة */
+      const dur = Number.isFinite(a.duration) && a.duration > 0 ? a.duration : total;
+      setPos(Math.min(a.currentTime, dur));
+    });
+    a.addEventListener("ended", () => {
+      setPlaying(false);
+      setPos(0);
+    });
+    a.addEventListener("error", () => {
+      setPlaying(false);
+      void handleFailure();
+    });
+    audioRef.current = a;
+    return a;
+  }, [total, handleFailure]);
 
   useEffect(() => {
     return () => {
@@ -59,68 +124,30 @@ export function VoiceBubble({
     };
   }, []);
 
-  const fetchSrc = useCallback(async (): Promise<string | null> => {
-    if (src) return src;
-    const cached = audioCache.get(id);
-    if (cached) {
-      setSrc(cached);
-      return cached;
-    }
-    setLoading(true);
-    setErr(false);
-    try {
-      const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
-      const r = await fetch(`/api/messages/${id}/audio${qs}`, { cache: "force-cache" });
-      if (!r.ok) throw new Error(String(r.status));
-      const d = await r.json();
-      if (!d?.content) throw new Error("empty");
-      audioCache.set(id, d.content);
-      setSrc(d.content);
-      return d.content as string;
-    } catch {
-      setErr(true);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [id, userId, src]);
-
   const toggle = useCallback(async () => {
     if (playing) {
       audioRef.current?.pause();
       setPlaying(false);
       return;
     }
-    const url = await fetchSrc();
-    if (!url) return;
-    if (!audioRef.current) {
-      const a = new Audio();
-      a.preload = "auto";
-      audioRef.current = a;
-      a.addEventListener("timeupdate", () => {
-        /* ملفات webm بلا مدة مضمّنة: نقيّد الموضع بالمدة المخزّنة */
-        const dur = Number.isFinite(a.duration) && a.duration > 0 ? a.duration : total;
-        setPos(Math.min(a.currentTime, dur));
-      });
-      a.addEventListener("ended", () => {
-        setPlaying(false);
-        setPos(0);
-      });
-      a.addEventListener("error", () => {
-        setPlaying(false);
-        setErr(true);
-      });
+    /* الضغط بعد الخطأ = محاولة جديدة دائماً */
+    if (err) retriedRef.current = false;
+    setLoading(true);
+    setErr(false);
+    const a = ensureAudio();
+    const url = localUrlRef.current || rawUrl;
+    if (a.src !== url) {
+      retriedRef.current = false;
+      a.src = url;
     }
-    const a = audioRef.current;
-    if (a.src !== url) a.src = url;
     try {
       await a.play();
       setPlaying(true);
+      setLoading(false);
     } catch {
-      setPlaying(false);
-      setErr(true);
+      await handleFailure();
     }
-  }, [playing, fetchSrc, total]);
+  }, [playing, err, ensureAudio, rawUrl, handleFailure]);
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -171,8 +198,14 @@ export function VoiceBubble({
         </span>
         <span className={cn("flex items-center gap-1.5 mt-0.5 text-[10px] font-black font-mono", mine ? "text-white/85" : "text-muted-foreground")}>
           <AudioLines className="h-3 w-3 shrink-0" />
-          {err ? <span className="font-sans">✕</span> : null}
-          {fmt(pos)} / {fmt(total)}
+          {legacy ? (
+            <span className={cn("font-sans whitespace-nowrap", mine ? "text-white/85" : "text-destructive")}>{t.session.voiceLegacy}</span>
+          ) : (
+            <>
+              {err ? <span className="font-sans text-destructive">✕</span> : null}
+              {fmt(pos)} / {fmt(total)}
+            </>
+          )}
         </span>
       </span>
     </span>

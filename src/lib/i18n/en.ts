@@ -337,6 +337,7 @@ export const en: Dict = {
     recordingHint: "Recording… the square button stops and sends",
     recCancel: "Cancel recording",
     voiceDenied: "Microphone unavailable — check browser permissions",
+    voiceLegacy: "Legacy recording unavailable — cannot be played",
     editedLabel: "edited",
     deletedMsg: "This message was deleted",
     editMsg: "Edit message",
