@@ -102,7 +102,11 @@ export class VoiceRecorder {
   }
 
   private static pickMime(): string | null {
-    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    /* v1.22.0: تفضيل audio/mp4 أولاً — حاوية يفكّها كل المتصفحات (iOS Safari
+       لا يفكّ webm/opus إطلاقاً فكانت رسائل أندرويد/كروم صامتة على آيفون).
+       isTypeSupported يحمي المتصفحات القديمة: من لا يدعم mp4 يسقط للترتيب
+       القديم (webm ثم ogg) دون أي تغيير سلوكي عنه */
+    const candidates = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
     for (const c of candidates) {
       if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported?.(c)) return c;
     }

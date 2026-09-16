@@ -19,24 +19,53 @@ async function ensureSeeded() {
     .lean()) as unknown as { textAr?: string }[];
   const existingAr = new Set(existing.map((q) => String(q.textAr || "").trim()));
   const missing = (
-    seedQuotes as { cat: string; ar: string; fr: string; en: string; tr?: string; ru?: string; zh?: string; au: string }[]
+    seedQuotes as { cat: string; ar: string; fr: string; en: string; tr?: string; ru?: string; zh?: string; es?: string; de?: string; it?: string; au: string }[]
   ).filter((q) => !existingAr.has(q.ar.trim()));
-  if (missing.length === 0) return;
   try {
-    await UpliftQuote.insertMany(
-      missing.map((q) => ({
-        category: q.cat,
-        textAr: q.ar,
-        textFr: q.fr,
-        textEn: q.en,
-        textTr: q.tr ?? null,
-        textRu: q.ru ?? null,
-        textZh: q.zh ?? null,
-        author: q.au || null,
-        active: true,
-      }))
+    if (missing.length > 0) {
+      await UpliftQuote.insertMany(
+        missing.map((q) => ({
+          category: q.cat,
+          textAr: q.ar,
+          textFr: q.fr,
+          textEn: q.en,
+          textTr: q.tr ?? null,
+          textRu: q.ru ?? null,
+          textZh: q.zh ?? null,
+          textEs: q.es ?? null,
+          textDe: q.de ?? null,
+          textIt: q.it ?? null,
+          author: q.au || null,
+          active: true,
+        }))
+      );
+      console.log(`🌱 تم زرع ${missing.length} عبارة اطمئنان جديدة (المكتبة الكاملة: ${seedQuotes.length})`);
+    }
+    /* v1.22.0: ترقية تزايديه للسجلات القديمة — النشرات السابقة زرعت المكتبة
+       بلا الإسبانية/الألمانية/الإيطالية، فنملأ الحقول الفارغة من ملف البذر
+       (مطابقة بالنص العربي) دون المساس بأي تعديل فعله الأدمين لاحقاً */
+    const seedByAr = new Map(
+      (seedQuotes as { ar: string; es?: string; de?: string; it?: string }[]).map((q) => [q.ar.trim(), q])
     );
-    console.log(`🌱 تم زرع ${missing.length} عبارة اطمئنان جديدة (المكتبة الكاملة: ${seedQuotes.length})`);
+    const stale = (await UpliftQuote.find({
+      $or: [{ textEs: null }, { textDe: null }, { textIt: null }],
+    })
+      .select("textAr textEs textDe textIt")
+      .limit(800)
+      .lean()) as unknown as { _id: unknown; textAr?: string; textEs?: string | null; textDe?: string | null; textIt?: string | null }[];
+    let upgraded = 0;
+    for (const row of stale) {
+      const seed = seedByAr.get(String(row.textAr || "").trim());
+      if (!seed) continue;
+      const set: Record<string, string> = {};
+      if (!row.textEs && seed.es) set.textEs = seed.es;
+      if (!row.textDe && seed.de) set.textDe = seed.de;
+      if (!row.textIt && seed.it) set.textIt = seed.it;
+      if (Object.keys(set).length === 0) continue;
+      await UpliftQuote.updateOne({ _id: row._id as never }, { $set: set }).catch(() => {});
+      upgraded++;
+    }
+    if (upgraded > 0) console.log(`🌱 تمت ترقية ${upgraded} عبارة اطمئنان باللغات الجديدة (es/de/it)`);
   } catch (e) {
     console.error("تعذر زرع العبارات الافتراضية:", (e as Error).message);
   }
@@ -51,6 +80,9 @@ function mapQuote(q: Record<string, unknown>) {
     textTr: q.textTr ?? null,
     textRu: q.textRu ?? null,
     textZh: q.textZh ?? null,
+    textEs: q.textEs ?? null,
+    textDe: q.textDe ?? null,
+    textIt: q.textIt ?? null,
     author: q.author ?? null,
     category: q.category ?? "wisdom",
     active: !!q.active,
@@ -63,7 +95,7 @@ async function GET_impl() {
   await connectDB();
   await ensureSeeded();
   const quotes = await UpliftQuote.find({ active: true })
-    .select("textAr textFr textEn textTr textRu textZh author category active createdAt")
+    .select("textAr textFr textEn textTr textRu textZh textEs textDe textIt author category active createdAt")
     .limit(300)
     .lean();
   return NextResponse.json({

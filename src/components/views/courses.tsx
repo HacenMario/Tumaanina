@@ -212,11 +212,14 @@ export function CoursesView() {
 
   /* v1.21.1: الشارة تُظهر الحالة فقط — سبب الرفض يُعرض في سطر مستقل يلتفّ
      طبيعياً (كان يُحقن داخل شارة whitespace-nowrap فيتخطى إطار الهاتف) */
+  /* v1.22.0: إصلاح التجاوز الأفقي نهائياً — نصوص الحالة طويلة بالعربية والإسبانية
+     والألمانية والإيطالية، وshadcn Badge أساسها whitespace-nowrap shrink-0 فلا
+     تستطيع التقلّص فتضغط البطاقة خارج إطارها على الهاتف. الآن تلتفّ داخلها */
   const statusBadge = (s: string) => {
-    if (s === "confirmed") return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 gap-1"><CircleCheck className="h-3 w-3" />{t.courses.statusConfirmed}</Badge>;
-    if (s === "rejected") return <Badge className="bg-destructive/10 text-destructive border-0 gap-1"><CircleX className="h-3 w-3" />{t.courses.statusRejected}</Badge>;
-    if (s === "cancelled") return <Badge className="bg-muted text-muted-foreground border-0 gap-1"><CircleX className="h-3 w-3" />{t.courses.statusCancelled}</Badge>;
-    return <Badge className="bg-amber-400/12 text-amber-600 dark:text-amber-400 border-0 gap-1"><Clock4 className="h-3 w-3" />{t.courses.statusPending}</Badge>;
+    if (s === "confirmed") return <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0 gap-1 whitespace-normal h-auto max-w-full min-w-0 py-1"><CircleCheck className="h-3 w-3 shrink-0" />{t.courses.statusConfirmed}</Badge>;
+    if (s === "rejected") return <Badge className="bg-destructive/10 text-destructive border-0 gap-1 whitespace-normal h-auto max-w-full min-w-0 py-1"><CircleX className="h-3 w-3 shrink-0" />{t.courses.statusRejected}</Badge>;
+    if (s === "cancelled") return <Badge className="bg-muted text-muted-foreground border-0 gap-1 whitespace-normal h-auto max-w-full min-w-0 py-1"><CircleX className="h-3 w-3 shrink-0" />{t.courses.statusCancelled}</Badge>;
+    return <Badge className="bg-amber-400/12 text-amber-600 dark:text-amber-400 border-0 gap-1 whitespace-normal h-auto max-w-full min-w-0 py-1"><Clock4 className="h-3 w-3 shrink-0" />{t.courses.statusPending}</Badge>;
   };
 
   if (!canBrowse) {
@@ -399,9 +402,9 @@ export function CoursesView() {
             {myEnrolls.map((e) => (
               <Card key={e.id} className="border-border/60">
                 <CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <p className="font-black text-sm truncate">{e.title}</p>
-                    <p className="text-[11px] font-bold text-muted-foreground truncate">
+                  <div className="min-w-0 max-w-full">
+                    <p className="font-black text-sm break-words">{e.title}</p>
+                    <p className="text-[11px] font-bold text-muted-foreground break-words">
                       {t.courses.by} {e.specialistName}
                       {e.startsAt ? ` · ${t.courses.schedule}: ${fmtDate(e.startsAt)}` : ""}
                       {" · "}

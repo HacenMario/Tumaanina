@@ -95,7 +95,7 @@ export const SPECIALTIES = [
 ] as const;
 export type SpecialtyKey = (typeof SPECIALTIES)[number];
 
-export const LANGUAGES = ["ar", "fr", "en", "tr", "ru", "zh"] as const;
+export const LANGUAGES = ["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"] as const;
 export type AppLang = (typeof LANGUAGES)[number];
 
 /**
@@ -192,6 +192,9 @@ export const WEEKDAY_LABELS: Record<AppLang, string[]> = {
   tr: ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"],
   ru: ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"],
   zh: ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+  es: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
+  de: ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
+  it: ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"],
 };
 
 /* v2.7.0: أيام مختصرة لرؤوس شبكة التقويم في منتقي المواعيد — 7 أعمدة بلا تمرير */
@@ -202,6 +205,9 @@ export const WEEKDAY_SHORT: Record<AppLang, string[]> = {
   tr: ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"],
   ru: ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"],
   zh: ["日", "一", "二", "三", "四", "五", "六"],
+  es: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"],
+  de: ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
+  it: ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"],
 };
 
 export const SESSION_STATUSES = [

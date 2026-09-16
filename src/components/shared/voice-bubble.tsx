@@ -1,18 +1,24 @@
 "use client";
 
 /**
- * v1.21.1 — فقاعة الرسالة الصوتية الموحّدة (الجيل الثاني)
+ * v1.22.0 — فقاعة الرسالة الصوتية الموحّدة (الجيل الثالث)
  * ─────────────────────────────────────────────────────────────
- * إصلاح جذري لمشكل «رمز ✕ والمدة 00:00 بعد فترة»:
- *  1) بثّ ثنائي مباشر (mode=raw) بدل JSON يحمّل data URL كاملاً —
- *     أخف على الشبكة، يدعم Range، ويستفيد من كاش المتصفح الآمن.
- *  2) إعادة محاولة تلقائية واحدة عند أي فشل عابر (شبكة/خادم) قبل
- *     إظهار ✕ — الفشل العابر لم يعد يعلق الفقاعة في خطأ للأبد،
- *     والضغط بعد ✕ يعيد المحاولة دائماً.
- *  3) الرسائل القديمة التالفة (خطأ قصّ v1.5.0) تُعرض برسالة واضحة
- *     مترجمة بدل رمز غامض.
- * المدة تُقرأ من حقل seconds المخزّن (ملفات webm بلا مدة مضمّنة).
- * رسالة المرسل الحديثة تُشغَّل من الذاكرة (dataUrl) بلا أي شبكة.
+ * إصلاح جذري لمشكل «رمز ✕ والمدة 00:00 بعد فترة» — تحليل الجيل الثاني
+ * كشف ثلاث ثغرات متبقية كانت تُفشل التشغيل لاحقاً رغم نجاحه لحظة الإرسال:
+ *
+ *  1) عنصر Audio «مسموم»: بعد أول حدث error كان retry يعيد استخدام العنصر
+ *     نفسه (a.load) — وعلى iOS/Safari خصوصاً يبقى العنصر معطوباً فيفشل
+ *     التشغيل دائماً بعدها. الآن كل محاولة تشغيل تبدأ بعنصر جديد نظيف.
+ *
+ *  2) بلا مسار بديل: كان mode=raw (بثّ ثنائي + Range) هو المحاولة الوحيدة،
+ *     وأي خلل في كاش المتصفح مع Range/immutable (سلوك iOS المتقلب) يُظهر ✕.
+ *     الآن السلسلة: عنصر جديد + raw → عنصر جديد + JSON dataUrl → ✕.
+ *
+ *  3) مقارنة a.src !== url كانت دائماً صحيحة (src مطلق وurl نسبي) فتُعيّن
+ *     src في كل ضغطة وتُهدر الكاش — الآن المقياس في ref داخلي.
+ *
+ * يُحتفظ بمكاسب الجيل الثاني: بثّ raw خفيف، كاش immutable، إعادة محاولة،
+ * ورسالة واضحة للرسائل القديمة التالفة (410). المدة من حقل seconds المخزّن.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Pause, AudioLines, Loader2 } from "lucide-react";
@@ -50,52 +56,49 @@ export function VoiceBubble({
   const [legacy, setLegacy] = useState(false);
   const retriedRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  /* v1.22.0: مصدر الصوت المعيَّن حالياً على العنصر — بديل a.src النسبي/المطلق */
+  const assignedSrcRef = useRef<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+  const failBusyRef = useRef(false);
   const total = Math.max(1, Math.round(seconds || 0));
 
   /* مسار البث الثنائي — كاش المتصفح يتكفل بالتكرار (immutable) */
   const rawUrl = `/api/messages/${id}/audio?mode=raw${userId ? `&userId=${encodeURIComponent(userId)}` : ""}`;
+  /* المسار البديل: JSON كامل ببيانات الصوت — يُستعمل فقط عند فشل raw */
+  const jsonUrl = `/api/messages/${id}/audio${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`;
 
-  /* تصنيف الفشل: رسالة قديمة تالفة (410) → رسالة واضحة بلا إعادة محاولة،
-     غير ذلك → إعادة محاولة تلقائية واحدة ثم ✕ عند التكرار */
-  const handleFailure = useCallback(async () => {
-    if (!legacy) {
-      try {
-        const probe = await fetch(rawUrl, { headers: { Range: "bytes=0-0" } });
-        if (probe.status === 410) {
-          setLegacy(true);
-          setErr(false);
-          setLoading(false);
-          return;
-        }
-      } catch {
-        /* شبكة — نكمل إلى إعادة المحاولة */
-      }
-    }
-    if (retriedRef.current) {
-      setErr(true);
-      setLoading(false);
-      return;
-    }
-    retriedRef.current = true;
+  const stopAudio = useCallback(() => {
     const a = audioRef.current;
     if (a) {
+      a.pause();
+      a.src = "";
+    }
+  }, []);
+
+  const releaseBlobUrl = useCallback(() => {
+    if (blobUrlRef.current) {
       try {
-        a.load();
-        await a.play();
-        setPlaying(true);
-        setErr(false);
-        setLoading(false);
-        return;
+        URL.revokeObjectURL(blobUrlRef.current);
       } catch {
-        /* نفشل نهائياً أدناه */
+        /* تجاهل */
+      }
+      blobUrlRef.current = null;
+    }
+  }, []);
+
+  /* v1.22.0: كسر الاعتماد الدائري بين العنصر ومسار التعافي —
+     مستمع error يستدعي أحدث نسخة من handleFailure عبر مرجع */
+  const handleFailureRef = useRef<() => Promise<void>>(async () => {});
+
+  /* عنصر صوت نظيف لكل محاولة — العنصر الذي أصابه error لا يُعاد استخدامه */
+  const freshAudio = useCallback((): HTMLAudioElement => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+      } catch {
+        /* تجاهل */
       }
     }
-    setErr(true);
-    setLoading(false);
-  }, [rawUrl, legacy]);
-
-  const ensureAudio = useCallback((): HTMLAudioElement => {
-    if (audioRef.current) return audioRef.current;
     const a = new Audio();
     a.preload = "auto";
     a.addEventListener("timeupdate", () => {
@@ -107,22 +110,108 @@ export function VoiceBubble({
       setPlaying(false);
       setPos(0);
     });
+    /* خطأ أثناء البث بعد نجاح التشغيل (انقطاع شبكة/كاش تالف) —
+       نفس سلسلة التعافي، مع حارس يمنع الازدواج مع رفض play() */
     a.addEventListener("error", () => {
       setPlaying(false);
-      void handleFailure();
+      if (failBusyRef.current) return;
+      failBusyRef.current = true;
+      void handleFailureRef.current().finally(() => {
+        failBusyRef.current = false;
+      });
     });
     audioRef.current = a;
     return a;
-  }, [total, handleFailure]);
+  }, [total]);
+
+  /* v1.22.0: جلب data URL عبر المسار البديل — آخر ورقة قبل ✕.
+     يعالج خلل كاش Range/immutable على iOS وأي خلل بثّ عابر */
+  const fetchJsonFallback = useCallback(async (): Promise<string | null> => {
+    try {
+      const r = await fetch(jsonUrl, { cache: "no-store" });
+      if (!r.ok) return null;
+      const d = (await r.json()) as { ok?: boolean; content?: string; seconds?: number };
+      if (!d?.content || !String(d.content).startsWith("data:audio/")) return null;
+      const res = await fetch(d.content);
+      const blob = await res.blob();
+      releaseBlobUrl();
+      blobUrlRef.current = URL.createObjectURL(blob);
+      return blobUrlRef.current;
+    } catch {
+      return null;
+    }
+  }, [jsonUrl, releaseBlobUrl]);
+
+  /* تصنيف الفشل: رسالة قديمة تالفة (410) → رسالة واضحة بلا إعادة محاولة،
+     غير ذلك → عنصر جديد عبر raw ثم بديل JSON ثم ✕ */
+  const handleFailure = useCallback(async () => {
+    if (!legacy) {
+      try {
+        const probe = await fetch(rawUrl, { headers: { Range: "bytes=0-0" } });
+        if (probe.status === 410) {
+          setLegacy(true);
+          setErr(false);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        /* شبكة — نكمل إلى المحاولات التالية */
+      }
+    }
+    /* المحاولة 2: عنصر جديد عبر raw */
+    if (!retriedRef.current) {
+      retriedRef.current = true;
+      const a = freshAudio();
+      assignedSrcRef.current = rawUrl;
+      a.src = rawUrl;
+      try {
+        await a.play();
+        setPlaying(true);
+        setErr(false);
+        setLoading(false);
+        return;
+      } catch {
+        /* نكمل للمسار البديل */
+      }
+    }
+    /* المحاولة 3: JSON dataUrl (blob) — عنصر جديد أيضاً */
+    const url = await fetchJsonFallback();
+    if (url) {
+      const a = freshAudio();
+      assignedSrcRef.current = url;
+      a.src = url;
+      try {
+        await a.play();
+        setPlaying(true);
+        setErr(false);
+        setLoading(false);
+        return;
+      } catch {
+        /* فشل نهائي */
+      }
+    }
+    setErr(true);
+    setLoading(false);
+  }, [rawUrl, legacy, freshAudio, fetchJsonFallback]);
+
+  /* مزامنة المرجع مع أحدث نسخة من مسار التعافي في كل تصيير */
+  useEffect(() => {
+    handleFailureRef.current = handleFailure;
+  }, [handleFailure]);
 
   useEffect(() => {
     return () => {
       if (audioRef.current) {
-        audioRef.current.pause();
+        try {
+          audioRef.current.pause();
+        } catch {
+          /* تجاهل */
+        }
         audioRef.current = null;
       }
+      releaseBlobUrl();
     };
-  }, []);
+  }, [releaseBlobUrl]);
 
   const toggle = useCallback(async () => {
     if (playing) {
@@ -134,10 +223,14 @@ export function VoiceBubble({
     if (err) retriedRef.current = false;
     setLoading(true);
     setErr(false);
-    const a = ensureAudio();
-    const url = localUrlRef.current || rawUrl;
-    if (a.src !== url) {
-      retriedRef.current = false;
+    const local = localUrlRef.current;
+    const url = local || rawUrl;
+    /* v1.22.0: مقارنة عبر ref داخلي — كانت a.src (مطلق) !== url (نسبي)
+       صحيحة دائماً فتُعيّن src بكل ضغطة وتُهدر كاش المتصفح */
+    const a = assignedSrcRef.current === url && audioRef.current ? audioRef.current : freshAudio();
+    if (assignedSrcRef.current !== url) {
+      if (!local) releaseBlobUrl();
+      assignedSrcRef.current = url;
       a.src = url;
     }
     try {
@@ -147,7 +240,7 @@ export function VoiceBubble({
     } catch {
       await handleFailure();
     }
-  }, [playing, err, ensureAudio, rawUrl, handleFailure]);
+  }, [playing, err, rawUrl, handleFailure, freshAudio, releaseBlobUrl]);
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();

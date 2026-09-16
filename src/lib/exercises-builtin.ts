@@ -4,7 +4,7 @@
  * مع تمرين التنفس التفاعلي الموجود أصلاً في المنصة.
  * التمارين التي يضيفها المختصون/الأدمين تُخزَّن في قاعدة البيانات.
  */
-export type ExerciseLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh";
+export type ExerciseLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh" | "es" | "de" | "it";
 
 export interface BuiltinExercise {
   slug: "breathing" | "54321" | "safe-place";
@@ -87,6 +87,39 @@ export const BUILTIN_EXERCISES: BuiltinExercise[] = [
           "平静地重复，直到思绪安宁",
         ],
       },
+      es: {
+        title: "Respiración calmante",
+        description: "Respiración guiada animada — siga el círculo que se expande y se contrae con su respiración para calmar su sistema nervioso.",
+        steps: [
+          "Siéntese con la espalda recta y relaje los hombros",
+          "Inspire por la nariz mientras el círculo se expande",
+          "Retenga la respiración un breve instante",
+          "Exhale lentamente por la boca mientras el círculo se contrae",
+          "Repita con calma hasta que sus pensamientos se aquieten",
+        ],
+      },
+      de: {
+        title: "Beruhigende Atmung",
+        description: "Animierte geführte Atemübung — folgen Sie dem Kreis, der sich mit Ihrem Atem weitet und zusammenzieht, um Ihr Nervensystem zu beruhigen.",
+        steps: [
+          "Sitzen Sie mit geradem Rücken und entspannen Sie die Schultern",
+          "Atmen Sie durch die Nase ein, während sich der Kreis weitet",
+          "Halten Sie den Atem einen kurzen Moment an",
+          "Atmen Sie langsam durch den Mund aus, während sich der Kreis zusammenzieht",
+          "Wiederholen Sie ruhig, bis sich Ihre Gedanken beruhigen",
+        ],
+      },
+      it: {
+        title: "Respirazione calmante",
+        description: "Respirazione guidata animata — segui il cerchio che si espande e si contrae con il tuo respiro per calmare il sistema nervoso.",
+        steps: [
+          "Siediti con la schiena dritta e rilassa le spalle",
+          "Inspira dal naso mentre il cerchio si espande",
+          "Trattieni il respiro per un breve istante",
+          "Espira lentamente dalla bocca mentre il cerchio si contrae",
+          "Ripeti con calma finché i tuoi pensieri si acquietano",
+        ],
+      },
     },
   },
   {
@@ -165,6 +198,39 @@ export const BUILTIN_EXERCISES: BuiltinExercise[] = [
           "1 样你能尝到的东西（一滴水的味道或口中余味…）",
         ],
       },
+      es: {
+        title: "Ejercicio 5-4-3-2-1",
+        description: "Un ejercicio de anclaje que le devuelve al momento presente a través de sus cinco sentidos — tras una respiración profunda y lenta, nombre con calma:",
+        steps: [
+          "5 cosas que puede ver (un bolígrafo, una lámpara, una ventana…)",
+          "4 cosas que puede tocar y sentir (la tela de su ropa, la mesa, un objeto cercano…)",
+          "3 sonidos que puede oír con claridad (el aire acondicionado, los coches fuera de la ventana…)",
+          "2 olores que puede oler (un perfume, café o aire fresco…)",
+          "1 cosa que puede saborear (un sorbo de agua o un sabor residual en la boca…)",
+        ],
+      },
+      de: {
+        title: "5-4-3-2-1-Übung",
+        description: "Eine Erdungsübung, die Sie über Ihre fünf Sinne zurück in den Moment bringt — nach einem tiefen, langsamen Atemzug nennen Sie ruhig:",
+        steps: [
+          "5 Dinge, die Sie sehen können (einen Stift, eine Lampe, ein Fenster…)",
+          "4 Dinge, die Sie berühren und fühlen können (den Stoff Ihrer Kleidung, den Tisch, einen Gegenstand in der Nähe…)",
+          "3 Geräusche, die Sie deutlich hören können (die Klimaanlage, Autos draußen…)",
+          "2 Gerüche, die Sie riechen können (ein Parfüm, Kaffee oder frische Luft…)",
+          "1 Sache, die Sie schmecken können (ein Schluck Wasser oder ein Nachgeschmack im Mund…)",
+        ],
+      },
+      it: {
+        title: "Esercizio 5-4-3-2-1",
+        description: "Un esercizio di ancoraggio che ti riporta al momento presente attraverso i cinque sensi — dopo un respiro profondo e lento, nomina con calma:",
+        steps: [
+          "5 cose che puoi vedere (una penna, una lampada, una finestra…)",
+          "4 cose che puoi toccare e sentire (il tessuto dei tuoi vestiti, il tavolo, un oggetto vicino…)",
+          "3 suoni che puoi sentire chiaramente (l'aria condizionata, le auto fuori dalla finestra…)",
+          "2 odori che puoi annusare (un profumo, il caffè o l'aria fresca…)",
+          "1 cosa che puoi gustare (un sorso d'acqua o un retrogusto in bocca…)",
+        ],
+      },
     },
   },
   {
@@ -241,6 +307,39 @@ export const BUILTIN_EXERCISES: BuiltinExercise[] = [
           "聚焦它的细节：颜色、气味、宁静的声音",
           "留意安宁一点点扩散到全身",
           "在你的安全之地停留约 5 分钟，然后缓缓睁开眼睛",
+        ],
+      },
+      es: {
+        title: "El lugar seguro (el refugio mental)",
+        description: "Imagine un lugar que le brinda una sensación completa de seguridad y confort — su refugio mental al que volver cuando se sienta mal.",
+        steps: [
+          "Cierre los ojos y respire profunda y lentamente",
+          "Imagine un lugar que le brinda una sensación completa de seguridad (una playa, un bosque, una habitación cálida…)",
+          "Concéntrese en sus detalles: los colores, los olores, los sonidos apacibles",
+          "Observe cómo la serenidad se extiende por su cuerpo poco a poco",
+          "Permanezca en su lugar seguro unos 5 minutos y abra los ojos con suavidad",
+        ],
+      },
+      de: {
+        title: "Der sichere Ort (das mentale Refugium)",
+        description: "Stellen Sie sich einen Ort vor, der Ihnen ein Gefühl vollkommener Sicherheit und Geborgenheit gibt — Ihr mentales Refugium, zu dem Sie zurückkehren, wann immer es Ihnen schlecht geht.",
+        steps: [
+          "Schließen Sie die Augen und atmen Sie tief und langsam",
+          "Stellen Sie sich einen Ort vor, der Ihnen vollkommene Sicherheit gibt (einen Strand, einen Wald, einen warmen Raum…)",
+          "Konzentrieren Sie sich auf seine Details: die Farben, die Gerüche, die ruhigen Klänge",
+          "Beobachten Sie, wie sich die Gelassenheit Stück für Stück in Ihrem Körper ausbreitet",
+          "Bleiben Sie etwa 5 Minuten an Ihrem sicheren Ort und öffnen Sie dann sanft die Augen",
+        ],
+      },
+      it: {
+        title: "Il luogo sicuro (il rifugio mentale)",
+        description: "Immagina un luogo che ti dona una sensazione completa di sicurezza e comfort — il tuo rifugio mentale dove tornare quando ti senti male.",
+        steps: [
+          "Chiudi gli occhi e respira in modo profondo e lento",
+          "Immagina un luogo che ti dona una sensazione completa di sicurezza (una spiaggia, un bosco, una stanza calda…)",
+          "Concentrati sui suoi dettagli: i colori, gli odori, i suoni tranquilli",
+          "Osserva la serenità diffondersi nel tuo corpo poco a poco",
+          "Resta nel tuo luogo sicuro circa 5 minuti e poi apri gli occhi con dolcezza",
         ],
       },
     },

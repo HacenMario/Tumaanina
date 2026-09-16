@@ -36,6 +36,11 @@ const FLOATERS = [
 function textFor(c: GratitudeContent, lang: AppLang): string {
   if (lang === "fr") return c.textFr || c.textAr;
   if (lang === "en") return c.textEn || c.textAr;
+  /* v1.22.0: الإسبانية/الألمانية/الإيطالية — إنقاض إلى الإنجليزية ثم العربية
+     إن كان السجل المُدار من الأدمين لا يحوي ترجمتها */
+  if (lang === "es") return c.textEn || c.textAr;
+  if (lang === "de") return c.textEn || c.textAr;
+  if (lang === "it") return c.textEn || c.textAr;
   return c.textAr;
 }
 

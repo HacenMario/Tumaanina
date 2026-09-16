@@ -67,7 +67,7 @@ export async function nextContractNumber(): Promise<string> {
 
 /** لغة مستند صالحة من بين الست — احتياطاً العربية */
 export function safeContractLang(v: unknown): string {
-  return typeof v === "string" && ["ar", "fr", "en", "tr", "ru", "zh"].includes(v) ? v : "ar";
+  return typeof v === "string" && ["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"].includes(v) ? v : "ar";
 }
 
 /* ═ v1.12.0: عقد المنصة الواحد — عقد علاجي واحد لكل المستخدمين يمثل المنصة ═

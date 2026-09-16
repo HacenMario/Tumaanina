@@ -15,6 +15,9 @@ import { en } from "@/lib/i18n/en";
 import { tr } from "@/lib/i18n/tr";
 import { ru } from "@/lib/i18n/ru";
 import { zh } from "@/lib/i18n/zh";
+import { es } from "@/lib/i18n/es";
+import { de } from "@/lib/i18n/de";
+import { it } from "@/lib/i18n/it";
 import type { AppLang, CurrencyCode } from "@/lib/constants";
 import { CURRENCY_CODES, buildSessionPrices } from "@/lib/constants";
 import { ShareButton } from "./share-button";
@@ -32,7 +35,7 @@ export const dynamic = "force-dynamic";
 type Dict = typeof ar;
 /* v2.11.0: الصفحة العمومية بست لغات كاملة — كانت التركية/الروسية/الصينية
    تعرض الإنجليزية احتياطاً */
-const DICTS: Partial<Record<AppLang, Dict>> = { ar, fr, en, tr, ru, zh };
+const DICTS: Partial<Record<AppLang, Dict>> = { ar, fr, en, tr, ru, zh, es, de, it };
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -91,7 +94,8 @@ export default async function PublicCounselorPage({ params, searchParams }: Prop
   const { id } = await params;
   const { lang: langParam } = await searchParams;
   const lang: AppLang =
-    langParam === "fr" || langParam === "en" || langParam === "tr" || langParam === "ru" || langParam === "zh"
+    langParam === "fr" || langParam === "en" || langParam === "tr" || langParam === "ru" || langParam === "zh" ||
+    langParam === "es" || langParam === "de" || langParam === "it"
       ? langParam
       : "ar";
   const t = DICTS[lang] ?? DICTS.ar!;
@@ -199,7 +203,7 @@ export default async function PublicCounselorPage({ params, searchParams }: Prop
 
         {/* مبدّل لغة الصفحة — v2.11.0: ست لغات كاملة بدل ثلاث */}
         <div className="flex items-center justify-center gap-1.5 mb-8 flex-wrap" dir="ltr">
-          {(["ar", "fr", "en", "tr", "ru", "zh"] as AppLang[]).map((l) => (
+          {(["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"] as AppLang[]).map((l) => (
             <a
               key={l}
               href={`/counselor/${encodeURIComponent(slug)}?lang=${l}`}
@@ -209,7 +213,7 @@ export default async function PublicCounselorPage({ params, searchParams }: Prop
                   : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
               }`}
             >
-              {l === "ar" ? "العربية" : l === "fr" ? "Français" : l === "en" ? "English" : l === "tr" ? "Türkçe" : l === "ru" ? "Русский" : "中文"}
+              {l === "ar" ? "العربية" : l === "fr" ? "Français" : l === "en" ? "English" : l === "tr" ? "Türkçe" : l === "ru" ? "Русский" : l === "zh" ? "中文" : l === "es" ? "Español" : l === "de" ? "Deutsch" : "Italiano"}
             </a>
           ))}
         </div>

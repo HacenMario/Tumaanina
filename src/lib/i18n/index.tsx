@@ -7,10 +7,13 @@ import { en } from "./en";
 import { tr } from "./tr";
 import { ru } from "./ru";
 import { zh } from "./zh";
+import { es } from "./es";
+import { de } from "./de";
+import { it } from "./it";
 import type { AppLang } from "@/lib/constants";
 import { useApp } from "@/lib/store";
 
-export const dictionaries: Record<AppLang, Dict> = { ar, fr, en, tr, ru, zh };
+export const dictionaries: Record<AppLang, Dict> = { ar, fr, en, tr, ru, zh, es, de, it };
 
 export const LANG_META: Record<AppLang, { label: string; dir: "rtl" | "ltr"; flag: string }> = {
   ar: { label: "العربية", dir: "rtl", flag: "🇩🇿" },
@@ -19,6 +22,9 @@ export const LANG_META: Record<AppLang, { label: string; dir: "rtl" | "ltr"; fla
   tr: { label: "Türkçe", dir: "ltr", flag: "🇹🇷" },
   ru: { label: "Русский", dir: "ltr", flag: "🇷🇺" },
   zh: { label: "中文", dir: "ltr", flag: "🇨🇳" },
+  es: { label: "Español", dir: "ltr", flag: "🇪🇸" },
+  de: { label: "Deutsch", dir: "ltr", flag: "🇩🇪" },
+  it: { label: "Italiano", dir: "ltr", flag: "🇮🇹" },
 };
 
 interface I18nCtx {
@@ -45,7 +51,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setLangState(l);
     localStorage.setItem("tumaanina-lang", l);
     /* v1.6.0: مزامنة اللغة مع الحساب — فتُرسل الإشعارات الفورية القادمة
-       بلغة المستخدم الحالية (طلب المستخدم: ترجمة كل الإشعارات للغات الست) */
+       بلغة المستخدم الحالية (طلب المستخدم: ترجمة كل الإشعارات لكل لغات المنصة) */
     try {
       const u = useApp.getState().user;
       if (u?.id) {

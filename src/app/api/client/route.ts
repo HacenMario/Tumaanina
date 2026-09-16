@@ -178,7 +178,7 @@ async function POST_impl(req: NextRequest) {
     const set: Record<string, unknown> = {};
     if (wilaya !== undefined) set.wilaya = wilaya || null;
     if (ageGroup !== undefined) set.ageGroup = ageGroup || null;
-    if (language === "ar" || language === "fr" || language === "en" || language === "tr" || language === "ru" || language === "zh") set.language = language;
+    if (language === "ar" || language === "fr" || language === "en" || language === "tr" || language === "ru" || language === "zh" || language === "es" || language === "de" || language === "it") set.language = language;
     if (body.gender === "male" || body.gender === "female") set.gender = body.gender;
     /* v2.7.0: تحديث رقم الهاتف اختيارياً — نفس قواعد التسجيل */
     if (body.phone !== undefined) {

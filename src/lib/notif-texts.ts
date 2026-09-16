@@ -55,10 +55,13 @@ export type NotifKey =
   | "courseCancelled"
   | "test";
 
-export type NotifLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh";
+export type NotifLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh" | "es" | "de" | "it";
 
 export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: string }>> = {
   booked: {
+    es: { title: "🔔 Nueva solicitud de consulta", body: "El cliente {name} solicita una sesión — acepte o proponga otro horario desde su panel" },
+    de: { title: "🔔 Neue Beratungsanfrage", body: "Der Kunde {name} bittet um eine Sitzung — nehmen Sie sie an oder schlagen Sie eine andere Uhrzeit über Ihr Panel vor" },
+    it: { title: "🔔 Nuova richiesta di consulenza", body: "Il cliente {name} richiede una sessione — accetti o proponi un altro orario dal tuo pannello" },
     ar: { title: "🔔 طلب استشارة جديد", body: "العميل {name} يطلب جلسة استشارة — راجع لوحتك للقبول أو تغيير الموعد" },
     fr: { title: "🔔 Nouvelle demande de consultation", body: "Le client {name} demande une séance — acceptez ou proposez un autre horaire depuis votre tableau de bord" },
     en: { title: "🔔 New consultation request", body: "Client {name} requests a session — accept or reschedule from your dashboard" },
@@ -67,6 +70,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🔔 新的咨询请求", body: "客户 {name} 请求预约会话——请在控制面板接受或改期" },
   },
   accepted: {
+    es: { title: "✅ Consulta confirmada", body: "El especialista {name} confirmó su cita — hora de la sesión: {when} — detalles en Mis sesiones" },
+    de: { title: "✅ Beratung bestätigt", body: "Die Fachkraft {name} hat Ihre Buchung bestätigt — Sitzungszeit: {when} — Details in Meine Sitzungen" },
+    it: { title: "✅ Consulenza confermata", body: "Lo specialista {name} ha confermato la tua prenotazione — orario della sessione: {when} — dettagli in Le mie sessioni" },
     ar: { title: "✅ تأكيد حجز استشارتك", body: "الأخصائي {name} قبل موعدك — موعد الجلسة: {when} — تفاصيل الغرفة في «جلستي»" },
     fr: { title: "✅ Consultation confirmée", body: "Le professionnel {name} a confirmé votre rendez-vous — horaire : {when} — détails dans Mes séances" },
     en: { title: "✅ Consultation confirmed", body: "Specialist {name} confirmed your booking — session time: {when} — details in My sessions" },
@@ -75,6 +81,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "✅ 咨询预约已确认", body: "专家 {name} 已确认您的预约——会话时间：{when}——详情见「我的会话」" },
   },
   started: {
+    es: { title: "🟢 Su sesión comienza ahora", body: "El especialista {name} le espera dentro de la sala de sesión" },
+    de: { title: "🟢 Ihre Sitzung beginnt jetzt", body: "Die Fachkraft {name} wartet auf Sie im Sitzungsraum" },
+    it: { title: "🟢 La tua sessione inizia ora", body: "Lo specialista {name} ti aspetta dentro la stanza di sessione" },
     ar: { title: "🟢 جلستك بدأت الآن", body: "الأخصائي {name} في انتظارك داخل غرفة الجلسة" },
     fr: { title: "🟢 Votre séance commence", body: "Le professionnel {name} vous attend dans la salle de séance" },
     en: { title: "🟢 Your session is starting", body: "Specialist {name} is waiting for you in the session room" },
@@ -83,6 +92,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🟢 您的会话即将开始", body: "专家 {name} 正在会话房间中等候您" },
   },
   declined: {
+    es: { title: "ℹ️ Sobre su solicitud de consulta", body: "El especialista {name} no está disponible en el horario solicitado — puede reservar con él más tarde o con otro especialista ahora" },
+    de: { title: "ℹ️ Zu Ihrer Beratungsanfrage", body: "Die Fachkraft {name} ist zur gewünschten Zeit nicht verfügbar — buchen Sie später bei ihr oder jetzt bei einer anderen Fachkraft" },
+    it: { title: "ℹ️ Sulla tua richiesta di consulenza", body: "Lo specialista {name} non è disponibile nell'orario richiesto — puoi prenotare con lui più tardi o con un altro specialista ora" },
     ar: { title: "ℹ️ بخصوص طلب استشارتك", body: "الأخصائي {name} غير متاح في الموعد المطلوب — يمكنك الحجز معه لاحقاً أو مع أخصائي آخر الآن" },
     fr: { title: "ℹ️ Concernant votre demande", body: "Le professionnel {name} n'est pas disponible à ce créneau — réservez plus tard avec lui ou avec un autre maintenant" },
     en: { title: "ℹ️ About your request", body: "Specialist {name} is unavailable at this time — book with him later or with another specialist now" },
@@ -91,6 +103,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "ℹ️ 关于您的请求", body: "专家 {name} 在该时段暂无空档——您可以稍后与他预约，或现在预约其他专家" },
   },
   feedback: {
+    es: { title: "💚 Seguimiento semanal", body: "¿Cómo se siente esta semana? Registre su evaluación rápida" },
+    de: { title: "💚 Wöchentliche Nachfrage", body: "Wie fühlen Sie sich diese Woche? Kurze Bewertung erfassen" },
+    it: { title: "💚 Follow-up settimanale", body: "Come ti senti questa settimana? Registra la tua valutazione rapida" },
     ar: { title: "💚 متابعة أسبوعية", body: "كيف تشعر هذا الأسبوع؟ سجل تقييمك السريع" },
     fr: { title: "💚 Suivi hebdomadaire", body: "Comment vous sentez-vous cette semaine ?" },
     en: { title: "💚 Weekly follow-up", body: "How are you feeling this week? Quick check-in" },
@@ -99,6 +114,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "💚 每周回访", body: "本周您感觉如何？请快速记录您的状态" },
   },
   followUp: {
+    es: { title: "📅 Sesión de seguimiento programada", body: "El especialista {name} le programó la próxima sesión — hora: {when} — consulte «Mis sesiones»" },
+    de: { title: "📅 Nachsorgesitzung geplant", body: "Die Fachkraft {name} hat Ihre nächste Sitzung geplant — Zeit: {when} — siehe Meine Sitzungen" },
+    it: { title: "📅 Sessione di follow-up programmata", body: "Lo specialista {name} ti ha programmato la prossima sessione — orario: {when} — vedi «Le mie sessioni»" },
     ar: { title: "📅 جلسة متابعة مبرمجة", body: "حدّد لك الأخصائي {name} جلسة المتابعة القادمة — الموعد: {when} — راجع «جلستي»" },
     fr: { title: "📅 Séance de suivi programmée", body: "Le professionnel {name} a planifié votre prochaine séance — horaire : {when} — voir Mes séances" },
     en: { title: "📅 Follow-up scheduled", body: "Specialist {name} scheduled your next session — time: {when} — see My sessions" },
@@ -107,6 +125,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "📅 已安排后续会话", body: "专家 {name} 已为您安排下一次会话——时间：{when}——请查看「我的会话」" },
   },
   treatmentEnded: {
+    es: { title: "🌿 Plan de seguimiento completado", body: "El especialista {name} cerró su plan de seguimiento psicológico — puede reservar una nueva consulta en cualquier momento" },
+    de: { title: "🌿 Nachsorgeplan abgeschlossen", body: "Die Fachkraft {name} hat Ihren psychologischen Nachsorgeplan abgeschlossen — Sie können jederzeit eine neue Beratung buchen" },
+    it: { title: "🌿 Piano di follow-up completato", body: "Lo specialista {name} ha chiuso il tuo piano di follow-up psicologico — puoi prenotare una nuova consulenza in qualsiasi momento" },
     ar: { title: "🌿 اكتمال خطة المتابعة", body: "أنهى الأخصائي {name} خطة المتابعة النفسية — يمكنك حجز استشارة جديدة في أي وقت" },
     fr: { title: "🌿 Plan de suivi terminé", body: "Le professionnel {name} a clôturé votre plan de suivi psychologique — réservez une nouvelle consultation à tout moment" },
     en: { title: "🌿 Follow-up plan completed", body: "Specialist {name} closed your psychological follow-up plan — you can book a new consultation anytime" },
@@ -115,6 +136,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🌿 随访计划已完成", body: "专家 {name} 已结束您的心理随访计划——您可以随时预约新的咨询" },
   },
   message: {
+    es: { title: "💬 Nuevo mensaje en la sala de sesión", body: "{name}: {excerpt}" },
+    de: { title: "💬 Neue Nachricht im Sitzungsraum", body: "{name}: {excerpt}" },
+    it: { title: "💬 Nuovo messaggio nella stanza di sessione", body: "{name}: {excerpt}" },
     ar: { title: "💬 رسالة جديدة في غرفة الجلسة", body: "{name}: {excerpt}" },
     fr: { title: "💬 Nouveau message dans la salle", body: "{name} : {excerpt}" },
     en: { title: "💬 New message in the session room", body: "{name}: {excerpt}" },
@@ -125,6 +149,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   /* v2.8.0 + v2.12.0: تغيير موعد الجلسة — إشعار للطرف الآخر بالتفاصيل
      كاملة: الموعد القديم والموعد الجديد معاً */
   rescheduled: {
+    es: { title: "🔁 Cambio de hora de la consulta", body: "{name} cambió la cita de {old} a {when} — consulte «Mis sesiones»" },
+    de: { title: "🔁 Beratungszeit geändert", body: "{name} hat den Termin von {old} auf {when} geändert — siehe Meine Sitzungen" },
+    it: { title: "🔁 Orario della consulenza modificato", body: "{name} ha cambiato l'appuntamento da {old} a {when} — vedi «Le mie sessioni»" },
     ar: { title: "🔁 تغيير موعد الاستشارة", body: "قام {name} بتغيير الموعد من {old} إلى {when} — راجع «جلستي»" },
     fr: { title: "🔁 Horaire de consultation modifié", body: "{name} a modifié le rendez-vous : de {old} à {when} — voir Mes séances" },
     en: { title: "🔁 Consultation time changed", body: "{name} changed the appointment from {old} to {when} — see My sessions" },
@@ -134,6 +161,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v2.8.0: رفض الطلب بسبب مذكور — يصل للعميل مع السبب نفسه */
   declinedReason: {
+    es: { title: "ℹ️ Disculpa por su solicitud de consulta", body: "El especialista {name} se disculpa — motivo: {reason} — puede reservar con otro especialista de inmediato" },
+    de: { title: "ℹ️ Ablehnung Ihrer Anfrage", body: "Die Fachkraft {name} entschuldigt sich — Grund: {reason} — Sie können sofort eine andere Fachkraft buchen" },
+    it: { title: "ℹ️ Discolpa per la tua richiesta", body: "Lo specialista {name} si scusa — motivo: {reason} — puoi prenotare subito con un altro specialista" },
     ar: { title: "ℹ️ اعتذار عن طلب الاستشارة", body: "الأخصائي {name} يعتذر — السبب: {reason} — يمكنك الحجز مع أخصائي آخر فوراً" },
     fr: { title: "ℹ️ Demande refusée", body: "Le professionnel {name} se désole — motif : {reason} — vous pouvez réserver avec un autre professionnel" },
     en: { title: "ℹ️ Request declined", body: "Specialist {name} sends apologies — reason: {reason} — you can book with another specialist anytime" },
@@ -143,6 +173,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v2.8.0: رسالة في محادثة ما قبل الجلسة (خيوط DM) — فقط للطرف الغائب */
   dm: {
+    es: { title: "💬 Nuevo mensaje", body: "{name}: {excerpt}" },
+    de: { title: "💬 Neue Nachricht", body: "{name}: {excerpt}" },
+    it: { title: "💬 Nuovo messaggio", body: "{name}: {excerpt}" },
     ar: { title: "💬 رسالة جديدة", body: "{name}: {excerpt}" },
     fr: { title: "💬 Nouveau message", body: "{name} : {excerpt}" },
     en: { title: "💬 New message", body: "{name}: {excerpt}" },
@@ -152,6 +185,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v2.10.0: رسالة في محادثة المختص مع الإدارة — للطرف الغائب فقط */
   adminChat: {
+    es: { title: "🛡️ Mensaje en el chat de administración", body: "{name}: {excerpt}" },
+    de: { title: "🛡️ Nachricht im Admin-Chat", body: "{name}: {excerpt}" },
+    it: { title: "🛡️ Messaggio nella chat dell'amministrazione", body: "{name}: {excerpt}" },
     ar: { title: "🛡️ رسالة في محادثة الإدارة", body: "{name}: {excerpt}" },
     fr: { title: "🛡️ Message du support administration", body: "{name} : {excerpt}" },
     en: { title: "🛡️ Administration chat message", body: "{name}: {excerpt}" },
@@ -161,6 +197,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v2.8.0: الإشعار الجماعي من الإدارة */
   bulk: {
+    es: { title: "📣 Aviso de la administración de la plataforma", body: "{text}" },
+    de: { title: "📣 Mitteilung der Plattformadministration", body: "{text}" },
+    it: { title: "📣 Avviso dell'amministrazione della piattaforma", body: "{text}" },
     ar: { title: "📣 إشعار من إدارة المنصة", body: "{text}" },
     fr: { title: "📣 Annonce de l'administration", body: "{text}" },
     en: { title: "📣 Platform administration notice", body: "{text}" },
@@ -170,6 +209,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v2.9.0: فائز تحدي الالتزام للعميلين */
   victimChallenge: {
+    es: { title: "👑 ¡Nuevo ganador del reto de compromiso!", body: "Primero en cumplir 4 citas consecutivas: {name} — consulte el panel de administración" },
+    de: { title: "👑 Neuer Gewinner der Commitment-Challenge!", body: "Erster mit 4 Terminen in Folge: {name} — prüfen Sie das Admin-Panel" },
+    it: { title: "👑 Nuovo vincitore della sfida di impegno!", body: "Primo a mantenere 4 appuntamenti consecutivi: {name} — controlla il pannello di amministrazione" },
     ar: { title: "👑 فائز جديد في تحدي الالتزام!", body: "أول من التزم بـ4 مواعيد متتالية: {name} — راجع لوحة الإدارة" },
     fr: { title: "👑 Nouveau gagnant du défi d'assiduité !", body: "Premier à respecter 4 rendez-vous consécutifs : {name} — consultez le panneau d'administration" },
     en: { title: "👑 New commitment challenge winner!", body: "First to keep 4 consecutive appointments: {name} — check the admin panel" },
@@ -179,6 +221,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v2.12.0: اكتمال الجلسة بلا متابعة مرتبطة — إشعار للعميل بالنتيجة */
   completed: {
+    es: { title: "🏁 Su consulta se completó", body: "El especialista {name} terminó su sesión — ¿cómo se siente ahora? Evalúe su experiencia desde «Mis sesiones»" },
+    de: { title: "🏁 Beratung abgeschlossen", body: "Die Fachkraft {name} hat Ihre Sitzung beendet — wie fühlen Sie sich jetzt? Bewerten Sie aus Meine Sitzungen" },
+    it: { title: "🏁 La tua consulenza è completata", body: "Lo specialista {name} ha concluso la vostra sessione — come ti senti ora? Valuta la tua esperienza da «Le mie sessioni»" },
     ar: { title: "🏁 اكتملت استشارتك", body: "أتم الأخصائي {name} جلستكما — كيف تشعر الآن؟ قيّم تجربتك من «جلستي»" },
     fr: { title: "🏁 Consultation terminée", body: "Le professionnel {name} a terminé votre séance — comment vous sentez-vous ? Évaluez depuis Mes séances" },
     en: { title: "🏁 Consultation completed", body: "Specialist {name} completed your session — how do you feel now? Rate it from My sessions" },
@@ -188,6 +233,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* إلغاء العميل لطلبه — إشعار للأخصائي بالموعد الذي تحرّر */
   cancelledByVictim: {
+    es: { title: "ℹ️ El cliente canceló su cita", body: "El cliente {name} canceló la solicitud del {when} — el horario está disponible de nuevo para otro cliente" },
+    de: { title: "ℹ️ Der Kunde hat den Termin storniert", body: "Der Kunde {name} hat die Anfrage für {when} storniert — die Zeit ist wieder verfügbar" },
+    it: { title: "ℹ️ Il cliente ha annullato l'appuntamento", body: "Il cliente {name} ha annullato la richiesta del {when} — l'orario è di nuovo disponibile per un altro cliente" },
     ar: { title: "ℹ️ ألغى العميل موعده", body: "العميل {name} ألغى طلب موعد {when} — صار الوقت متاحاً لعميل آخر" },
     fr: { title: "ℹ️ Rendez-vous annulé par le client", body: "Le client {name} a annulé la demande du {when} — le créneau est de nouveau disponible" },
     en: { title: "ℹ️ Client cancelled the appointment", body: "Client {name} cancelled the request for {when} — the slot is available again" },
@@ -198,6 +246,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   /* v2.13.0: منشور جديد من أخصائي يتابعه المستخدم — القيمة الفعلية للمتابعة */
   /* v2.14.0: تفاعلات المجتمع + المتابعة + التقييمات — كل حالة لها إشعار */
   socialLike: {
+    es: { title: "❤️ Nuevo me gusta en su publicación", body: "A {name} le gustó su publicación en la comunidad" },
+    de: { title: "❤️ Neues Like auf Ihrem Beitrag", body: "{name} hat Ihren Beitrag in der Community geliked" },
+    it: { title: "❤️ Nuovo mi piace sul tuo post", body: "A {name} è piaciuto il tuo post nella comunità" },
     ar: { title: "❤️ إعجاب جديد بمنشورك", body: "أعجب {name} بمنشورك في المجتمع" },
     fr: { title: "❤️ Nouveau j'aime sur votre post", body: "{name} a aimé votre publication" },
     en: { title: "❤️ New like on your post", body: "{name} liked your post" },
@@ -206,6 +257,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "❤️ 您的帖子获得了新点赞", body: "{name} 赞了您的帖子" },
   },
   socialComment: {
+    es: { title: "💬 Nuevo comentario en su publicación", body: "{name} comentó: {excerpt}" },
+    de: { title: "💬 Neuer Kommentar zu Ihrem Beitrag", body: "{name} kommentierte: {excerpt}" },
+    it: { title: "💬 Nuovo commento sul tuo post", body: "{name} ha commentato: {excerpt}" },
     ar: { title: "💬 تعليق جديد على منشورك", body: "{name} علّق: {excerpt}" },
     fr: { title: "💬 Nouveau commentaire sur votre post", body: "{name} a commenté : {excerpt}" },
     en: { title: "💬 New comment on your post", body: "{name} commented: {excerpt}" },
@@ -214,6 +268,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "💬 您的帖子收到了新评论", body: "{name} 评论：{excerpt}" },
   },
   newFollower: {
+    es: { title: "👥 Nuevo seguidor", body: "{name} comenzó a seguir su cuenta en la comunidad" },
+    de: { title: "👥 Neuer Follower", body: "{name} hat begonnen, Ihrem Konto in der Community zu folgen" },
+    it: { title: "👥 Nuovo seguace", body: "{name} ha iniziato a seguire il tuo account nella comunità" },
     ar: { title: "👥 متابع جديد", body: "بدأ {name} بمتابعة حسابك في المجتمع" },
     fr: { title: "👥 Nouvel abonné", body: "{name} a commencé à suivre votre profil" },
     en: { title: "👥 New follower", body: "{name} started following you" },
@@ -223,6 +280,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v1.5.0: إشعار التقييم يذكر اسم العميل صراحة (طلب المستخدم) */
   ratingReceived: {
+    es: { title: "⭐ Nueva valoración de un cliente", body: "El cliente {name} le dio {stars} de 5 estrellas — gracias por su compromiso" },
+    de: { title: "⭐ Neue Bewertung von einem Kunden", body: "Der Kunde {name} gab Ihnen {stars} von 5 Sternen — danke für Ihr Engagement" },
+    it: { title: "⭐ Nuova valutazione da un cliente", body: "Il cliente {name} ti ha dato {stars} stelle su 5 — grazie per il tuo impegno" },
     ar: { title: "⭐ تقييم جديد من عميل", body: "العميل {name} قيّمك بـ{stars} من 5 نجوم — شكراً لالتزامك" },
     fr: { title: "⭐ Nouvelle évaluation d'un client", body: "Le client {name} vous a donné {stars} étoiles sur 5 — merci pour votre engagement" },
     en: { title: "⭐ New rating from a client", body: "Client {name} rated you {stars} out of 5 stars — thank you for your commitment" },
@@ -232,6 +292,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v1.5.0: نتيجة توثيق الأخصائي من الإدارة تصل إشعاراً فورياً */
   counselorVerified: {
+    es: { title: "✅ Su cuenta profesional está verificada", body: "La administración de la plataforma «Tumaanina» aprobó su perfil — ya es visible en el directorio de especialistas y listo para recibir reservas" },
+    de: { title: "✅ Ihr professionelles Konto ist verifiziert", body: "Die Verwaltung von «Tumaanina» hat Ihr Profil bestätigt — Sie sind jetzt im Fachkräfteverzeichnis sichtbar und bereit für Buchungen" },
+    it: { title: "✅ Il tuo account professionale è verificato", body: "L'amministrazione di «Tumaanina» ha approvato il tuo profilo — ora sei visibile nella directory degli specialisti e pronto a ricevere prenotazioni" },
     ar: { title: "✅ تم توثيق حسابك المهني", body: "أكّدت إدارة منصة «طمأنينة» ملفك المهني — أصبحت ظاهراً للعميلين في دليل الأخصائيين جاهزاً لاستقبال الحجوزات" },
     fr: { title: "✅ Votre compte professionnel est vérifié", body: "L'administration de Tuma'anina a validé votre profil — vous êtes désormais visible dans l'annuaire et prêt à recevoir des réservations" },
     en: { title: "✅ Your professional account is verified", body: "The Tuma'anina administration approved your profile — you are now visible in the specialists directory and ready to receive bookings" },
@@ -240,6 +303,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "✅ 您的专业账号已通过认证", body: "Tuma'anina 管理团队已审核通过您的档案——您现已出现在专家目录中，可以接受预约" },
   },
   counselorRejected: {
+    es: { title: "ℹ️ Sobre la verificación de su perfil", body: "Su solicitud de verificación no fue aprobada por ahora — revise los datos de su título en la configuración o contacte con la administración para volver a solicitarlo" },
+    de: { title: "ℹ️ Zur Verifizierung Ihres Profils", body: "Ihr Verifizierungsantrag wurde vorerst nicht genehmigt — prüfen Sie Ihre Diplomdaten in den Einstellungen oder kontaktieren Sie die Verwaltung für einen erneuten Antrag" },
+    it: { title: "ℹ️ Sulla verifica del tuo profilo", body: "La tua richiesta di verifica non è stata per ora approvata — controlla i dati della tua laurea nelle impostazioni o contatta l'amministrazione per presentare di nuovo la domanda" },
     ar: { title: "ℹ️ بخصوص توثيق ملفك المهني", body: "لم تتم الموافقة على توثيق ملفك حالياً — راجع بيانات شهادتك من إعداداتك أو تواصل مع إدارة المنصة لإعادة الطلب" },
     fr: { title: "ℹ️ Concernant la vérification de votre profil", body: "Votre demande de vérification n'a pas été approuvée pour le moment — vérifiez votre diplôme dans vos paramètres ou contactez l'administration" },
     en: { title: "ℹ️ About your profile verification", body: "Your verification was not approved at this time — review your diploma details in settings or contact platform administration to reapply" },
@@ -249,6 +315,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v1.9.0: العقد العلاجي — إشعار للعميل عند القبول وإشعار للأخصائي عند الإمضاء */
   contractAwaiting: {
+    es: { title: "📜 Contrato terapéutico pendiente de su firma", body: "El especialista {name} aceptó su sesión — lea el contrato, fírmelo y pulse «Acepto»" },
+    de: { title: "📜 Therapievertrag wartet auf Ihre Unterschrift", body: "Die Fachkraft {name} hat Ihre Sitzung angenommen — lesen Sie den Vertrag, unterschreiben Sie ihn und drücken Sie „Ich akzeptiere“" },
+    it: { title: "📜 Contratto terapeutico in attesa della tua firma", body: "Lo specialista {name} ha accettato la tua sessione — leggi il contratto, firmalo e premi «Accetto»" },
     ar: { title: "📜 عقد علاجي بانتظار إمضائك", body: "الأخصائي {name} قبل جلسك — يرجى قراءة العقد العلاجي وامضاؤه والضغط على «أقبل»" },
     fr: { title: "📜 Contrat thérapeutique à signer", body: "Le professionnel {name} a accepté votre séance — veuillez lire le contrat, le signer et appuyer sur « J'accepte »" },
     en: { title: "📜 Therapy contract awaiting your signature", body: "Specialist {name} accepted your session — please read the contract, sign it and press “I accept”" },
@@ -257,6 +326,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "📜 治疗合同等待您的签署", body: "专家 {name} 已接受您的会话——请阅读合同、签名并点击「我接受」" },
   },
   contractSigned: {
+    es: { title: "📜 Contrato firmado por ambas partes", body: "El cliente {name} firmó el contrato terapéutico — la versión final está guardada en su configuración" },
+    de: { title: "📜 Vertrag von beiden Parteien unterzeichnet", body: "Der Kunde {name} hat den Therapievertrag unterzeichnet — die endgültige Version ist in Ihren Einstellungen gespeichert" },
+    it: { title: "📜 Contratto firmato da entrambe le parti", body: "Il cliente {name} ha firmato il contratto terapeutico — la versione finale è salvata nelle tue impostazioni" },
     ar: { title: "📜 عقد علاجي موقّع من الطرفين", body: "العميل {name} امضى العقد العلاجي — النسخة النهائية محفوظة في إعداداتك" },
     fr: { title: "📜 Contrat signé par les deux parties", body: "Le client {name} a signé le contrat thérapeutique — la version finale est dans vos paramètres" },
     en: { title: "📜 Contract signed by both parties", body: "Client {name} signed the therapy contract — the final version is saved in your settings" },
@@ -267,6 +339,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   /* v1.6.0: تذكير ما قبل الجلسة بساعة — يُنشأ في server.js وreminders.ts
      ويعاد توليده هنا بلغة واجهة المستخدم الحالية في جرس الإشعارات */
   reminder: {
+    es: { title: "⏰ Recordatorio: su sesión en una hora", body: "Su sesión en «Tumaanina» comienza en aproximadamente una hora — la sala les espera" },
+    de: { title: "⏰ Erinnerung: Ihre Sitzung in einer Stunde", body: "Ihre Tumaanina-Sitzung beginnt in etwa einer Stunde — der Raum wartet auf euch beide" },
+    it: { title: "⏰ Promemoria: la tua sessione tra un'ora", body: "La tua sessione su «Tumaanina» inizia tra circa un'ora — la stanza vi aspetta" },
     ar: { title: "⏰ تذكير: جلستك بعد ساعة", body: "جلستك في «طمأنينة» بعد ساعة تقريباً — الغرفة تنتظركما" },
     fr: { title: "⏰ Rappel : votre séance dans une heure", body: "Votre séance sur Tumaanina commence dans une heure — la salle vous attend" },
     en: { title: "⏰ Reminder: your session in one hour", body: "Your Tumaanina session starts in about an hour — the room is waiting for you" },
@@ -276,6 +351,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* v1.6.0: فوز تحدي المختصين — يُعاد توليده بالغات الست في الجرس أيضاً */
   challengeWon: {
+    es: { title: "👑 ¡Nuevo ganador del reto de la plataforma!", body: "Primer ganador del reto secreto: {name} — consulte el panel de administración para los detalles" },
+    de: { title: "👑 Neuer Challenge-Gewinner!", body: "Erster Gewinner der geheimen Challenge: {name} — Details im Admin-Panel" },
+    it: { title: "👑 Nuovo vincitore della sfida della piattaforma!", body: "Primo vincitore della sfida segreta: {name} — dettagli nel pannello di amministrazione" },
     ar: { title: "👑 فائز جديد في تحدي المنصة!", body: "أول فائز بالتحدي السري: {name} — راجع لوحة الإدارة للتفاصيل" },
     fr: { title: "👑 Nouveau gagnant du défi !", body: "Premier gagnant du défi secret : {name} — consultez le panneau d'administration" },
     en: { title: "👑 New challenge winner!", body: "First winner of the secret challenge: {name} — check the admin panel" },
@@ -285,6 +363,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
   },
   /* ═ v1.14.0: منظومة العيادات — اقتراح المختص، الحجز الحضوري، الإعلانات ═ */
   clinicSuggested: {
+    es: { title: "🧭 Su especialista le sugiere una clínica", body: "{clinic} en {wilaya} — especialidades: {specs} — años de experiencia: {years} — nota del especialista: {note} — toque para ver la clínica y reservar" },
+    de: { title: "🧭 Ihre Fachkraft schlägt Ihnen eine Klinik vor", body: "{clinic} in {wilaya} — Fachgebiete: {specs} — Erfahrung: {years} Jahre — Notiz: {note} — tippen, um die Klinik zu sehen und zu buchen" },
+    it: { title: "🧭 Il tuo specialista ti suggerisce una clinica", body: "{clinic} a {wilaya} — specialità: {specs} — anni di esperienza: {years} — nota dello specialista: {note} — tocca per vedere la clinica e prenotare" },
     ar: { title: "🧭 اقترح لك مختصك عيادة", body: "{clinic} في {wilaya} — التخصصات: {specs} — سنوات الخبرة: {years} — ملاحظة المختص: {note} — اضغط لعرض العيادة والحجز الحضوري" },
     fr: { title: "🧭 Votre spécialiste vous suggère une clinique", body: "{clinic} à {wilaya} — spécialités : {specs} — années d'expérience : {years} — note : {note} — touchez pour voir la clinique et réserver" },
     en: { title: "🧭 Your specialist suggests a clinic", body: "{clinic} in {wilaya} — specialties: {specs} — years of experience: {years} — note: {note} — tap to view the clinic and book" },
@@ -293,6 +374,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🧭 您的专家为您推荐了一家诊所", body: "「{clinic}」位于{wilaya}——专长：{specs}——经验：{years} 年——备注：{note}——点击查看诊所并预约" },
   },
   clinicBookingNew: {
+    es: { title: "📅 Nueva solicitud de visita presencial", body: "El cliente {name} solicita una visita presencial en {clinic} el {when} — confirme o cancele desde el panel de su clínica" },
+    de: { title: "📅 Neue Anfrage für einen Präsenztermin", body: "Der Kunde {name} erbittet einen Präsenztermin in {clinic} am {when} — bestätigen oder stornieren Sie über Ihr Klinik-Panel" },
+    it: { title: "📅 Nuova richiesta di visita di persona", body: "Il cliente {name} richiede una visita di persona in {clinic} il {when} — conferma o annulla dal pannello della tua clinica" },
     ar: { title: "📅 طلب حجز حضوري جديد", body: "العميل {name} يطلب موعداً حضورياً في {clinic} بتاريخ {when} — راجع لوحة عيادتك للتأكيد أو الإلغاء" },
     fr: { title: "📅 Nouvelle demande de rendez-vous", body: "Le client {name} demande une consultation présentielle à {clinic} le {when} — confirmez ou annulez depuis votre tableau de bord" },
     en: { title: "📅 New in-person booking request", body: "Client {name} requests an in-person visit at {clinic} on {when} — confirm or cancel from your dashboard" },
@@ -301,6 +385,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "📅 新的线下预约请求", body: "客户{name}申请在「{clinic}」于{when}进行线下就诊——请在您的面板确认或取消" },
   },
   clinicBookingConfirmed: {
+    es: { title: "✅ Confirmación de su reserva presencial", body: "La clínica {clinic} confirmó su visita: {when} — dirección: {address} — consulte la página de la clínica para cualquier contacto" },
+    de: { title: "✅ Ihre Buchung ist bestätigt", body: "Die Klinik {clinic} hat Ihren Präsenztermin bestätigt: {when} — Adresse: {address} — Kontaktdaten auf der Klinikseite" },
+    it: { title: "✅ La tua prenotazione è confermata", body: "La clinica {clinic} ha confermato la tua visita di persona: {when} — indirizzo: {address} — per i contatti vedi la pagina della clinica" },
     ar: { title: "✅ تأكيد حجزك الحضوري", body: "العيادة {clinic} أكدت موعدك الحضوري: {when} — العنوان: {address} — راجع صفحة العيادة لأي تواصل" },
     fr: { title: "✅ Votre rendez-vous est confirmé", body: "La clinique {clinic} a confirmé votre visite : {when} — adresse : {address} — consultez la page de la clinique pour tout contact" },
     en: { title: "✅ Your booking is confirmed", body: "{clinic} confirmed your in-person visit: {when} — address: {address} — see the clinic page for contact details" },
@@ -309,6 +396,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "✅ 您的预约已确认", body: "「{clinic}」已确认您的线下就诊：{when}——地址：{address}——联系方式请查看诊所页面" },
   },
   clinicBookingCancelled: {
+    es: { title: "ℹ️ Cancelación de reserva presencial", body: "La clínica {clinic} canceló su cita del {when} — motivo: {reason} — puede reservar otro horario desde la página de la clínica" },
+    de: { title: "ℹ️ Präsenztermin storniert", body: "Die Klinik {clinic} hat Ihren Termin am {when} storniert — Grund: {reason} — Sie können auf der Klinikseite eine neue Zeit wählen" },
+    it: { title: "ℹ️ Annullamento della prenotazione di persona", body: "La clinica {clinic} ha annullato il tuo appuntamento del {when} — motivo: {reason} — puoi prenotare un altro orario dalla pagina della clinica" },
     ar: { title: "ℹ️ إلغاء حجز حضوري", body: "العيادة {clinic} ألغت موعدك: {when} — السبب: {reason} — يمكنك حجز موعد آخر من صفحة العيادة" },
     fr: { title: "ℹ️ Rendez-vous annulé", body: "La clinique {clinic} a annulé votre rendez-vous du {when} — motif : {reason} — vous pouvez réserver un autre créneau depuis la page de la clinique" },
     en: { title: "ℹ️ Booking cancelled", body: "{clinic} cancelled your appointment on {when} — reason: {reason} — you can book another slot from the clinic page" },
@@ -317,6 +407,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "ℹ️ 预约已取消", body: "「{clinic}」取消了您在{when}的预约——原因：{reason}——您可以在诊所页面重新预约" },
   },
   clinicBookingCancelledByClient: {
+    es: { title: "ℹ️ El cliente canceló su reserva presencial", body: "El cliente {name} canceló la cita del {when} en {clinic} — el horario está disponible de nuevo para otro cliente" },
+    de: { title: "ℹ️ Der Kunde hat die Buchung storniert", body: "Der Kunde {name} hat den Termin am {when} in {clinic} storniert — die Zeit ist wieder frei" },
+    it: { title: "ℹ️ Il cliente ha annullato la prenotazione", body: "Il cliente {name} ha annullato l'appuntamento del {when} in {clinic} — l'orario è di nuovo libero per un altro cliente" },
     ar: { title: "ℹ️ العميل ألغى حجزه الحضوري", body: "العميل {name} ألغى موعد {when} في {clinic} — الوقت متاح الآن لعميل آخر" },
     fr: { title: "ℹ️ Le client a annulé son rendez-vous", body: "Le client {name} a annulé le rendez-vous du {when} à {clinic} — le créneau est de nouveau disponible" },
     en: { title: "ℹ️ Client cancelled the booking", body: "Client {name} cancelled the appointment on {when} at {clinic} — the slot is available again" },
@@ -325,6 +418,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "ℹ️ 客户取消了预约", body: "客户{name}取消了{when}在「{clinic}」的预约——该时段重新可用" },
   },
   clinicVisitCompleted: {
+    es: { title: "🏁 Su visita presencial se completó", body: "La clínica {clinic} cerró su cita — ¿cómo fue su experiencia? Valore la clínica desde su página" },
+    de: { title: "🏁 Ihr Besuch ist abgeschlossen", body: "Die Klinik {clinic} hat Ihren Termin abgeschlossen — wie war Ihre Erfahrung? Bewerten Sie die Klinik auf ihrer Seite" },
+    it: { title: "🏁 La tua visita di persona è completata", body: "La clinica {clinic} ha chiuso il tuo appuntamento — com'è andata? Valuta la clinica dalla sua pagina" },
     ar: { title: "🏁 اكتملت زيارتك الحضورية", body: "أنهت العيادة {clinic} موعدك — كيف كانت تجربتك؟ قيّم العيادة من صفحتها" },
     fr: { title: "🏁 Votre visite est terminée", body: "La clinique {clinic} a clôturé votre rendez-vous — comment s'est passée votre expérience ? Évaluez la clinique depuis sa page" },
     en: { title: "🏁 Your visit is completed", body: "{clinic} closed your appointment — how was your experience? Rate the clinic from its page" },
@@ -333,6 +429,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🏁 您的就诊已完成", body: "「{clinic}」已完成您的预约——体验如何？请在诊所页面进行评价" },
   },
   clinicAdDues: {
+    es: { title: "💳 Tarifas de publicación de su anuncio", body: "La administración fijó la tarifa de su anuncio {title} en {amount} DZD — contacte con la administración para pagarlas y confirmar la publicación" },
+    de: { title: "💳 Veröffentlichungsgebühren Ihrer Anzeige", body: "Die Verwaltung hat die Gebühr für Ihre Anzeige {title} auf {amount} DZD festgelegt — kontaktieren Sie die Verwaltung zur Zahlung und Bestätigung der Veröffentlichung" },
+    it: { title: "💳 Tariffe di pubblicazione del tuo annuncio", body: "L'amministrazione ha fissato la tariffa del tuo annuncio {title} a {amount} DZD — contatta l'amministrazione per pagarle e confermare la pubblicazione" },
     ar: { title: "💳 مستحقات نشر إعلانك", body: "حددت الإدارة مستحقات نشر إعلانك {title} بمبلغ {amount} دج — تواصلي مع الإدارة لسدادها وتأكيد نشر إعلانك" },
     fr: { title: "💳 Frais de publication de votre annonce", body: "L'administration a fixé les frais de votre annonce {title} à {amount} DZD — contactez l'administration pour les régler et confirmer la publication" },
     en: { title: "💳 Ad publication fees due", body: "Administration set the publication fee for your ad {title} at {amount} DZD — contact administration to pay and confirm publication" },
@@ -341,6 +440,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "💳 广告发布费用", body: "管理员已将您的广告「{title}」发布费用定为 {amount} DZD——请联系管理员付款以确认发布" },
   },
   clinicAdPaidConfirmed: {
+    es: { title: "✅ Pago de las tarifas confirmado", body: "La administración confirmó el pago de las tarifas de su anuncio {title} — su anuncio se publicará pronto si aún no se publicó" },
+    de: { title: "✅ Zahlung bestätigt", body: "Die Verwaltung hat die Gebührenzahlung für Ihre Anzeige {title} bestätigt — Ihre Anzeige wird bald veröffentlicht" },
+    it: { title: "✅ Pagamento delle tariffe confermato", body: "L'amministrazione ha confermato il pagamento delle tariffe del tuo annuncio {title} — il tuo annuncio sarà pubblicato presto" },
     ar: { title: "✅ تم تأكيد سداد المستحقات", body: "أكدت الإدارة سداد مستحقات إعلانك {title} — سيتم نشر إعلانك قريباً إن لم يُنشَر بعد" },
     fr: { title: "✅ Paiement confirmé", body: "L'administration a confirmé le règlement des frais de votre annonce {title} — votre annonce sera publiée prochainement" },
     en: { title: "✅ Payment confirmed", body: "Administration confirmed the fees payment for your ad {title} — your ad will be published soon" },
@@ -349,6 +451,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "✅ 付款已确认", body: "管理员已确认您的广告「{title}」的费用已付——您的广告即将发布" },
   },
   clinicAdApproved: {
+    es: { title: "✅ Su anuncio de clínica está publicado", body: "{title} — publicación confirmada tras verificar el pago; el anuncio ya es visible para el público" },
+    de: { title: "✅ Ihre Klinik-Anzeige ist online", body: "{title} — Veröffentlichung nach Zahlungsprüfung bestätigt; die Anzeige ist jetzt öffentlich sichtbar" },
+    it: { title: "✅ Il tuo annuncio della clinica è online", body: "{title} — pubblicazione confermata dopo la verifica del pagamento; l'annuncio è ora visibile al pubblico" },
     ar: { title: "✅ نُشر إعلان عيادتك", body: "{title} — أُكد نشر الإعلان بعد التأكد من السداد، وهو الآن ظاهر للجمهور في صفحة الإعلانات" },
     fr: { title: "✅ Votre annonce est publiée", body: "{title} — publication confirmée après vérification du paiement ; l'annonce est visible par le public" },
     en: { title: "✅ Your clinic ad is live", body: "{title} — publication confirmed after payment verification; the ad is now visible to the public" },
@@ -357,6 +462,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "✅ 您的诊所广告已发布", body: "「{title}」——已确认付款并发布；广告现已向公众展示" },
   },
   clinicAdRejected: {
+    es: { title: "ℹ️ Sobre su anuncio de clínica", body: "{title} — el anuncio no fue aprobado por ahora — motivo: {reason} — edite el anuncio desde el panel de su clínica" },
+    de: { title: "ℹ️ Zu Ihrer Klinik-Anzeige", body: "{title} — die Anzeige wurde vorerst nicht genehmigt — Grund: {reason} — bearbeiten Sie sie über Ihr Klinik-Panel" },
+    it: { title: "ℹ️ Sul tuo annuncio della clinica", body: "{title} — l'annuncio non è stato per ora approvato — motivo: {reason} — modificalo dal pannello della tua clinica" },
     ar: { title: "ℹ️ بخصوص إعلان عيادتك", body: "{title} — لم تتم الموافقة على النشر حالياً — السبب: {reason} — راجع لوحة عيادتك لتعديل الإعلان" },
     fr: { title: "ℹ️ Concernant votre annonce", body: "{title} — publication non approuvée pour le moment — motif : {reason} — modifiez l'annonce depuis votre tableau de bord" },
     en: { title: "ℹ️ About your clinic ad", body: "{title} — the ad was not approved at this time — reason: {reason} — edit the ad from your dashboard" },
@@ -365,6 +473,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "ℹ️ 关于您的诊所广告", body: "「{title}」——该广告暂未获批——原因：{reason}——请在您的面板中修改" },
   },
   clinicAdSubmitted: {
+    es: { title: "📣 Nuevo anuncio pendiente de revisión", body: "La clínica «{clinic}» redactó un nuevo anuncio titulado «{title}» — revíselo desde el panel de administración" },
+    de: { title: "📣 Neue Anzeige wartet auf Prüfung", body: "Die Klinik «{clinic}» hat eine neue Anzeige «{title}» verfasst — prüfen Sie sie im Admin-Panel" },
+    it: { title: "📣 Nuovo annuncio in attesa di revisione", body: "La clinica «{clinic}» ha redatto un nuovo annuncio intitolato «{title}» — esaminalo dal pannello di amministrazione" },
     ar: { title: "📣 إعلان جديد بانتظار المراجعة", body: "عيادة «{clinic}» صاغت إعلاناً جديداً بعنوان «{title}» — راجعه من لوحة الإدارة" },
     fr: { title: "📣 Nouvelle annonce à examiner", body: "La clinique «{clinic}» a rédigé une nouvelle annonce «{title}» — examinez-la depuis le panneau d'administration" },
     en: { title: "📣 New ad awaiting review", body: "Clinic «{clinic}» created a new ad «{title}» — review it from the admin panel" },
@@ -373,6 +484,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "📣 有新广告待审核", body: "诊所「{clinic}」创建了新广告「{title}」——请在管理面板中审核" },
   },
   clinicAdComment: {
+    es: { title: "💬 Nuevo comentario en su anuncio", body: "{name} comentó el anuncio «{title}» — revise los comentarios desde el panel de su clínica" },
+    de: { title: "💬 Neuer Kommentar zu Ihrer Anzeige", body: "{name} kommentierte die Anzeige «{title}» — sehen Sie die Kommentare über Ihr Klinik-Panel" },
+    it: { title: "💬 Nuovo commento sul tuo annuncio", body: "{name} ha commentato l'annuncio «{title}» — controlla i commenti dal pannello della tua clinica" },
     ar: { title: "💬 تعليق جديد على إعلانك", body: "{name} علّق على إعلان «{title}» — راجع التعليقات من لوحة عيادتك" },
     fr: { title: "💬 Nouveau commentaire sur votre annonce", body: "{name} a commenté l'annonce «{title}» — consultez les commentaires depuis votre tableau de bord" },
     en: { title: "💬 New comment on your ad", body: "{name} commented on the ad «{title}» — review comments from your clinic dashboard" },
@@ -381,6 +495,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "💬 您的广告有新评论", body: "{name} 评论了广告「{title}」——请在诊所面板中查看" },
   },
   clinicAdReply: {
+    es: { title: "💬 Respuesta a su comentario", body: "La clínica «{clinic}» respondió a su comentario en el anuncio «{title}» — abra la página de anuncios para leerlo" },
+    de: { title: "💬 Antwort auf Ihren Kommentar", body: "Die Klinik «{clinic}» hat auf Ihren Kommentar zu «{title}» geantwortet — öffnen Sie die Anzeigenseite zum Lesen" },
+    it: { title: "💬 Risposta al tuo commento", body: "La clinica «{clinic}» ha risposto al tuo commento sull'annuncio «{title}» — apri la pagina degli annunci per leggerlo" },
     ar: { title: "💬 رد على تعليقك", body: "عيادة «{clinic}» ردت على تعليقك في إعلان «{title}» — افتح صفحة الإعلانات لقراءة الرد" },
     fr: { title: "💬 Réponse à votre commentaire", body: "La clinique «{clinic}» a répondu à votre commentaire sur «{title}» — ouvrez la page des annonces" },
     en: { title: "💬 Reply to your comment", body: "Clinic «{clinic}» replied to your comment on «{title}» — open the ads page to read it" },
@@ -389,6 +506,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "💬 您的评论收到回复", body: "诊所「{clinic}」回复了您在「{title}」下的评论——请打开广告页面查看" },
   },
   test: {
+    es: { title: "Bienvenido a Tumaanina 💜", body: "Las notificaciones funcionan perfectamente — está en buenas manos" },
+    de: { title: "Willkommen bei Tumaanina 💜", body: "Benachrichtigungen funktionieren einwandfrei — Sie sind in guten Händen" },
+    it: { title: "Benvenuto su Tumaanina 💜", body: "Le notifiche funzionano perfettamente — sei in buone mani" },
     ar: { title: "مرحباً بك في طمأنينة 💜", body: "الإشعارات تعمل بنجاح — أنت في أيدٍ أمينة" },
     fr: { title: "Bienvenue sur Tumaanina 💜", body: "Les notifications fonctionnent — vous êtes entre de bonnes mains" },
     en: { title: "Welcome to Tumaanina 💜", body: "Notifications work perfectly — you're in good hands" },
@@ -397,6 +517,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "欢迎来到 Tumaanina 💜", body: "通知功能运行正常——您在值得信赖的陪伴中" },
   },  /* ═ v1.19.0: الدورات الأونلاين — إشعارات الحجز والتأكيد والرفض والإلغاء ═ */
   courseNewBooking: {
+    es: { title: "🎓 Nueva reserva de plaza en su curso", body: "El cliente {name} reservó una plaza en el curso «{course}» — confirme o rechace desde la pestaña Cursos de su panel" },
+    de: { title: "🎓 Neue Platzbuchung in Ihrem Kurs", body: "Der Kunde {name} hat einen Platz im Kurs «{course}» gebucht — bestätigen oder lehnen Sie über den Tab Kurse Ihres Panels ab" },
+    it: { title: "🎓 Nuova prenotazione di posto nel tuo corso", body: "Il cliente {name} ha prenotato un posto nel corso «{course}» — conferma o rifiuta dalla scheda Corsi del tuo pannello" },
     ar: { title: "🎓 حجز مقعد في دورتك", body: "العميل {name} حجز مقعداً في دورة «{course}» — راجع تبويب الدورات في لوحتك للتأكيد أو الرفض" },
     fr: { title: "🎓 Nouvelle inscription à votre cours", body: "Le client {name} a réservé une place dans «{course}» — confirmez ou refusez depuis l'onglet Cours de votre tableau" },
     en: { title: "🎓 New seat booking in your course", body: "Client {name} booked a seat in «{course}» — confirm or reject from the Courses tab in your dashboard" },
@@ -405,6 +528,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🎓 有客户报名您的课程", body: "客户 {name} 预订了「{course}」的席位——请在面板的“课程”标签中确认或拒绝" },
   },
   coursePending: {
+    es: { title: "🎓 Reserva de plaza recibida", body: "Su reserva en el curso «{course}» espera la confirmación de {name} — recibirá notificaciones de estado" },
+    de: { title: "🎓 Platzbuchung erhalten", body: "Ihr Platz im Kurs «{course}» wartet auf die Bestätigung von {name} — Statusbenachrichtigungen folgen" },
+    it: { title: "🎓 Prenotazione del posto ricevuta", body: "La tua prenotazione nel corso «{course}» attende la conferma di {name} — riceverai notifiche sullo stato" },
     ar: { title: "🎓 تم استلام حجز مقعدك", body: "حجزك في دورة «{course}» بانتظار تأكيد {name} — ستصلك إشعارات الحالة" },
     fr: { title: "🎓 Réservation reçue", body: "Votre place dans «{course}» attend la confirmation de {name} — vous serez notifié du statut" },
     en: { title: "🎓 Seat booking received", body: "Your booking in «{course}» is awaiting confirmation from {name} — status notifications will follow" },
@@ -413,6 +539,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "🎓 已收到您的席位预订", body: "您在「{course}」的预订正在等待 {name} 确认——后续会有状态通知" },
   },
   courseConfirmed: {
+    es: { title: "✅ Su plaza en el curso está confirmada", body: "El especialista {name} confirmó su plaza en el curso «{course}» — justo después del registro recibirá los detalles de acceso" },
+    de: { title: "✅ Ihr Platz ist bestätigt", body: "Die Fachkraft {name} hat Ihren Platz im Kurs «{course}» bestätigt — nach der Registrierung folgen die Zugangsdetails" },
+    it: { title: "✅ Il tuo posto nel corso è confermato", body: "Lo specialista {name} ha confermato il tuo posto nel corso «{course}» — subito dopo la registrazione riceverai i dettagli di accesso" },
     ar: { title: "✅ تم تأكيد مقعدك في الدورة", body: "الأخصائي {name} أكّد مقعدك في دورة «{course}» — مباشرة بعد التسجيل ستصلك تفاصيل الدخول" },
     fr: { title: "✅ Place confirmée", body: "{name} a confirmé votre place dans «{course}» — les détails d'accès vous seront envoyés" },
     en: { title: "✅ Your seat is confirmed", body: "{name} confirmed your seat in «{course}» — access details will follow after registration" },
@@ -421,6 +550,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "✅ 席位已确认", body: "{name} 已确认您在「{course}」的席位——注册后将发送参与详情" },
   },
   courseRejected: {
+    es: { title: "ℹ️ Sobre su reserva en el curso", body: "{name} declinó su reserva en el curso «{course}» — motivo: {reason}" },
+    de: { title: "ℹ️ Zu Ihrer Kursbuchung", body: "{name} hat Ihre Buchung im Kurs «{course}» abgelehnt — Grund: {reason}" },
+    it: { title: "ℹ️ Sulla tua prenotazione al corso", body: "{name} ha rifiutato la tua prenotazione al corso «{course}» — motivo: {reason}" },
     ar: { title: "ℹ️ بخصوص حجزك في الدورة", body: "{name} اعتذر عن حجزك في دورة «{course}» — السبب: {reason}" },
     fr: { title: "ℹ️ Concernant votre inscription", body: "{name} a décliné votre inscription à «{course}» — motif : {reason}" },
     en: { title: "ℹ️ About your course booking", body: "{name} declined your booking in «{course}» — reason: {reason}" },
@@ -429,6 +561,9 @@ export const TEXTS: Record<NotifKey, Record<NotifLang, { title: string; body: st
     zh: { title: "ℹ️ 关于您的课程预订", body: "{name} 拒绝了您在「{course}」的预订——原因：{reason}" },
   },
   courseCancelled: {
+    es: { title: "🎓 Cancelación de plaza en su curso", body: "El cliente {name} canceló su plaza en el curso «{course}» — las plazas restantes se actualizaron en su panel" },
+    de: { title: "🎓 Platz in Ihrem Kurs storniert", body: "Der Kunde {name} hat seinen Platz im Kurs «{course}» storniert — die freien Plätze wurden in Ihrem Panel aktualisiert" },
+    it: { title: "🎓 Posto annullato nel tuo corso", body: "Il cliente {name} ha annullato il suo posto nel corso «{course}» — i posti rimanenti sono stati aggiornati nel tuo pannello" },
     ar: { title: "🎓 إلغاء مقعد في دورتك", body: "العميل {name} ألغى مقعده في دورة «{course}» — تحدّث الأماكن المتبقية في لوحتك" },
     fr: { title: "🎓 Annulation d'une place", body: "Le client {name} a annulé sa place dans «{course}» — les places restantes ont été mises à jour" },
     en: { title: "🎓 Seat cancelled in your course", body: "Client {name} cancelled their seat in «{course}» — remaining seats updated in your dashboard" },

@@ -33,7 +33,7 @@ const UserSchema = new Schema(
     },
     /* v1.3.0: كل لغات المنصة الست — كان التعداد الثلاثي يُفشل تسجيل/حفظ حساب
        مستخدم واجهته التركية/الروسية/الصينية (خطأ تحقق صامت) */
-    language: { type: String, enum: ["ar", "fr", "en", "tr", "ru", "zh"], default: "ar" },
+    language: { type: String, enum: ["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"], default: "ar" },
     wilaya: { type: String, default: null },
     ageGroup: { type: String, default: null },
     /* الجنس — للعميلين: ذكر أو أنثى فقط (يُحدّد عند التسجيل) */
@@ -365,6 +365,9 @@ const UpliftQuoteSchema = new Schema(
     textTr: { type: String, default: null },
     textRu: { type: String, default: null },
     textZh: { type: String, default: null },
+    textEs: { type: String, default: null },
+    textDe: { type: String, default: null },
+    textIt: { type: String, default: null },
     author: { type: String, default: null }, /* مصدر العبارة: سورة/حديث/مثل/اسم صاحبها */
     /* religious | social | wisdom */
     category: { type: String, default: "wisdom" },

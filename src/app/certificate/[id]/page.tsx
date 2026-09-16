@@ -7,6 +7,9 @@ import { LogoMark } from "@/lib/logo";
 import { ar } from "@/lib/i18n/ar";
 import { fr } from "@/lib/i18n/fr";
 import { en } from "@/lib/i18n/en";
+import { es } from "@/lib/i18n/es";
+import { de } from "@/lib/i18n/de";
+import { it } from "@/lib/i18n/it";
 import type { AppLang } from "@/lib/constants";
 import { PrintButton } from "./print-button";
 import { formatYearMonth, formatDateYMD } from "@/lib/utils";
@@ -27,7 +30,7 @@ export const dynamic = "force-dynamic";
    أو الإدارة من تبويب الحسابات، ويجوز للأخصائي مشاركتها عمومياً. */
 
 type Dict = typeof ar;
-const DICTS: Partial<Record<AppLang, Dict>> = { ar, fr, en, tr: en, ru: en, zh: en };
+const DICTS: Partial<Record<AppLang, Dict>> = { ar, fr, en, tr: en, ru: en, zh: en, es, de, it };
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -37,7 +40,7 @@ interface Props {
 export default async function CertificatePage({ params, searchParams }: Props) {
   const { id } = await params;
   const { lang: langParam } = await searchParams;
-  const lang: AppLang = langParam === "fr" || langParam === "en" ? langParam : "ar";
+  const lang: AppLang = ["fr", "en", "es", "de", "it"].includes(langParam || "") ? (langParam as AppLang) : "ar";
   const t = DICTS[lang] ?? DICTS.ar!;
   const dir = lang === "ar" ? "rtl" : "ltr";
 

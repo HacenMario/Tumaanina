@@ -19,7 +19,7 @@ async function POST_impl(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const userId = typeof body.userId === "string" ? body.userId : "";
   const language = typeof body.language === "string" ? body.language : "";
-  if (!userId || !["ar", "fr", "en", "tr", "ru", "zh"].includes(language)) {
+  if (!userId || !["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"].includes(language)) {
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
   }
 

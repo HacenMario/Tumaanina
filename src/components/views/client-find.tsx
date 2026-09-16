@@ -314,7 +314,7 @@ export function ClientFindView() {
                         <span>·</span>
                         <span className="flex items-center gap-1">
                           <LangIcon className="h-3 w-3" />
-                          {c.languages.map((l) => (l === "ar" ? "ع" : l === "fr" ? "FR" : l === "en" ? "EN" : l === "tr" ? "TR" : l === "ru" ? "RU" : "中文")).join(" · ")}
+                          {c.languages.map((l) => (l === "ar" ? "ع" : l === "fr" ? "FR" : l === "en" ? "EN" : l === "tr" ? "TR" : l === "ru" ? "RU" : l === "zh" ? "中文" : l === "es" ? "ES" : l === "de" ? "DE" : "IT")).join(" · ")}
                         </span>
                       </div>
                     </div>

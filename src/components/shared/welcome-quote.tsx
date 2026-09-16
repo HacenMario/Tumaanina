@@ -24,6 +24,9 @@ interface Quote {
   textTr?: string | null;
   textRu?: string | null;
   textZh?: string | null;
+  textEs?: string | null;
+  textDe?: string | null;
+  textIt?: string | null;
   author?: string | null;
   category?: string;
 }
@@ -40,6 +43,11 @@ function textFor(q: Quote, lang: AppLang): string {
   if (lang === "tr") return q.textTr || q.textAr;
   if (lang === "ru") return q.textRu || q.textAr;
   if (lang === "zh") return q.textZh || q.textAr;
+  /* v1.22.0: الإسبانية/الألمانية/الإيطالية — تسقط إلى الإنجليزية ثم العربية
+     إن كان السجل قديماً بلا ترجمة (نفس فلسفة اللغات الست) */
+  if (lang === "es") return q.textEs || q.textEn || q.textAr;
+  if (lang === "de") return q.textDe || q.textEn || q.textAr;
+  if (lang === "it") return q.textIt || q.textEn || q.textAr;
   return q.textAr;
 }
 
@@ -101,7 +109,7 @@ export function WelcomeQuote() {
       if (cancelled) return;
       if (pool.length === 0) {
         /* مكتبة مدمجة مسبقاً: أبداً لا تظهر النافذة فارغة */
-        pool = (seedQuotes as { cat: string; ar: string; fr: string; en: string; tr?: string; ru?: string; zh?: string; au: string }[]).map((q, i) => ({
+        pool = (seedQuotes as { cat: string; ar: string; fr: string; en: string; tr?: string; ru?: string; zh?: string; es?: string; de?: string; it?: string; au: string }[]).map((q, i) => ({
           id: `seed-${i}`,
           textAr: q.ar,
           textFr: q.fr,
@@ -109,6 +117,9 @@ export function WelcomeQuote() {
           textTr: q.tr ?? null,
           textRu: q.ru ?? null,
           textZh: q.zh ?? null,
+          textEs: q.es ?? null,
+          textDe: q.de ?? null,
+          textIt: q.it ?? null,
           author: q.au,
           category: q.cat,
         }));

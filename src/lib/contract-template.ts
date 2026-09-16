@@ -9,7 +9,7 @@
  * وهيكل المستند يُترجم حسب اللغة المختارة عند الطباعة.
  */
 
-export const CONTRACT_LANGS = ["ar", "fr", "en", "tr", "ru", "zh"] as const;
+export const CONTRACT_LANGS = ["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"] as const;
 export type ContractLang = (typeof CONTRACT_LANGS)[number];
 
 export const CONTRACT_LANG_LABELS: Record<ContractLang, string> = {
@@ -19,6 +19,9 @@ export const CONTRACT_LANG_LABELS: Record<ContractLang, string> = {
   tr: "Türkçe",
   ru: "Русский",
   zh: "中文",
+  es: "Español",
+  de: "Deutsch",
+  it: "Italiano",
 };
 
 export interface ContractDocTexts {
@@ -176,6 +179,66 @@ export const CONTRACT_DOC_TEXTS: Record<ContractLang, ContractDocTexts> = {
       "本文件由 Tumaanina 平台电子生成 — 载有上述合同编号及双方登记的签名；任何对文本或编号的更改均使其无效。",
     awaiting: "等待签署",
     signedByBoth: "双方已签署",
+  },
+  es: {
+    title: "Contrato de consulta psicológica (acuerdo terapéutico)",
+    docNo: "N.º de contrato",
+    issuedOn: "Fecha de celebración",
+    intro: "El presente contrato se celebra electrónicamente a través de la plataforma Tumaanina con fecha {date} entre:",
+    party1: "Parte I (el especialista / terapeuta)",
+    party2: "Parte II (el cliente)",
+    clausesTitle: "Cláusulas del contrato",
+    declarationTitle: "Declaración y firmas de las partes",
+    declaration:
+      "Cada parte declara haber leído la totalidad de las cláusulas del presente contrato, haber comprendido sus condiciones y la política de confidencialidad y cancelación, y aceptarlas voluntariamente; la firma electrónica registrada en la plataforma Tumaanina constituye prueba vinculante entre las partes desde la fecha de su registro.",
+    signCounselor: "Firma del especialista (Parte I)",
+    signClient: "Firma del cliente (Parte II)",
+    dateLabel: "Fecha",
+    platform: "Plataforma Tumaanina",
+    footer:
+      "Documento emitido electrónicamente por la plataforma Tumaanina — lleva el número de contrato indicado arriba y las firmas registradas de ambas partes; cualquier alteración de su texto o número lo invalida.",
+    awaiting: "Pendiente de firma",
+    signedByBoth: "Firmado por ambas partes",
+  },
+  de: {
+    title: "Beratung zur psychologischen Sprechstunde (Therapeutische Vereinbarung)",
+    docNo: "Vertrags-Nr.",
+    issuedOn: "Datum des Vertragsschlusses",
+    intro: "Dieser Vertrag wird elektronisch über die Tumaanina-Plattform am {date} geschlossen zwischen:",
+    party1: "Partei I (die Fachkraft / der Therapeut)",
+    party2: "Partei II (der Kunde)",
+    clausesTitle: "Vertragsklauseln",
+    declarationTitle: "Erklärung und Unterschriften der Parteien",
+    declaration:
+      "Jede Partei erklärt, alle Klauseln dieses Vertrags gelesen, dessen Bedingungen sowie die Vertraulichkeits- und Stornierungsrichtlinie verstanden zu haben und diesen freiwillig zuzustimmen; die auf der Tumaanina-Plattform erfasste elektronische Unterschrift gilt ab ihrem Registrierungsdatum als bindender Nachweis zwischen den Parteien.",
+    signCounselor: "Unterschrift der Fachkraft (Partei I)",
+    signClient: "Unterschrift des Kunden (Partei II)",
+    dateLabel: "Datum",
+    platform: "Tumaanina-Plattform",
+    footer:
+      "Elektronisch von der Tumaanina-Plattform erstelltes Dokument — trägt die oben genannte Vertragsnummer und die erfassten Unterschriften beider Parteien; jede Änderung des Texts oder der Nummer macht es ungültig.",
+    awaiting: "Wartet auf Unterschrift",
+    signedByBoth: "Von beiden Parteien unterzeichnet",
+  },
+  it: {
+    title: "Contratto di consulenza psicologica (accordo terapeutico)",
+    docNo: "N.º del contratto",
+    issuedOn: "Data di stipula",
+    intro: "Il presente contratto è stipulato elettronicamente tramite la piattaforma Tumaanina in data {date} tra:",
+    party1: "Parte I (lo specialista / terapeuta)",
+    party2: "Parte II (il cliente)",
+    clausesTitle: "Clausole del contratto",
+    declarationTitle: "Dichiarazione e firme delle parti",
+    declaration:
+      "Ciascuna parte dichiara di aver letto l'intero delle clausole del presente contratto, di averne compreso le condizioni e la politica di riservatezza e annullamento, e di accettarle volontariamente; la firma elettronica registrata sulla piattaforma Tumaanina costituisce prova vincolante tra le parti dalla data del suo registrazione.",
+    signCounselor: "Firma dello specialista (Parte I)",
+    signClient: "Firma del cliente (Parte II)",
+    dateLabel: "Data",
+    platform: "Piattaforma Tumaanina",
+    footer:
+      "Documento emesso elettronicamente dalla piattaforma Tumaanina — riporta il numero di contratto indicato sopra e le firme registrate di entrambe le parti; qualsiasi alterazione del testo o del numero lo rende invalido.",
+    awaiting: "In attesa di firma",
+    signedByBoth: "Firmato da entrambe le parti",
   },
 };
 

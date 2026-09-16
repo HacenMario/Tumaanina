@@ -379,7 +379,7 @@ export function ClientStartView() {
                 <div className="space-y-1.5">
                   <span className="text-xs font-semibold text-muted-foreground">💬 {t.client.langPrefLabel}</span>
                   <div className="flex gap-2 flex-wrap">
-                    {(["ar", "fr", "en", "tr", "ru", "zh"] as const).map((l) => (
+                    {(["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"] as const).map((l) => (
                       <Button
                         key={l}
                         type="button"
@@ -388,14 +388,14 @@ export function ClientStartView() {
                         className={`rounded-full font-bold ${prefLang === l ? "gradient-primary text-white" : ""}`}
                         onClick={() => setPrefLang(l)}
                       >
-                        {l === "ar" ? "العربية" : l === "fr" ? "Français" : l === "en" ? "English" : l === "tr" ? "Türkçe" : l === "ru" ? "Русский" : "中文"}
+                        {l === "ar" ? "العربية" : l === "fr" ? "Français" : l === "en" ? "English" : l === "tr" ? "Türkçe" : l === "ru" ? "Русский" : l === "zh" ? "中文" : l === "es" ? "Español" : l === "de" ? "Deutsch" : "Italiano"}
                       </Button>
                     ))}
                   </div>
                 </div>
                 {prefLang !== lang && (
                   <Button variant="link" size="sm" className="p-0 h-auto text-primary" onClick={() => setLang(prefLang as never)}>
-                    {t.settings.languageLabel} → {prefLang === "ar" ? "العربية" : prefLang === "fr" ? "Français" : prefLang === "en" ? "English" : prefLang === "tr" ? "Türkçe" : prefLang === "ru" ? "Русский" : "中文"}
+                    {t.settings.languageLabel} → {prefLang === "ar" ? "العربية" : prefLang === "fr" ? "Français" : prefLang === "en" ? "English" : prefLang === "tr" ? "Türkçe" : prefLang === "ru" ? "Русский" : prefLang === "zh" ? "中文" : prefLang === "es" ? "Español" : prefLang === "de" ? "Deutsch" : "Italiano"}
                   </Button>
                 )}
               </div>

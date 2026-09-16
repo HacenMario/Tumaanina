@@ -120,7 +120,7 @@ export function ensurePushConfigured() {
   return true;
 }
 
-export type PushLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh";
+export type PushLang = "ar" | "fr" | "en" | "tr" | "ru" | "zh" | "es" | "de" | "it";
 
 export async function sendPushToUser(
   userId: string,

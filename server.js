@@ -165,7 +165,7 @@ async function userLanguage(userId) {
       { projection: { language: 1 } }
     );
     /* v1.0.0: اللغات الست كاملة — كانت tr/ru/zh تُسقط إلى العربية */
-    return u && ["ar", "fr", "en", "tr", "ru", "zh"].includes(u.language) ? u.language : "ar";
+    return u && ["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"].includes(u.language) ? u.language : "ar";
   } catch {
     return "ar";
   }

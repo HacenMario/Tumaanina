@@ -82,7 +82,7 @@ export const en: Dict = {
     trustAnon: "Protected identity",
     trustFree: "Clear, upfront pricing",
     trustVerified: "Verified professionals",
-    trustLanguages: "Arabic · French · English · Turkish · Russian · Chinese",
+    trustLanguages: "Arabic · French · English · Turkish · Russian · Chinese · Spanish · German · Italian",
     statsCounselors: "Verified counselors",
     statsVictims: "Registered clients",
     statsSessions: "Consultation sessions",

@@ -22,7 +22,7 @@ export async function displayNameOf(userId: string): Promise<string> {
 }
 
 /** لغة المستخدم من قاعدة البيانات (افتراضي: العربية) — v2.9.0: + تر/روسية/صينية */
-const NOTIF_LANGS: NotifLang[] = ["ar", "fr", "en", "tr", "ru", "zh"];
+const NOTIF_LANGS: NotifLang[] = ["ar", "fr", "en", "tr", "ru", "zh", "es", "de", "it"];
 async function langOf(userId: string): Promise<NotifLang> {
   try {
     const user = (await User.findById(userId).select("language").lean()) as { language?: string } | null;
@@ -118,7 +118,16 @@ export async function notifyNewMessage(
   const lang = await langOf(partnerUserId);
   const tpl = TEXTS.message[lang];
   const safeName = String(senderName || "").trim().slice(0, 60);
-  const fallbackName = lang === "ar" ? "الطرف الآخر" : lang === "fr" ? "l'autre partie" : "the other party";
+  const fallbackName =
+    lang === "ar" ? "الطرف الآخر"
+    : lang === "fr" ? "l'autre partie"
+    : lang === "tr" ? "sohbet ortağınız"
+    : lang === "ru" ? "ваш собеседник"
+    : lang === "zh" ? "聊天对象"
+    : lang === "es" ? "su interlocutor"
+    : lang === "de" ? "Ihr Gesprächspartner"
+    : lang === "it" ? "il suo interlocutore"
+    : "the other party";
   const title = tpl.title;
   const body = fill(tpl.body, {
     name: safeName || fallbackName,
@@ -179,6 +188,9 @@ export async function notifyDmMessage(
     : lang === "tr" ? "sohbet ortağınız"
     : lang === "ru" ? "ваш собеседник"
     : lang === "zh" ? "聊天对象"
+    : lang === "es" ? "su interlocutor"
+    : lang === "de" ? "Ihr Gesprächspartner"
+    : lang === "it" ? "il suo interlocutore"
     : "your chat partner";
   const title = tpl.title;
   const body = fill(tpl.body, { name: safeName || fallbackName, excerpt: excerpt.slice(0, 120) });
