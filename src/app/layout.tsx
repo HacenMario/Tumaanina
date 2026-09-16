@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "@/components/providers";
 import { PALETTE_BOOT_SCRIPT } from "@/lib/themes";
+import { Analytics } from "@vercel/analytics/next";
 
 const cairo = Cairo({
   variable: "--font-cairo",
@@ -83,6 +84,7 @@ export default function RootLayout({
           {children}
           <Toaster />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
