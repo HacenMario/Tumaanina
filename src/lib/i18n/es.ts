@@ -219,7 +219,7 @@ export const es: Dict = {
     bookingModeLabel: "¿Cómo prefieres consultar?",
     bookingDateLabel: "Fecha de la sesión",
     bookingSlotLabel: "Franja horaria preferida",
-    bookingSlotHint: "Las franjas van de 09:00 a 20:00 cada hora — la pausa del mediodía 12:00–13:00 queda excluida; las horas pasadas de hoy están desactivadas",
+    bookingSlotHint: "Las franjas van de 08:00 a 00:00 (medianoche) cada hora — la pausa del mediodía 12:00–13:00 queda excluida; las horas pasadas de hoy están desactivadas",
     bookingConfirm: "Confirmar reserva",
     bookingPastError: "Esta franja ya pasó — elige otra",
     bookingSuccess: "¡Reservado! El especialista responderá pronto — recibirás notificaciones instantáneas",

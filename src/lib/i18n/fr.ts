@@ -219,7 +219,7 @@ export const fr: Dict = {
     bookingModeLabel: "Comment préférez-vous consulter ?",
     bookingDateLabel: "Date de la séance",
     bookingSlotLabel: "Créneau souhaité",
-    bookingSlotHint: "Créneaux de 09:00 à 20:00 toutes les heures — pause déjeuner 12:00–13:00 exclue, créneaux passés du jour désactivés",
+    bookingSlotHint: "Créneaux de 08:00 à 00:00 (minuit) toutes les heures — pause déjeuner 12:00–13:00 exclue, créneaux passés du jour désactivés",
     bookingConfirm: "Confirmer la réservation",
     bookingPastError: "Ce créneau est déjà passé — veuillez en choisir un autre",
     bookingSuccess: "Réservé ! Le professionnel vous répondra sous peu — notifications activées",

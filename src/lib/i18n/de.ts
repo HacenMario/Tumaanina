@@ -219,7 +219,7 @@ export const de: Dict = {
     bookingModeLabel: "Wie möchten Sie beraten werden?",
     bookingDateLabel: "Sitzungsdatum",
     bookingSlotLabel: "Bevorzugter Zeitraum",
-    bookingSlotHint: "Zeiten laufen stündlich 09:00–20:00 — Mittagspause 12:00–13:00 ausgeschlossen; vergangene Zeiten von heute sind deaktiviert",
+    bookingSlotHint: "Zeiten laufen stündlich 08:00–00:00 (Mitternacht) — Mittagspause 12:00–13:00 ausgeschlossen; vergangene Zeiten von heute sind deaktiviert",
     bookingConfirm: "Buchung bestätigen",
     bookingPastError: "Dieser Zeitraum ist bereits vorbei — bitte wählen Sie einen anderen",
     bookingSuccess: "Gebucht! Die Fachkraft antwortet bald — Sie erhalten sofortige Benachrichtigungen",

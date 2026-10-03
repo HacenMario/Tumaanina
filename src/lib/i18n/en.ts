@@ -219,7 +219,7 @@ export const en: Dict = {
     bookingModeLabel: "How do you prefer to consult?",
     bookingDateLabel: "Session date",
     bookingSlotLabel: "Preferred time slot",
-    bookingSlotHint: "Slots run 09:00–20:00 hourly — lunch break 12:00–13:00 excluded; today's past slots are disabled",
+    bookingSlotHint: "Slots run 08:00 to 00:00 (midnight) hourly — lunch break 12:00–13:00 excluded; today's past slots are disabled",
     bookingConfirm: "Confirm booking",
     bookingPastError: "This slot has already passed — please choose another",
     bookingSuccess: "Booked! The counselor will respond soon — you'll get instant notifications",

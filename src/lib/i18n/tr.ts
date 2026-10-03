@@ -217,7 +217,7 @@ export const tr = {
     bookingModeLabel: "Danışmayı nasıl tercih edersiniz?",
     bookingDateLabel: "Seans tarihi",
     bookingSlotLabel: "Uygun randevu",
-    bookingSlotHint: "Randevular 09:00–20:00 arası her saat başıdır — kahvaltı saati 12:00–13:00 hariçtir, günün geçmiş randevuları kapalıdır",
+    bookingSlotHint: "Randevular 08:00–00:00 (gece yarısı) arası her saat başıdır — kahvaltı saati 12:00–13:00 hariçtir, günün geçmiş randevuları kapalıdır",
     bookingConfirm: "Rezervasyonu onayla",
     bookingPastError: "Bu randevu geçti — daha sonraki bir randevu seçin",
     bookingSuccess: "Rezerve edildi! Uzman yakında yanıt verecek ve anlık bildirimler alacaksınız",

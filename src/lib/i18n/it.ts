@@ -219,7 +219,7 @@ export const it: Dict = {
     bookingModeLabel: "Come preferisci consultarti?",
     bookingDateLabel: "Data della sessione",
     bookingSlotLabel: "Fascia oraria preferita",
-    bookingSlotHint: "Gli orari vanno dalle 09:00 alle 20:00 ogni ora — la pausa pranzo 12:00–13:00 è esclusa; gli orari passati di oggi sono disattivati",
+    bookingSlotHint: "Gli orari vanno dalle 08:00 alle 00:00 (mezzanotte) ogni ora — la pausa pranzo 12:00–13:00 è esclusa; gli orari passati di oggi sono disattivati",
     bookingConfirm: "Conferma prenotazione",
     bookingPastError: "Questa fascia è già passata — scegline un'altra",
     bookingSuccess: "Prenotato! Lo specialista risponderà presto — riceverai notifiche immediate",

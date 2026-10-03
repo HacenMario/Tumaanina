@@ -217,7 +217,7 @@ export const zh = {
     bookingModeLabel: "您偏好哪种咨询方式？",
     bookingDateLabel: "会话日期",
     bookingSlotLabel: "合适的时间",
-    bookingSlotHint: "时段为 09:00–20:00 每小时一次——12:00–13:00 早餐时间除外；今天已过的时段不可选",
+    bookingSlotHint: "时段为 08:00–00:00（午夜）每小时一次——12:00–13:00 早餐时间除外；今天已过的时段不可选",
     bookingConfirm: "确认预约",
     bookingPastError: "该时段已过——请选择更晚的时间",
     bookingSuccess: "预约成功！专家将很快回复，您会收到即时通知",
